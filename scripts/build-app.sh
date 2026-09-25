@@ -11,6 +11,15 @@ mkdir -p "$REPO_DIR/dist"
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 cp ".build/$BUILD_MODE/Jarvis" "$APP_DIR/Contents/MacOS/Jarvis"
 cp scripts/Info.plist "$APP_DIR/Contents/Info.plist"
+ICONSET="$STAGING_DIR/AppIcon.iconset"
+mkdir -p "$ICONSET"
+swift scripts/make-icon.swift "$STAGING_DIR/icon.png"
+for px in 16 32 128 256 512; do
+  sips -z $px $px "$STAGING_DIR/icon.png" --out "$ICONSET/icon_${px}x${px}.png" >/dev/null
+  sips -z $((px * 2)) $((px * 2)) "$STAGING_DIR/icon.png" --out "$ICONSET/icon_${px}x${px}@2x.png" >/dev/null
+done
+iconutil -c icns "$ICONSET" -o "$APP_DIR/Contents/Resources/AppIcon.icns"
+rm -rf "$ICONSET" "$STAGING_DIR/icon.png"
 python3 scripts/write-defaults.py "$REPO_DIR" "$APP_DIR/Contents/Resources/RuntimeDefaults.json"
 # Finder/iCloud metadata on development folders can make ad-hoc signing fail.
 xattr -cr "$APP_DIR"
