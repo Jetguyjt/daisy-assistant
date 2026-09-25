@@ -36,16 +36,14 @@ struct ReviewCard: View {
             }
         }
         .padding(14)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(HUD.amber.opacity(0.06)))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(HUD.amber.opacity(0.25), lineWidth: 1))
-        .overlay(CornerBrackets(radius: 12, length: 10).stroke(HUD.amber.opacity(0.8), style: StrokeStyle(lineWidth: 1.5, lineCap: .round)))
+        .hudPanel(tint: HUD.amber)
     }
 }
 
 struct ConnectionsView: View {
     @ObservedObject var model: AppModel
     var body: some View {
-        HUDPage {
+        HUDPage(kicker: "BROWSER LINK / " + (model.chromeConnected ? "CONNECTED" : "OFFLINE"), title: "Connections") {
             HStack(spacing: 12) {
                 Image(systemName: "globe").font(.system(size: 18)).foregroundStyle(HUD.cyan)
                 VStack(alignment: .leading, spacing: 3) {
@@ -80,7 +78,7 @@ struct ConnectionsView: View {
     private func step(_ number: Int, _ text: String) -> some View {
         HStack(spacing: 10) {
             Text("\(number)").font(HUD.readout(10)).foregroundStyle(HUD.cyan)
-                .frame(width: 20, height: 20).overlay(Circle().strokeBorder(HUD.cyan.opacity(0.4), lineWidth: 1))
+                .frame(width: 20, height: 20).overlay(Rectangle().strokeBorder(HUD.cyan.opacity(0.4), lineWidth: 1))
             Text(text).font(.system(size: 12.5)).foregroundStyle(HUD.ice.opacity(0.9))
         }
     }
@@ -93,7 +91,7 @@ struct TasksView: View {
     @State private var deleting: WorkItem?
     var filtered: [WorkItem] { model.tasks.filter { query.isEmpty || ($0.title + " " + $0.project + " " + $0.notes).localizedCaseInsensitiveContains(query) } }
     var body: some View {
-        HUDPage {
+        HUDPage(kicker: "TASK LOG / \(model.tasks.filter { $0.status != "done" }.count) OPEN", title: "Tasks") {
             HStack(spacing: 10) {
                 TextField("Search tasks, projects and notes", text: $query).hudField()
                 Button { editing = WorkItem(title: "") } label: { Label("Add task", systemImage: "plus") }
@@ -224,7 +222,7 @@ struct ApprovalCard: View {
                 Text(detail).font(looksLikeCode ? .system(size: 12, design: .monospaced) : .system(size: 14))
                     .foregroundStyle(HUD.ice.opacity(0.92)).textSelection(.enabled).lineLimit(14)
                     .padding(12).frame(maxWidth: .infinity, alignment: .leading)
-                    .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.black.opacity(0.3)))
+                    .background(Rectangle().fill(HUD.void.opacity(0.6)))
             }
             HStack(spacing: 10) {
                 Button("Cancel") { model.answer(request, allow: false) }.buttonStyle(HUDButtonStyle(kind: .ghost))
@@ -233,9 +231,7 @@ struct ApprovalCard: View {
         }
         .padding(16)
         .frame(maxWidth: 560, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(HUD.amber.opacity(0.07)))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(HUD.amber.opacity(0.3), lineWidth: 1))
-        .overlay(CornerBrackets(radius: 12, length: 10).stroke(HUD.amber.opacity(0.85), style: StrokeStyle(lineWidth: 1.5, lineCap: .round)))
+        .hudPanel(tint: HUD.amber)
     }
     /// The button says what will happen: Send, Delete, Run… or Allow.
     private var verb: String {

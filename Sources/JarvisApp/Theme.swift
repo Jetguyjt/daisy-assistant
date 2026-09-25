@@ -1,97 +1,100 @@
 import SwiftUI
 
-/// Palette and type for the HUD. Deep navy ground, cyan light, white text, amber and crimson
-/// only where something needs a decision or can be stopped.
+/// Palette and type for the HUD. Near-black ground, arc-reactor cyan, amber only for decisions,
+/// crimson only for stop and delete.
 enum HUD {
-    static let void = Color(red: 0.012, green: 0.027, blue: 0.059)
-    static let deep = Color(red: 0.027, green: 0.063, blue: 0.122)
-    static let panel = Color(red: 0.035, green: 0.090, blue: 0.170)
-    static let line = Color(red: 0.55, green: 0.85, blue: 1.0)
-    static let cyan = Color(red: 0.24, green: 0.89, blue: 1.0)
-    static let blue = Color(red: 0.25, green: 0.50, blue: 0.98)
-    static let ice = Color(red: 0.91, green: 0.96, blue: 1.0)
-    static let steel = Color(red: 0.62, green: 0.74, blue: 0.84)
-    static let dim = Color(red: 0.45, green: 0.58, blue: 0.69)
-    static let amber = Color(red: 1.0, green: 0.56, blue: 0.24)
-    static let crimson = Color(red: 1.0, green: 0.27, blue: 0.38)
+    static let void = Color(red: 0.024, green: 0.043, blue: 0.071)
+    static let deep = Color(red: 0.040, green: 0.067, blue: 0.098)
+    static let panel = Color(red: 0.067, green: 0.118, blue: 0.157)
+    static let line = Color(red: 0.36, green: 0.88, blue: 0.90)
+    static let cyan = Color(red: 0.36, green: 0.88, blue: 0.90)
+    static let blue = Color(red: 0.31, green: 0.55, blue: 0.95)
+    static let ice = Color(red: 0.86, green: 0.90, blue: 0.925)
+    static let steel = Color(red: 0.66, green: 0.74, blue: 0.79)
+    static let dim = Color(red: 0.49, green: 0.58, blue: 0.63)
+    static let amber = Color(red: 0.94, green: 0.68, blue: 0.27)
+    static let crimson = Color(red: 0.88, green: 0.27, blue: 0.24)
 
     /// Small tracked caps for readouts and field labels.
-    static func label(_ size: CGFloat = 9) -> Font { .system(size: size, weight: .semibold, design: .monospaced) }
+    static func label(_ size: CGFloat = 9) -> Font { .system(size: size, weight: .medium, design: .monospaced) }
     /// Numbers and live values.
     static func readout(_ size: CGFloat = 11) -> Font { .system(size: size, weight: .medium, design: .monospaced) }
-    static let wordmark = Font.system(size: 13, weight: .semibold).width(.expanded)
-    static let title = Font.system(size: 20, weight: .semibold).width(.expanded)
+    static let wordmark = Font.system(size: 13, weight: .bold, design: .monospaced)
+    static let title = Font.system(size: 22, weight: .semibold)
 }
 
-/// Window ground: navy with two soft light sources and a faint dot grid.
+/// Window ground: a 28pt line grid, a faint glow in the middle, scanlines and a vignette.
 struct HUDBackground: View {
     var body: some View {
         ZStack {
-            HUD.void
-            RadialGradient(colors: [HUD.blue.opacity(0.20), .clear], center: UnitPoint(x: 0.88, y: 1.0), startRadius: 0, endRadius: 760)
-            RadialGradient(colors: [HUD.cyan.opacity(0.09), .clear], center: UnitPoint(x: 0.18, y: 0.0), startRadius: 0, endRadius: 620)
             Canvas { context, size in
-                let step: CGFloat = 26
-                var dots = Path()
-                var y = step / 2
-                while y < size.height {
-                    var x = step / 2
-                    while x < size.width { dots.addEllipse(in: CGRect(x: x - 0.6, y: y - 0.6, width: 1.2, height: 1.2)); x += step }
-                    y += step
-                }
-                context.fill(dots, with: .color(HUD.line.opacity(0.07)))
+                let rect = CGRect(origin: .zero, size: size)
+                context.fill(Path(rect), with: .color(HUD.void))
+                context.fill(Path(rect), with: .radialGradient(Gradient(colors: [HUD.cyan.opacity(0.045), .clear]),
+                                                               center: CGPoint(x: size.width / 2, y: size.height / 2),
+                                                               startRadius: 0, endRadius: max(size.width, size.height) * 0.62))
+                var grid = Path()
+                for x in stride(from: 0, through: size.width, by: 28) { grid.move(to: CGPoint(x: x, y: 0)); grid.addLine(to: CGPoint(x: x, y: size.height)) }
+                for y in stride(from: 0, through: size.height, by: 28) { grid.move(to: CGPoint(x: 0, y: y)); grid.addLine(to: CGPoint(x: size.width, y: y)) }
+                context.stroke(grid, with: .color(HUD.line.opacity(0.05)), lineWidth: 1)
+                var scan = Path()
+                for y in stride(from: 3, through: size.height, by: 4) { scan.addRect(CGRect(x: 0, y: y, width: size.width, height: 1)) }
+                context.fill(scan, with: .color(.white.opacity(0.012)))
+            }
+            GeometryReader { geo in
+                RadialGradient(colors: [.clear, .black.opacity(0.45)], center: .center,
+                               startRadius: min(geo.size.width, geo.size.height) * 0.45,
+                               endRadius: max(geo.size.width, geo.size.height) * 0.8)
             }
         }
         .ignoresSafeArea()
+        .allowsHitTesting(false)
     }
 }
 
-/// Short strokes that hug a rounded rectangle's four corners.
+/// Panel outline with the top-right and bottom-left corners cut off.
+struct Chamfer: Shape {
+    var cut: CGFloat = 12
+    func path(in r: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: r.minX, y: r.minY))
+        p.addLine(to: CGPoint(x: r.maxX - cut, y: r.minY))
+        p.addLine(to: CGPoint(x: r.maxX, y: r.minY + cut))
+        p.addLine(to: CGPoint(x: r.maxX, y: r.maxY))
+        p.addLine(to: CGPoint(x: r.minX + cut, y: r.maxY))
+        p.addLine(to: CGPoint(x: r.minX, y: r.maxY - cut))
+        p.closeSubpath()
+        return p
+    }
+}
+
+/// L-shaped brackets on the top-left and bottom-right corners, the two that aren't cut.
 struct CornerBrackets: Shape {
-    var radius: CGFloat
+    var radius: CGFloat = 0
     var length: CGFloat = 12
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let r = min(radius, min(rect.width, rect.height) / 2), l = length
-        path.move(to: CGPoint(x: rect.minX, y: rect.minY + r + l))
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + r))
-        path.addArc(center: CGPoint(x: rect.minX + r, y: rect.minY + r), radius: r, startAngle: .degrees(180), endAngle: .degrees(270), clockwise: false)
-        path.addLine(to: CGPoint(x: rect.minX + r + l, y: rect.minY))
-        path.move(to: CGPoint(x: rect.maxX - r - l, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX - r, y: rect.minY))
-        path.addArc(center: CGPoint(x: rect.maxX - r, y: rect.minY + r), radius: r, startAngle: .degrees(270), endAngle: .degrees(360), clockwise: false)
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + r + l))
-        path.move(to: CGPoint(x: rect.maxX, y: rect.maxY - r - l))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - r))
-        path.addArc(center: CGPoint(x: rect.maxX - r, y: rect.maxY - r), radius: r, startAngle: .degrees(0), endAngle: .degrees(90), clockwise: false)
-        path.addLine(to: CGPoint(x: rect.maxX - r - l, y: rect.maxY))
-        path.move(to: CGPoint(x: rect.minX + r + l, y: rect.maxY))
-        path.addLine(to: CGPoint(x: rect.minX + r, y: rect.maxY))
-        path.addArc(center: CGPoint(x: rect.minX + r, y: rect.maxY - r), radius: r, startAngle: .degrees(90), endAngle: .degrees(180), clockwise: false)
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - r - l))
-        return path
+    func path(in r: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: r.minX, y: r.minY + length))
+        p.addLine(to: CGPoint(x: r.minX, y: r.minY))
+        p.addLine(to: CGPoint(x: r.minX + length, y: r.minY))
+        p.move(to: CGPoint(x: r.maxX - length, y: r.maxY))
+        p.addLine(to: CGPoint(x: r.maxX, y: r.maxY))
+        p.addLine(to: CGPoint(x: r.maxX, y: r.maxY - length))
+        return p
     }
 }
 
-/// Frosted glass over the window ground, a hairline edge, and lit corners.
+/// Flat gradient plate with a cut outline and lit brackets.
 struct HUDPanel: ViewModifier {
     var radius: CGFloat = 14
     var tint: Color = HUD.cyan
     var brackets = true
     func body(content: Content) -> some View {
-        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
         content
-            .background {
-                shape.fill(.ultraThinMaterial)
-                    .overlay(shape.fill(HUD.panel.opacity(0.62)))
-                    .shadow(color: .black.opacity(0.4), radius: 16, y: 10)
-            }
-            .overlay {
-                shape.strokeBorder(LinearGradient(colors: [HUD.line.opacity(0.24), HUD.line.opacity(0.06)], startPoint: .top, endPoint: .bottom), lineWidth: 1)
-            }
-            .overlay {
-                if brackets { CornerBrackets(radius: radius).stroke(tint.opacity(0.75), style: StrokeStyle(lineWidth: 1.5, lineCap: .round)) }
-            }
+            .background(LinearGradient(colors: [HUD.panel.opacity(0.65), HUD.deep.opacity(0.9)],
+                                       startPoint: .topLeading, endPoint: .bottomTrailing), in: Chamfer())
+            .overlay { Chamfer().stroke(tint.opacity(0.28), lineWidth: 1) }
+            .overlay { if brackets { CornerBrackets().stroke(tint, lineWidth: 2) } }
     }
 }
 
@@ -101,12 +104,12 @@ extension View {
     }
     /// Section caption: small tracked caps.
     func hudCaption(_ color: Color = HUD.dim) -> some View {
-        font(HUD.label(9)).tracking(1.6).foregroundStyle(color)
+        font(HUD.label(10)).tracking(1.6).foregroundStyle(color)
     }
 }
 
 /// Buttons: primary is lit cyan, critical is amber (approve, send), danger is crimson (stop,
-/// delete), ghost is an outline for everything else.
+/// delete), ghost is an outline for everything else. Square, monospace caps.
 struct HUDButtonStyle: ButtonStyle {
     enum Kind { case primary, critical, danger, ghost }
     var kind: Kind = .ghost
@@ -125,19 +128,18 @@ private struct HUDButtonBody: View {
     var body: some View {
         let color: Color = kind == .critical ? HUD.amber : kind == .danger ? HUD.crimson : HUD.cyan
         let filled = kind != .ghost
-        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
         configuration.label
-            .font(.system(size: compact ? 11 : 12, weight: .semibold))
+            .font(.system(size: compact ? 10 : 11, weight: .semibold, design: .monospaced))
+            .tracking(1.1).textCase(.uppercase)
             .labelStyle(.titleAndIcon)
             .padding(.horizontal, compact ? 10 : 14)
             .frame(minHeight: compact ? 26 : 32)
             .foregroundStyle(filled ? HUD.void : color)
-            .background(shape.fill(filled ? color.opacity(hovering ? 1 : 0.88) : color.opacity(hovering ? 0.16 : 0.07)))
-            .overlay(shape.strokeBorder(color.opacity(filled ? 0 : (hovering ? 0.7 : 0.4)), lineWidth: 1))
-            .shadow(color: filled ? color.opacity(hovering ? 0.55 : 0.3) : .clear, radius: hovering ? 12 : 7, y: 2)
+            .background(Rectangle().fill(filled ? color.opacity(hovering ? 1 : 0.9) : color.opacity(hovering ? 0.14 : 0.04)))
+            .overlay(Rectangle().strokeBorder(color.opacity(filled ? 0 : (hovering ? 0.7 : 0.35)), lineWidth: 1))
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .opacity(enabled ? 1 : 0.4)
-            .contentShape(shape)
+            .contentShape(Rectangle())
             .onHover { hovering = $0 && enabled }
             .animation(.easeOut(duration: 0.14), value: hovering)
             .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
@@ -151,8 +153,8 @@ extension View {
             .font(.system(size: 13))
             .foregroundStyle(HUD.ice)
             .padding(.horizontal, 12).frame(minHeight: 34)
-            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.black.opacity(0.28)))
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(HUD.line.opacity(0.2), lineWidth: 1))
+            .background(Rectangle().fill(HUD.void.opacity(0.7)))
+            .overlay(Rectangle().strokeBorder(HUD.line.opacity(0.2), lineWidth: 1))
     }
 }
 
@@ -165,17 +167,16 @@ struct HUDSwitch: View {
     @State private var hovering = false
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 9) {
-                ZStack(alignment: isOn ? .trailing : .leading) {
-                    Capsule().fill(isOn ? HUD.cyan.opacity(0.28) : Color.white.opacity(0.06))
-                        .overlay(Capsule().strokeBorder(isOn ? HUD.cyan.opacity(0.8) : HUD.dim.opacity(hovering ? 0.8 : 0.5), lineWidth: 1))
-                        .frame(width: 34, height: 19)
-                    Circle().fill(isOn ? HUD.ice : HUD.dim).frame(width: 13, height: 13).padding(3)
-                        .shadow(color: isOn ? HUD.cyan : .clear, radius: 6)
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title).font(HUD.label(10)).tracking(1.6).foregroundStyle(isOn ? HUD.cyan : HUD.steel)
+                    Text(detail ?? (isOn ? "ON" : "OFF")).font(.system(size: 10)).foregroundStyle(HUD.dim)
                 }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(HUD.label(8.5)).tracking(1.2).foregroundStyle(isOn ? HUD.ice : HUD.steel)
-                    Text(detail ?? (isOn ? "ON" : "OFF")).font(HUD.label(8.5)).tracking(1.2).foregroundStyle(isOn ? HUD.cyan : HUD.dim)
+                ZStack(alignment: isOn ? .trailing : .leading) {
+                    Capsule().fill(isOn ? HUD.cyan.opacity(0.85) : Color.white.opacity(0.08))
+                        .overlay(Capsule().strokeBorder(isOn ? .clear : HUD.dim.opacity(hovering ? 0.8 : 0.5), lineWidth: 1))
+                        .frame(width: 34, height: 19)
+                    Circle().fill(isOn ? HUD.void : HUD.dim).frame(width: 13, height: 13).padding(3)
                 }
             }
             .contentShape(Rectangle())
@@ -189,20 +190,20 @@ struct HUDSwitch: View {
     }
 }
 
-/// A dot and a caption, for link and microphone state in the top bar.
+/// A square dot and a caption, for link and microphone state in the top bar.
 struct StatusPill: View {
     let text: String
     let color: Color
     var lit = true
     var body: some View {
         HStack(spacing: 7) {
-            Circle().fill(color).frame(width: 6, height: 6).shadow(color: lit ? color : .clear, radius: 4)
-            Text(text).font(HUD.label(9)).tracking(1.3).foregroundStyle(lit ? HUD.ice.opacity(0.9) : HUD.dim)
+            Rectangle().fill(color).frame(width: 6, height: 6)
+            Text(text).font(HUD.label(10)).tracking(1.5).foregroundStyle(lit ? color : HUD.dim)
                 .lineLimit(1)
         }
-        .padding(.horizontal, 11).frame(height: 26)
-        .background(Capsule().fill(Color.black.opacity(0.25)))
-        .overlay(Capsule().strokeBorder(color.opacity(lit ? 0.35 : 0.18), lineWidth: 1))
+        .padding(.horizontal, 10).frame(height: 26)
+        .background(Rectangle().fill(color.opacity(lit ? 0.05 : 0.02)))
+        .overlay(Rectangle().strokeBorder(color.opacity(lit ? 0.3 : 0.15), lineWidth: 1))
     }
 }
 
@@ -212,10 +213,10 @@ struct LevelBars: View {
     var bars = 12
     var color: Color = HUD.cyan
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(alignment: .bottom, spacing: 2) {
             ForEach(0..<bars, id: \.self) { index in
                 let lit = Double(index) / Double(bars) < level
-                RoundedRectangle(cornerRadius: 1).fill(lit ? color : color.opacity(0.15))
+                Rectangle().fill(lit ? color : color.opacity(0.15))
                     .frame(width: 3, height: 5 + CGFloat(index % 4) * 2)
             }
         }

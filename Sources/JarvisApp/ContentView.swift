@@ -5,6 +5,7 @@ struct ContentView: View {
     @ObservedObject var model: AppModel
     @FocusState private var inputFocused: Bool
     @Namespace private var orbSpace
+    @AppStorage("telemetryCollapsed") private var telemetryCollapsed = false
 
     private static let tabs: [(id: String, label: String, symbol: String)] = [
         ("Assistant", "JARVIS", "circle.hexagongrid"), ("Tasks", "TASKS", "checklist"),
@@ -19,6 +20,7 @@ struct ContentView: View {
                 rail
                 VStack(spacing: 0) {
                     topBar
+                    Rectangle().fill(HUD.line.opacity(0.2)).frame(height: 1).padding(.bottom, 14)
                     Group {
                         switch model.tab {
                         case "Memory": MemoryView(model: model)
@@ -41,35 +43,53 @@ struct ContentView: View {
     // MARK: Frame
 
     private var rail: some View {
-        VStack(spacing: 4) {
-            Color.clear.frame(height: 40)
+        VStack(spacing: 8) {
+            Button { model.tab = "Assistant" } label: {
+                VStack(spacing: 3) {
+                    Text("J").font(.system(size: 14, weight: .bold, design: .monospaced)).foregroundStyle(HUD.cyan)
+                    Text("JARVIS").font(HUD.label(7)).tracking(1.4).foregroundStyle(HUD.dim)
+                }
+            }
+            .buttonStyle(.plain).padding(.top, 34).padding(.bottom, 20)
+            .accessibilityLabel("Assistant")
             ForEach(Self.tabs, id: \.id) { tab in
                 RailButton(label: tab.label, symbol: tab.symbol, selected: model.tab == tab.id,
                            badge: tab.id == "Memory" && !model.memories.isEmpty ? "\(model.memories.count)" : nil) { model.tab = tab.id }
             }
             Spacer()
+            Text("V0.4").font(HUD.label(9)).tracking(1.4).foregroundStyle(HUD.dim).padding(.bottom, 20)
         }
         .frame(width: 76)
-        .background(HUD.void.opacity(0.6))
-        .overlay(alignment: .trailing) { Rectangle().fill(HUD.line.opacity(0.1)).frame(width: 1) }
+        .background(HUD.deep.opacity(0.9))
+        .overlay(alignment: .trailing) { Rectangle().fill(HUD.line.opacity(0.2)).frame(width: 1) }
     }
 
     private var topBar: some View {
-        HStack(spacing: 10) {
-            Text("JARVIS").font(HUD.wordmark).tracking(5).foregroundStyle(HUD.ice)
-            Text("/").font(HUD.label(11)).foregroundStyle(HUD.dim)
-            Text(sectionLabel).font(HUD.label(10)).tracking(2).foregroundStyle(HUD.steel)
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(model.tab == "Assistant" ? "ACTIVE SESSION" : "WORKSPACE / " + sectionLabel).font(HUD.label(10)).tracking(1.6).foregroundStyle(HUD.dim)
+                Text(sessionTitle).font(.system(size: 13, weight: .medium)).foregroundStyle(HUD.ice).lineLimit(1)
+            }
             Spacer()
             StatusPill(text: linkText, color: linkColor, lit: model.connected)
             MicPill(audio: model.audio, phase: model.phase, standby: model.standby)
-            Button { model.clearConversation() } label: { Image(systemName: "plus.bubble") }
+            Button { model.clearConversation() } label: { Label("New conversation", systemImage: "plus.circle") }
                 .buttonStyle(HUDButtonStyle(kind: .ghost, compact: true))
                 .help("New conversation (⌘N)")
-                .accessibilityLabel("New conversation")
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                Text(context.date, format: .dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits).second(.twoDigits))
+                    .font(HUD.readout(12)).foregroundStyle(HUD.cyan).monospacedDigit()
+            }
+            .frame(width: 70, alignment: .trailing)
         }
-        .padding(.leading, 20).padding(.trailing, 18).frame(height: 54)
+        .padding(.leading, 20).padding(.trailing, 18).padding(.top, 22).frame(height: 70)
     }
 
+    private var sessionTitle: String {
+        guard model.tab == "Assistant" else { return model.tab }
+        guard let first = model.messages.first(where: { $0.role == "user" })?.text else { return "New session" }
+        return first.count > 60 ? String(first.prefix(60)) + "…" : first
+    }
     private var sectionLabel: String {
         model.tab == "Assistant" ? "ASSISTANT" : Self.tabs.first { $0.id == model.tab }?.label ?? ""
     }
@@ -103,7 +123,18 @@ struct ContentView: View {
                 if conversationEmpty { hero } else { transcript }
                 composer
             }
-            corePanel.frame(width: 264)
+            if telemetryCollapsed {
+                VStack(spacing: 22) {
+                    Button { telemetryCollapsed = false } label: { Image(systemName: "chevron.left") }
+                        .buttonStyle(.plain).foregroundStyle(HUD.dim).help("Show telemetry")
+                    Text("TELEMETRY").font(HUD.label(9)).tracking(1.6).foregroundStyle(HUD.dim)
+                        .fixedSize().rotationEffect(.degrees(90)).frame(width: 20, height: 90)
+                    Spacer()
+                }
+                .padding(.top, 14).frame(width: 36).frame(maxHeight: .infinity).hudPanel(brackets: false)
+            } else {
+                corePanel.frame(width: 264)
+            }
         }
         .padding(.horizontal, 16).padding(.bottom, 16)
         .animation(.spring(response: 0.55, dampingFraction: 0.86), value: conversationEmpty)
@@ -165,7 +196,7 @@ struct ContentView: View {
     private var hero: some View {
         VStack(spacing: 22) {
             Spacer(minLength: 0)
-            orb(setupShowing ? 220 : 300)
+            orb(setupShowing ? 220 : 260)
             phaseReadout(large: true)
             if setupShowing {
                 SetupPanel(model: model)
@@ -223,21 +254,26 @@ struct ContentView: View {
                         .accessibilityLabel("Dismiss")
                 }
                 .font(.system(size: 11.5)).padding(.horizontal, 12).padding(.vertical, 9)
-                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(HUD.amber.opacity(0.08)))
-                .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(HUD.amber.opacity(0.3), lineWidth: 1))
+                .background(Rectangle().fill(HUD.amber.opacity(0.06)))
+                .overlay(Rectangle().strokeBorder(HUD.amber.opacity(0.3), lineWidth: 1))
             }
-            HStack(spacing: 12) {
+            HStack(spacing: 14) {
+                HStack(spacing: 10) {
+                    if model.phase == .listening || model.phase == .preparing {
+                        ListeningStrip(audio: model.audio, preparing: model.phase == .preparing)
+                    } else { inputField }
+                    talkButton
+                    if model.busy && model.phase != .listening && model.phase != .preparing { stopButton } else { sendButton }
+                }
+                .padding(.leading, 12).padding(.trailing, 6).padding(.vertical, 6)
+                .background(Rectangle().fill(HUD.void.opacity(0.7)))
+                .overlay(Rectangle().strokeBorder(inputFocused ? HUD.cyan.opacity(0.5) : HUD.line.opacity(0.2), lineWidth: 1))
                 HUDSwitch(title: "ALWAYS LISTENING", isOn: model.alwaysListening,
-                          detail: model.alwaysListening ? (model.standby ? "HEY JARVIS" : "ON") : "OFF") {
+                          detail: model.alwaysListening ? (model.standby ? "Say “Hey Jarvis”" : "Arming mic…") : "Mic off between turns") {
                     model.setAlwaysListening(!model.alwaysListening)
                 }
                 .help("Keep the mic open for “Hey Jarvis” (⌘⇧L)")
-                Rectangle().fill(HUD.line.opacity(0.14)).frame(width: 1, height: 28)
-                if model.phase == .listening || model.phase == .preparing {
-                    ListeningStrip(audio: model.audio, preparing: model.phase == .preparing)
-                } else { inputField }
-                talkButton
-                if model.busy && model.phase != .listening && model.phase != .preparing { stopButton } else { sendButton }
+                .frame(width: 200, alignment: .trailing)
             }
             .padding(.horizontal, 14).padding(.vertical, 10)
             .hudPanel(radius: 14, brackets: false)
@@ -263,9 +299,7 @@ struct ContentView: View {
                 .font(.system(size: 13, weight: .semibold))
                 .frame(width: 34, height: 34)
                 .foregroundStyle(live ? HUD.void : HUD.cyan)
-                .background(Circle().fill(live ? HUD.crimson : HUD.cyan.opacity(0.1)))
-                .overlay(Circle().strokeBorder(live ? .clear : HUD.cyan.opacity(0.45), lineWidth: 1))
-                .shadow(color: live ? HUD.crimson.opacity(0.7) : .clear, radius: 8)
+                .background(Rectangle().fill(live ? HUD.crimson : HUD.cyan.opacity(0.08)))
         }
         .buttonStyle(.plain)
         .help(live ? "Finish and send (⌘⇧Space)" : "Talk (⌘⇧Space)")
@@ -279,8 +313,7 @@ struct ContentView: View {
                 .font(.system(size: 13, weight: .bold))
                 .frame(width: 34, height: 34)
                 .foregroundStyle(HUD.void)
-                .background(Circle().fill(HUD.cyan.opacity(empty ? 0.35 : 1)))
-                .shadow(color: empty ? .clear : HUD.cyan.opacity(0.6), radius: 8)
+                .background(Rectangle().fill(HUD.cyan.opacity(empty ? 0.35 : 1)))
         }
         .buttonStyle(.plain).disabled(empty)
         .help("Send (Return)")
@@ -293,8 +326,7 @@ struct ContentView: View {
                 .font(.system(size: 12, weight: .bold))
                 .frame(width: 34, height: 34)
                 .foregroundStyle(HUD.void)
-                .background(Circle().fill(HUD.crimson))
-                .shadow(color: HUD.crimson.opacity(0.7), radius: 8)
+                .background(Rectangle().fill(HUD.crimson))
         }
         .buttonStyle(.plain)
         .help("Stop (⌘.)")
@@ -313,6 +345,13 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity).padding(.top, 16).padding(.bottom, 14)
                 rule
             }
+            HStack {
+                Text("SYSTEM TELEMETRY").hudCaption(HUD.cyan)
+                Spacer()
+                Button { telemetryCollapsed = true } label: { Image(systemName: "chevron.right") }
+                    .buttonStyle(.plain).foregroundStyle(HUD.dim).help("Hide telemetry")
+            }
+            .padding(.horizontal, 16).padding(.top, 16).padding(.bottom, 4)
             VStack(alignment: .leading, spacing: 10) {
                 Text("ACTIVITY").hudCaption()
                 if model.activity.isEmpty {
@@ -323,8 +362,7 @@ struct ContentView: View {
             }
             .padding(16)
             rule
-            VStack(alignment: .leading, spacing: 11) {
-                Text("SYSTEMS").hudCaption()
+            VStack(alignment: .leading, spacing: 12) {
                 readout("LINK", model.agentLink.isReady ? (model.agentDetail ?? model.linkLabel) : linkText.capitalized, color: model.agentLink.isReady ? HUD.ice : linkColor)
                 readout("REPLY", replyText)
                 MicReadout(audio: model.audio)
@@ -354,9 +392,11 @@ struct ContentView: View {
     }
 
     private func readout(_ label: String, _ value: String, color: Color = HUD.ice, action: (() -> Void)? = nil) -> some View {
-        HStack(spacing: 8) {
-            Text(label).font(HUD.label(9)).tracking(1.4).foregroundStyle(HUD.dim).frame(width: 58, alignment: .leading)
-            Text(value).font(HUD.readout(11)).foregroundStyle(color).lineLimit(1).truncationMode(.middle)
+        HStack(alignment: .bottom, spacing: 8) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(label).font(HUD.label(10)).tracking(1.6).foregroundStyle(HUD.dim)
+                Text(value).font(.system(size: 12)).foregroundStyle(color).lineLimit(1).truncationMode(.middle)
+            }
             Spacer(minLength: 0)
             if let action {
                 Button(action: action) { Image(systemName: "chevron.right").font(.system(size: 9, weight: .bold)) }
@@ -364,6 +404,8 @@ struct ContentView: View {
                     .accessibilityLabel("Open \(label.lowercased())")
             }
         }
+        .padding(.bottom, 8)
+        .overlay(alignment: .bottom) { Rectangle().fill(HUD.line.opacity(0.12)).frame(height: 1) }
     }
 }
 
@@ -384,13 +426,16 @@ private struct MicPill: View {
 private struct MicReadout: View {
     @ObservedObject var audio: AudioController
     var body: some View {
-        HStack(spacing: 8) {
-            Text("MIC").font(HUD.label(9)).tracking(1.4).foregroundStyle(HUD.dim).frame(width: 58, alignment: .leading)
-            if audio.engineRunning { LevelBars(level: audio.level, bars: 10) } else {
-                Text("Off").font(HUD.readout(11)).foregroundStyle(HUD.steel)
+        VStack(alignment: .leading, spacing: 4) {
+            Text("MIC INPUT").font(HUD.label(10)).tracking(1.6).foregroundStyle(HUD.dim)
+            HStack(spacing: 8) {
+                Text(audio.inputDeviceName).font(.system(size: 12)).foregroundStyle(audio.engineRunning ? HUD.ice : HUD.steel).lineLimit(1)
+                Spacer(minLength: 0)
+                if audio.engineRunning { LevelBars(level: audio.level, bars: 10) }
             }
-            Spacer(minLength: 0)
         }
+        .padding(.bottom, 8)
+        .overlay(alignment: .bottom) { Rectangle().fill(HUD.line.opacity(0.12)).frame(height: 1) }
     }
 }
 
@@ -419,26 +464,23 @@ private struct RailButton: View {
     @State private var hovering = false
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 5) {
-                Image(systemName: symbol).font(.system(size: 16, weight: selected ? .semibold : .regular))
-                    .shadow(color: selected ? HUD.cyan.opacity(0.8) : .clear, radius: 6)
-                Text(label).font(HUD.label(7.5)).tracking(1.1)
-            }
-            .foregroundStyle(selected ? HUD.cyan : hovering ? HUD.ice : HUD.dim)
-            .frame(width: 60, height: 54)
-            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(selected ? HUD.cyan.opacity(0.1) : hovering ? Color.white.opacity(0.04) : .clear))
-            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(selected ? HUD.cyan.opacity(0.35) : .clear, lineWidth: 1))
-            .overlay(alignment: .topTrailing) {
-                if let badge {
-                    Text(badge).font(HUD.label(8)).foregroundStyle(HUD.void)
-                        .padding(.horizontal, 4).frame(minWidth: 15, minHeight: 15)
-                        .background(Capsule().fill(HUD.cyan)).offset(x: 2, y: -2)
+            Image(systemName: symbol).font(.system(size: 15, weight: selected ? .semibold : .regular))
+                .foregroundStyle(selected ? HUD.cyan : hovering ? HUD.ice : HUD.dim)
+                .frame(width: 40, height: 40)
+                .background(Rectangle().fill(selected ? HUD.cyan.opacity(0.1) : hovering ? Color.white.opacity(0.04) : .clear))
+                .overlay(alignment: .topTrailing) {
+                    if let badge {
+                        Text(badge).font(HUD.label(8)).foregroundStyle(HUD.void)
+                            .padding(.horizontal, 3).frame(minWidth: 14, minHeight: 14)
+                            .background(Rectangle().fill(HUD.cyan)).offset(x: 3, y: -3)
+                    }
                 }
-            }
-            .contentShape(Rectangle())
+                .overlay(alignment: .leading) { if selected { Rectangle().fill(HUD.cyan).frame(width: 1, height: 20).offset(x: -18) } }
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
+        .help(label.capitalized)
         .accessibilityLabel(label.capitalized)
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
@@ -495,8 +537,8 @@ private struct LiveReply: View {
 
 private func speaker(_ name: String, color: Color, detail: String? = nil) -> some View {
     HStack(spacing: 7) {
-        Circle().fill(color).frame(width: 5, height: 5).shadow(color: color, radius: 3)
-        Text(name).font(HUD.label(9)).tracking(1.8).foregroundStyle(color)
+        Rectangle().fill(color).frame(width: 5, height: 5)
+        Text(name).font(HUD.label(10)).tracking(1.6).foregroundStyle(color)
         if let detail { Text(detail).font(HUD.readout(9)).foregroundStyle(HUD.dim).lineLimit(1) }
     }
 }
@@ -518,15 +560,13 @@ private struct MessageView: View {
     }
 
     private var user: some View {
-        HStack {
-            Spacer(minLength: 80)
-            VStack(alignment: .trailing, spacing: 7) {
-                Text("YOU").font(HUD.label(9)).tracking(1.8).foregroundStyle(HUD.dim)
-                Text(item.text).font(.system(size: 14)).lineSpacing(4).foregroundStyle(HUD.ice).textSelection(.enabled)
-                    .padding(.horizontal, 14).padding(.vertical, 10)
-                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(HUD.cyan.opacity(0.09)))
-                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(HUD.cyan.opacity(0.22), lineWidth: 1))
-            }
+        VStack(alignment: .leading, spacing: 7) {
+            Text("YOU").font(HUD.label(10)).tracking(1.6).foregroundStyle(HUD.dim)
+            Text(item.text).font(.system(size: 14)).lineSpacing(4).foregroundStyle(HUD.ice).textSelection(.enabled)
+                .padding(.horizontal, 12).padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Rectangle().fill(HUD.cyan.opacity(0.06)))
+                .overlay(alignment: .leading) { Rectangle().fill(HUD.cyan.opacity(0.4)).frame(width: 1) }
         }
     }
 
@@ -595,7 +635,9 @@ private struct MessageView: View {
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 10)
-        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.black.opacity(0.22)))
+        .background(Rectangle().fill(HUD.cyan.opacity(0.025)))
+        .overlay(Rectangle().strokeBorder(HUD.cyan.opacity(0.2), lineWidth: 1))
+        .overlay(CornerBrackets(length: 10).stroke(HUD.cyan, lineWidth: 1.5))
     }
 }
 
@@ -610,7 +652,7 @@ private struct MemoryView: View {
     @State private var profile: [String] = []
     @State private var notes: [String] = []
     var body: some View {
-        HUDPage {
+        HUDPage(kicker: "KNOWLEDGE STORE / \(model.memories.count) SAVED", title: "Memory") {
             if model.usesHermes { hermes }
             HStack {
                 Text(model.usesHermes ? "ON-DEVICE MEMORY · OLD ENGINE" : "\(model.memories.count) SAVED").hudCaption(model.usesHermes ? HUD.dim : HUD.cyan)
@@ -707,7 +749,7 @@ private struct MemoryView: View {
 private struct SettingsView: View {
     @ObservedObject var model: AppModel
     var body: some View {
-        HUDPage(width: 760) {
+        HUDPage(kicker: "SYSTEM CONFIGURATION", title: "Settings", width: 760) {
             section("AGENT") {
                 field("Brain") {
                     Picker("", selection: Binding(get: { model.usesHermes ? "hermes" : "local" }, set: { model.config.agentBackend = $0 })) {
@@ -825,7 +867,7 @@ private struct SettingsView: View {
 private struct CapabilitiesView: View {
     @ObservedObject var model: AppModel
     var body: some View {
-        HUDPage {
+        HUDPage(kicker: "CAPABILITY REGISTRY / \(model.capabilityEntries.count) INSTALLED", title: "Capabilities") {
             ForEach(model.capabilityEntries, id: \.definition.id) { entry in
                 HStack(alignment: .top, spacing: 14) {
                     VStack(alignment: .leading, spacing: 5) {
@@ -857,11 +899,22 @@ private struct CapabilitiesView: View {
 
 /// Scrolling page body for the non-assistant tabs: one glass panel, rows inside.
 struct HUDPage<Content: View>: View {
+    var kicker: String?
+    var title: String?
     var width: CGFloat = .infinity
     @ViewBuilder var content: Content
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) { content }
+            VStack(alignment: .leading, spacing: 14) {
+                if let title {
+                    VStack(alignment: .leading, spacing: 8) {
+                        if let kicker { Text(kicker).font(HUD.label(10)).tracking(1.6).foregroundStyle(HUD.cyan) }
+                        Text(title).font(HUD.title).foregroundStyle(HUD.ice)
+                    }
+                    .padding(.bottom, 8)
+                }
+                content
+            }
                 .padding(24)
                 .frame(maxWidth: width, alignment: .leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
