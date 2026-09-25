@@ -321,6 +321,12 @@ import Foundation
             count += 1
             print("\(TestLog.failures == before ? "PASS" : "FAIL") testChromeHealthKeepsSlowAdapterAndDropsDeadAdapter")
         } catch { fail("testChromeHealthKeepsSlowAdapterAndDropsDeadAdapter: \(error)") }
+        do {
+            let before = TestLog.failures
+            try await WorkspaceTests().testBrowserTabsParseTextPageListWithoutStructuredContent()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testBrowserTabsParseTextPageListWithoutStructuredContent")
+        } catch { fail("testBrowserTabsParseTextPageListWithoutStructuredContent: \(error)") }
         print("\(count) tests completed in \(String(format: "%.2f", Date().timeIntervalSince(started)))s; \(TestLog.failures) failures")
         if TestLog.failures > 0 { exit(1) }
     }

@@ -4,8 +4,15 @@ import JarvisCore
 private actor BrowserFixture: BrowserTransport {
     var count = 40
     var calls = [String]()
+    var textOnly = false
+    func setTextOnly(_ value: Bool) { textOnly = value }
     func call(_ name: String, arguments: [String: JSONValue]) async throws -> JSONValue {
         calls.append(name)
+        if textOnly && name != "take_snapshot" {
+            if name == "new_page" { count += 1 }
+            let lines = ["## Pages"] + (1...count).map { "\($0): Fixture \($0) (https://example.com/\($0))" + ($0 == 1 ? " [selected]" : "") }
+            return .object(["content": .array([.object(["type": "text", "text": .string(lines.joined(separator: "\n"))])])])
+        }
         if name == "new_page" { count += 1 }
         if name == "take_snapshot" { return .object(["content": .array([.object(["type": "text", "text": .string(String(repeating: "Synthetic page text. ", count: 300))])])]) }
         return .object(["structuredContent": .object(["pages": .array((1...count).map { i in
@@ -48,6 +55,35 @@ final class WorkspaceTests {
         try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
         expectThrows(try DraftFile.write(root: root, name: "link.txt", text: "changed"))
         try expectEqual(try String(contentsOf: target), "print('fixture')\n")
+    }
+    func testBrowserTabsParseTextPageListWithoutStructuredContent() async throws {
+        let text = """
+        Note: the browser was reconnected.
+        ## Pages
+        0: Gmail - Inbox (12) - me@example.com (https://mail.google.com/mail/u/0/#inbox) [selected]
+        1: https://example.com/
+        2: Bar (baz) - Wikipedia (https://en.wikipedia.org/wiki/Bar_(baz)) isolatedContext=work
+        3: New Tab (chrome://newtab/)
+        ## Extension Pages
+        7: Helper (chrome-extension://abcdef/popup.html)
+        """
+        let pages = BrowserAccess.pages(fromText: text)
+        expectEqual(pages.map(\.id), [0, 1, 2, 3])
+        expectEqual(pages[0].title, "Gmail - Inbox (12) - me@example.com")
+        expectEqual(pages[0].url, "https://mail.google.com/mail/u/0/#inbox")
+        expectEqual(pages[1].title, ""); expectEqual(pages[1].url, "https://example.com/")
+        expectEqual(pages[2].url, "https://en.wikipedia.org/wiki/Bar_(baz)"); expectEqual(pages[2].title, "Bar (baz) - Wikipedia")
+        expectThrows(try BrowserAccess.pages(in: .object(["content": .array([.object(["type": "text", "text": "No pages here"])])])))
+        let fixture = BrowserFixture(); await fixture.setTextOnly(true)
+        let session = CapabilitySession(registry: try CapabilityRegistry(providers: [BrowserCapabilityProvider(connection: fixture, available: true)]))
+        let tabs = try await session.execute(.init(name: "browser_tabs", arguments: ["query": "Fixture 4"]))
+        expectEqual(tabs.status, .succeeded)
+        let tabsJSON = try tabs.output.data.json()   // JSONSerialization escapes slashes, so match titles
+        expectTrue(tabsJSON.contains("Fixture 4\"")); expectTrue(tabsJSON.contains("Fixture 40")); expectFalse(tabsJSON.contains("Fixture 5"))
+        let opened = try await session.execute(.init(name: "browser_open", arguments: ["url": "https://example.com/new"]))
+        expectEqual(opened.status, .succeeded)
+        let openedJSON = try opened.output.data.json()
+        expectTrue(openedJSON.contains("Fixture 41")); expectFalse(openedJSON.contains("Fixture 40"))
     }
     func testBrowserPaginationNewTabAndIDValidation() async throws {
         let fake = BrowserFixture()

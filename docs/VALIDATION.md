@@ -73,6 +73,12 @@ Measured on this Mac with George: the cleaned Markdown answer produced 49.9 s of
 
 The user also reported Chrome "doesn't work" in the build with the health probe. Observed process state: the adapter child was alive with an established socket to Chrome's debugging port, so Chrome had accepted the connection. The probe used a 4-second timeout and treated any failure, including a slow reply during model inference, as a lost connection, then stopped probing without stopping the child. `ChromeConnection.health` now returns alive, slow or lost; only a closed transport or exited child counts as lost, and the child is then stopped. The app skips the probe while the model is busy and polls every 10 seconds. A fixture test covers a slow adapter (stays connected) and one that exits (dropped and cleaned up). A live reconnect through the installed app has **not** yet been observed after this change.
 
+## Chrome tab list — 2026-09-24, later still
+
+With the probe fix installed the user reconnected Chrome and asked for Gmail. The connection held, the browser tools were offered, and `browser_tabs` failed with "Chrome returned no structured tab list." Cause, read from the installed adapter source (chrome-devtools-mcp 1.10.1): `structuredContent` is attached to a tool result only when the server runs with `--experimentalStructuredContent`, which defaults to off and was not passed. The page list was arriving as text lines under a `## Pages` heading and the parser only knew the structured form. This is very likely what the earlier "Not connected" screenshots were about too, since the connect step itself never parsed pages.
+
+Fix: the adapter is now launched with that flag, and the parser also accepts the text form (`3: Title (https://url) [selected]`, optional `isolatedContext=` suffix, extension pages under their own heading ignored). A fixture test covers the text form through `browser_tabs` and `browser_open`, including a title that contains parentheses and a URL that contains parentheses. The check tool's `--browser-metadata` mode uses the same argument list as the app. A live tab read through the installed app after this change has **not** yet been observed.
+
 ## Hands-on acceptance
 
 1. Settings → Voice → Preview voice; compare voices, then Save settings. Stop should interrupt playback/preparation.

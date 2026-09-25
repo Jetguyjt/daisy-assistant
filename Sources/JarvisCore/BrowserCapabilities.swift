@@ -18,11 +18,18 @@ public actor ChromeConnection: BrowserTransport {
         guard FileManager.default.isExecutableFile(atPath: node) else {
             throw JarvisError.message("Node is not executable at \(node). Install Node 22+ or set browserNode in Settings.")
         }
-        try await connect(executable: URL(fileURLWithPath: node), arguments: [script.path, "--autoConnect",
-            "--no-usage-statistics", "--no-performance-crux", "--no-javascript-evaluation", "--no-source-maps",
-            "--category-input=false", "--category-performance=false", "--category-network=false", "--category-emulation=false"],
-            environment: ["CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS": "1", "CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS": "1"])
+        try await connect(executable: URL(fileURLWithPath: node), arguments: Self.adapterArguments(script: script.path),
+                          environment: Self.adapterEnvironment)
     }
+    /// One argument list for the app and the check tool. Structured content is an experimental
+    /// adapter flag (off by default); without it page lists arrive only as text, which the parser
+    /// also accepts.
+    public static func adapterArguments(script: String) -> [String] {
+        [script, "--autoConnect", "--experimentalStructuredContent",
+         "--no-usage-statistics", "--no-performance-crux", "--no-javascript-evaluation", "--no-source-maps",
+         "--category-input=false", "--category-performance=false", "--category-network=false", "--category-emulation=false"]
+    }
+    public static let adapterEnvironment = ["CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS": "1", "CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS": "1"]
     /// The same two stages with any adapter executable, so tests can drive them with a fixture.
     public func connect(executable: URL, arguments: [String], environment: [String: String] = [:]) async throws {
         // Stage 1: launch the adapter and complete the MCP handshake.
@@ -80,15 +87,49 @@ public actor BrowserAccess {
     private let transport: any BrowserTransport
     private var observed = Set<Double>()
     public init(transport: any BrowserTransport) { self.transport = transport }
-    private func pages(_ result: JSONValue) throws -> [BrowserPage] {
-        guard case .object(let root) = result, case .object(let structured) = root["structuredContent"],
-              case .array(let entries) = structured["pages"] else { throw JarvisError.message("Chrome returned no structured tab list. Reconnect or update the browser adapter.") }
-        return entries.compactMap { entry in
-            guard case .object(let fields) = entry, case .number(let id) = fields["id"],
-                  id >= 0, id <= 9_007_199_254_740_991, id.rounded() == id,
-                  let url = fields["url"]?.stringValue else { return nil }
-            return BrowserPage(id: id, url: url, title: fields["title"]?.stringValue ?? "")
+    private func pages(_ result: JSONValue) throws -> [BrowserPage] { try Self.pages(in: result) }
+    /// The adapter attaches a structured page list only behind an experimental flag. Without it,
+    /// pages arrive as text lines under a "## Pages" heading: `3: Title (https://url) [selected]`.
+    /// Accept both so a flag or adapter change cannot silently take the tab list away again.
+    public static func pages(in result: JSONValue) throws -> [BrowserPage] {
+        guard case .object(let root) = result else { throw JarvisError.message("Chrome returned no tab list. Reconnect or update the browser adapter.") }
+        if case .object(let structured) = root["structuredContent"], case .array(let entries) = structured["pages"] {
+            return entries.compactMap { entry in
+                guard case .object(let fields) = entry, case .number(let id) = fields["id"],
+                      id >= 0, id <= 9_007_199_254_740_991, id.rounded() == id,
+                      let url = fields["url"]?.stringValue else { return nil }
+                return BrowserPage(id: id, url: url, title: fields["title"]?.stringValue ?? "")
+            }
         }
+        guard case .array(let blocks) = root["content"] else { throw JarvisError.message("Chrome returned no tab list. Reconnect or update the browser adapter.") }
+        let text = blocks.compactMap { block -> String? in
+            guard case .object(let fields) = block, fields["type"] == .string("text") else { return nil }
+            return fields["text"]?.stringValue
+        }.joined(separator: "\n")
+        guard text.contains("## Pages") else { throw JarvisError.message("Chrome returned no tab list. Reconnect or update the browser adapter.") }
+        return pages(fromText: text)
+    }
+    public static func pages(fromText text: String) -> [BrowserPage] {
+        var pages: [BrowserPage] = []
+        var inPages = false
+        for rawLine in text.split(whereSeparator: \.isNewline) {
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("## ") { inPages = line == "## Pages"; continue }
+            guard inPages, let colon = line.firstIndex(of: ":"), let id = Double(line[..<colon]),
+                  id >= 0, id <= 9_007_199_254_740_991, id.rounded() == id else { continue }
+            var rest = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
+            if let context = rest.range(of: " isolatedContext=") { rest = String(rest[..<context.lowerBound]) }
+            if rest.hasSuffix(" [selected]") { rest.removeLast(" [selected]".count) }
+            let pattern = "^(.*?)\\s*\\(([A-Za-z][A-Za-z0-9+.-]*:\\S*)\\)$"
+            if let regex = try? NSRegularExpression(pattern: pattern),
+               let match = regex.firstMatch(in: rest, range: NSRange(rest.startIndex..., in: rest)),
+               let titleRange = Range(match.range(at: 1), in: rest), let urlRange = Range(match.range(at: 2), in: rest) {
+                pages.append(BrowserPage(id: id, url: String(rest[urlRange]), title: String(rest[titleRange])))
+            } else if rest.contains(":") {
+                pages.append(BrowserPage(id: id, url: rest, title: ""))
+            }
+        }
+        return pages
     }
     public func tabs(query: String, offset: Int) async throws -> CapabilityOutput {
         let all = try pages(await transport.call("list_pages", arguments: [:]))

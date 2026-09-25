@@ -12,7 +12,7 @@ import JarvisCore
                 let script = Configuration.dataDirectory.appendingPathComponent("Runtime/browser/node_modules/chrome-devtools-mcp/build/src/bin/chrome-devtools-mcp.js")
                 let node = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/bin/node")
                 do {
-                    try await connection.start(executable: node, arguments: [script.path, "--autoConnect", "--no-usage-statistics", "--no-performance-crux", "--no-javascript-evaluation", "--no-source-maps", "--category-input=false", "--category-performance=false", "--category-network=false", "--category-emulation=false"])
+                    try await connection.start(executable: node, arguments: ChromeConnection.adapterArguments(script: script.path), environment: ChromeConnection.adapterEnvironment)
                     let result = try await connection.request(method: "tools/list", parameters: .object([:]))
                     guard case .object(let object) = result, case .array(let list) = object["tools"] else { throw JarvisError.message("Missing tool metadata") }
                     let names = Set(list.compactMap { value -> String? in if case .object(let fields) = value { return fields["name"]?.stringValue }; return nil })
