@@ -94,6 +94,46 @@ import JarvisCore
                 await worker.stop()
                 return
             }
+            if args.dropFirst().first == "--mic" {
+                // The app's engine and downsampler on the real microphone. Optional WAV plays through
+                // the engine meanwhile, fed to the barge-in endpointer to catch self-interruption.
+                final class Readings: @unchecked Sendable {
+                    let lock = NSLock(); var items: [(Float, Double)] = []; var downsampler: MicDownsampler?
+                    func add(_ buffer: AVAudioPCMBuffer) {
+                        lock.lock(); defer { lock.unlock() }
+                        if downsampler == nil { downsampler = MicDownsampler(inputFormat: buffer.format) }
+                        guard let converted = downsampler?.convert(buffer) else { return }
+                        items.append((converted.power, Double(converted.samples.count) / MicDownsampler.sampleRate))
+                    }
+                }
+                let readings = Readings()
+                let session = try MicrophoneEngine.start(preferVoiceProcessing: !args.contains("plain")) { buffer in readings.add(buffer) }
+                print("engine started · voice processing \(session.voiceProcessing ? "on" : "off (fallback)") · input \(session.inputFormat.channelCount) ch at \(Int(session.inputFormat.sampleRate)) Hz")
+                let playback = args.dropFirst(2).first { $0.hasSuffix(".wav") }
+                if let playback {
+                    let file = try AVAudioFile(forReading: URL(fileURLWithPath: playback))
+                    session.engine.connect(session.player, to: session.engine.mainMixerNode, format: file.processingFormat)
+                    session.player.volume = 0.5
+                    session.player.scheduleFile(file, at: nil, completionHandler: nil)
+                    session.player.play()
+                    print("playing \(URL(fileURLWithPath: playback).lastPathComponent) through the engine")
+                }
+                try await Task.sleep(nanoseconds: 4_000_000_000)
+                session.stop()
+                readings.lock.lock(); let items = readings.items; readings.lock.unlock()
+                var endpointer = SpeechEndpointer(settings: playback == nil ? .standard : .bargeIn)
+                var events: [String] = []
+                var t = 0.0
+                for (power, duration) in items {
+                    t += duration
+                    let event = endpointer.observe(power: power, duration: duration)
+                    if event != .none { events.append(String(format: "%.2fs %@", t, "\(event)")) }
+                }
+                let powers = items.map(\.0)
+                print("chunks \(items.count) · audio \(String(format: "%.2f", t))s · power min \(String(format: "%.1f", powers.min() ?? -140)) max \(String(format: "%.1f", powers.max() ?? -140)) dB")
+                print("\(playback == nil ? "endpointer" : "barge-in endpointer") events: \(events.isEmpty ? "none" : events.joined(separator: ", "))")
+                return
+            }
             if args.dropFirst().first == "--runtime" {
                 try await checkRuntime()
                 return

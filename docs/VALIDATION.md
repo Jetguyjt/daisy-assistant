@@ -100,6 +100,17 @@ Measured with `jarvis-check` on synthesized clips (not a live microphone):
 
 Not yet observed: a live "Hey Jarvis" from across the room, barge-in over real speaker output, the follow-up loop, and whether Apple's voice processing accepts the Studio Display or built-in microphone on this Mac. The mode defaults to wake word, so the first launch of this build asks for the microphone and then shows "Listening for Hey Jarvis" in the composer.
 
+## Audio engine failure on first live launch — 2026-09-25
+
+The user's first launch of the always-listening build showed "The audio engine could not start … error -10875" and no voice at all. Reproduced outside the app with a probe on the same Mac (built-in 3-channel mic and speakers, both 48 kHz). Two defects:
+
+- Enabling Apple voice processing and then letting AVAudioEngine create the mixer-to-output connection lazily picked up a stale 44.1 kHz format while the voice-processing unit ran at 48 kHz; the output side reported 0 channels and `start()` failed with -10875. Wiring the mixer to the output explicitly with the output's post-voice-processing format starts cleanly. If voice processing is refused anyway, the engine is rebuilt without it, so the microphone keeps working and only talk-over interruption is lost.
+- The tap converted the multi-channel input (3 channels plain, 7 with voice processing) straight to 16 kHz mono with AVAudioConverter, which does not downmix and wrote silence: every reading was -140 dB, so the endpointer and wake gate could never have fired even if the engine had started. The processed voice is channel 0; it is now copied out before resampling.
+
+Also added: barge-in calibrates its floor to Jarvis's own echo during the first 0.6 s of speech and lets the floor fall slowly between sentences, so gaps in playback do not make the echo look like the user.
+
+Verified: 56 tests (new: multichannel downsampling, interleaved input, empty buffers, barge-in against echo with sentence gaps). `jarvis-check --mic` runs the app's engine and downsampler on the real microphone: with voice processing, 7-channel input, levels from -50 to -13 dB with speech in the room and speech detected at 0.4 s; forced plain fallback, 1-channel input, speech detected at 0.2 s; with a George sample playing through the engine for 4 s, the barge-in endpointer fired no events. A live wake-word turn and a real talk-over interruption still need the user.
+
 ## Hands-on acceptance
 
 1. Settings → Voice → Preview voice; compare voices, then Save settings. Stop should interrupt playback/preparation.

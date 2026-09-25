@@ -22,8 +22,7 @@ import JarvisCore
 
     static let sampleRate = 16000.0
     private static let preRollSeconds: TimeInterval = 1.5
-    private let engine = AVAudioEngine()
-    private let player = AVAudioPlayerNode()
+    private var session: MicrophoneSession?
     private let bridge = TapBridge()
     private var preRoll: [Chunk] = []
     private var capture: [Int16]?
@@ -32,7 +31,6 @@ import JarvisCore
     private var configurationObserver: NSObjectProtocol?
 
     init() {
-        engine.attach(player)
         bridge.deliver = { [weak self] chunk in Task { @MainActor in self?.ingest(chunk) } }
         bridge.levelSink = { [weak self] power in Task { @MainActor in self?.level = Self.meter(power) } }
     }
@@ -59,33 +57,17 @@ import JarvisCore
     // MARK: Engine
 
     func startEngine() throws {
-        if engine.isRunning { return }
-        let input = engine.inputNode
-        if !echoCancellation {
-            do { try input.setVoiceProcessingEnabled(true); echoCancellation = true }
-            catch { echoCancellation = false }
-        }
-        _ = engine.mainMixerNode
-        engine.prepare()
-        let format = input.outputFormat(forBus: 0)
-        guard format.sampleRate > 0, format.channelCount > 0 else { throw JarvisError.message("No audio input device is available.") }
-        guard let target = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: Self.sampleRate, channels: 1, interleaved: true),
-              let converter = AVAudioConverter(from: format, to: target) else {
-            throw JarvisError.message("The microphone format could not be converted for transcription.")
-        }
-        bridge.prepare(converter: converter, target: target)
-        input.removeTap(onBus: 0)
+        if let session, session.engine.isRunning { return }
+        session?.stop(); session = nil
+        bridge.reset()
         let bridge = self.bridge
-        input.installTap(onBus: 0, bufferSize: 4096, format: format) { buffer, _ in bridge.handle(buffer) }
-        do { try engine.start() } catch {
-            input.removeTap(onBus: 0)
-            throw JarvisError.message("The audio engine could not start: \(error.localizedDescription)")
-        }
+        let started = try MicrophoneEngine.start(preferVoiceProcessing: true) { buffer in bridge.handle(buffer) }
+        session = started
+        echoCancellation = started.voiceProcessing
         engineRunning = true
-        if configurationObserver == nil {
-            configurationObserver = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { [weak self] _ in
-                Task { @MainActor in self?.engineConfigurationChanged() }
-            }
+        if let configurationObserver { NotificationCenter.default.removeObserver(configurationObserver) }
+        configurationObserver = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: started.engine, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.engineConfigurationChanged() }
         }
     }
     private func engineConfigurationChanged() {
@@ -96,8 +78,7 @@ import JarvisCore
     func stopEngine() {
         stopPlayback()
         capture = nil; preRoll = []
-        engine.inputNode.removeTap(onBus: 0)
-        if engine.isRunning { engine.stop() }
+        session?.stop(); session = nil
         engineRunning = false; level = 0; elapsed = 0
     }
 
@@ -167,11 +148,12 @@ import JarvisCore
             }
             continuation.onTermination = { _ in producer.cancel() }
         }
-        if engine.isRunning { try await playThroughEngine(files, onReady: onReady) }
+        if let session, session.engine.isRunning { try await playThroughEngine(files, session: session, onReady: onReady) }
         else { try await playWithFallback(files, onReady: onReady) }
     }
-    private func playThroughEngine(_ files: AsyncThrowingStream<URL, Error>, onReady: (() -> Void)?) async throws {
-        let player = self.player
+    private func playThroughEngine(_ files: AsyncThrowingStream<URL, Error>, session: MicrophoneSession, onReady: (() -> Void)?) async throws {
+        let engine = session.engine
+        let player = session.player
         let bridge = self.bridge
         player.installTap(onBus: 0, bufferSize: 2048, format: nil) { buffer, _ in bridge.meter(buffer) }
         defer { player.removeTap(onBus: 0); player.stop(); gate = nil; level = 0 }
@@ -218,7 +200,7 @@ import JarvisCore
     }
     func stopPlayback() {
         gate?.cancel(); gate = nil
-        if engine.isRunning { player.stop() }
+        if let session, session.engine.isRunning { session.player.stop() }
         fallback?.stop(); fallback = nil
         level = 0
     }
@@ -257,36 +239,23 @@ private final class PlaybackGate: @unchecked Sendable {
     }
 }
 
-/// Runs on the audio thread: converts input to 16 kHz Int16, measures power, hands chunks to the
-/// main actor.
+/// Runs on the audio thread: hands each input buffer to a downsampler matched to its format and
+/// passes the 16 kHz chunk to the main actor.
 private final class TapBridge: @unchecked Sendable {
     private let lock = NSLock()
-    private var converter: AVAudioConverter?
-    private var target: AVAudioFormat?
+    private var downsampler: MicDownsampler?
+    private var format: AVAudioFormat?
     var deliver: (@Sendable (AudioController.Chunk) -> Void)?
     var levelSink: (@Sendable (Float) -> Void)?
-    func prepare(converter: AVAudioConverter, target: AVAudioFormat) {
-        lock.lock(); self.converter = converter; self.target = target; lock.unlock()
-    }
+    func reset() { lock.lock(); downsampler = nil; format = nil; lock.unlock() }
     func handle(_ buffer: AVAudioPCMBuffer) {
-        lock.lock(); let converter = self.converter; let target = self.target; lock.unlock()
-        guard let converter, let target, let deliver else { return }
-        let ratio = target.sampleRate / buffer.format.sampleRate
-        let capacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 64
-        guard let out = AVAudioPCMBuffer(pcmFormat: target, frameCapacity: capacity) else { return }
-        var supplied = false
-        var error: NSError?
-        let status = converter.convert(to: out, error: &error) { _, outStatus in
-            if supplied { outStatus.pointee = .noDataNow; return nil }
-            supplied = true; outStatus.pointee = .haveData; return buffer
-        }
-        guard status != .error, out.frameLength > 0, let data = out.int16ChannelData else { return }
-        let samples = Array(UnsafeBufferPointer(start: data[0], count: Int(out.frameLength)))
-        var sum = 0.0
-        for sample in samples { let value = Double(sample) / 32768; sum += value * value }
-        let rms = (sum / Double(samples.count)).squareRoot()
-        let power = Float(20 * log10(max(rms, 1e-7)))
-        deliver(AudioController.Chunk(samples: samples, power: power, duration: Double(samples.count) / target.sampleRate))
+        lock.lock()
+        if format != buffer.format { downsampler = MicDownsampler(inputFormat: buffer.format); format = buffer.format }
+        let downsampler = self.downsampler
+        lock.unlock()
+        guard let deliver, let converted = downsampler?.convert(buffer) else { return }
+        deliver(AudioController.Chunk(samples: converted.samples, power: converted.power,
+                                      duration: Double(converted.samples.count) / MicDownsampler.sampleRate))
     }
     func meter(_ buffer: AVAudioPCMBuffer) {
         guard let channel = buffer.floatChannelData?[0], buffer.frameLength > 0 else { return }

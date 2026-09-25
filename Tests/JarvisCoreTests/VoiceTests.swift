@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import JarvisCore
 
@@ -127,6 +128,59 @@ final class VoiceTests {
         var closed = false
         for _ in 0..<30 { if standby.observe(power: -60, duration: 0.05) == .finished { closed = true } }
         expectTrue(closed)
+    }
+    private func buffer(channels: AVAudioChannelCount, interleaved: Bool, frames: Int, fill: (Int, Int) -> Float) -> AVAudioPCMBuffer {
+        // More than two channels needs an explicit layout; the device reports discrete channels too.
+        let layout = AVAudioChannelLayout(layoutTag: kAudioChannelLayoutTag_DiscreteInOrder | UInt32(channels))!
+        let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48000, interleaved: interleaved, channelLayout: layout)
+        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(max(frames, 1)))!
+        buffer.frameLength = AVAudioFrameCount(frames)
+        let data = buffer.floatChannelData!
+        for c in 0..<Int(channels) {
+            for i in 0..<frames {
+                if interleaved { data[0][i * Int(channels) + c] = fill(c, i) } else { data[c][i] = fill(c, i) }
+            }
+        }
+        return buffer
+    }
+    func testDownsamplerKeepsChannelZeroOfMultichannelInput() {
+        // Voice processing delivers seven channels; a straight AVAudioConverter downmix wrote zeros.
+        let tone: (Int, Int) -> Float = { c, i in c == 0 ? 0.5 * sin(Float(i) * 2 * .pi * 440 / 48000) : 0 }
+        let seven = buffer(channels: 7, interleaved: false, frames: 4800, fill: tone)
+        let downsampler = MicDownsampler(inputFormat: seven.format)!
+        let result = downsampler.convert(seven)
+        expectTrue(result != nil)
+        expectTrue(abs((result?.power ?? -140) - (-9.0)) < 1.5)          // 0.5 amplitude sine is about -9 dBFS
+        // The resampler emits in blocks (1360 first, then mostly 1664), averaging 1,600 per 100 ms.
+        var total = result?.samples.count ?? 0
+        for _ in 0..<9 { total += downsampler.convert(seven)?.samples.count ?? 0 }
+        expectTrue(abs(total - 16000) <= 400)
+        let quietVoice = buffer(channels: 7, interleaved: false, frames: 4800) { c, i in c == 0 ? 0 : 0.8 * sin(Float(i) / 7) }
+        expectTrue((MicDownsampler(inputFormat: quietVoice.format)!.convert(quietVoice)?.power ?? 0) < -60)
+        let interleaved = buffer(channels: 2, interleaved: true, frames: 4800, fill: tone)
+        expectTrue(abs((MicDownsampler(inputFormat: interleaved.format)!.convert(interleaved)?.power ?? -140) - (-9.0)) < 1.5)
+        let empty = buffer(channels: 3, interleaved: false, frames: 0) { _, _ in 0 }
+        expectTrue(MicDownsampler(inputFormat: empty.format)!.convert(empty) == nil)
+    }
+    func testBargeInCalibratesToEchoAndIgnoresSentenceGaps() {
+        var barge = SpeechEndpointer(settings: .bargeIn)
+        func feed(_ power: Float, _ seconds: Double) -> [SpeechEndpointer.Event] {
+            var events: [SpeechEndpointer.Event] = []
+            var t = 0.0
+            while t < seconds - 0.0001 { events.append(barge.observe(power: power, duration: 0.05)); t += 0.05 }
+            return events
+        }
+        // Jarvis speaking: echo residue at -30 dB, with quiet gaps between sentences.
+        var heard: [SpeechEndpointer.Event] = []
+        for _ in 0..<4 { heard += feed(-30, 2.0); heard += feed(-55, 0.4) }
+        expectFalse(heard.contains(.speechStarted))
+        // The user talks over it, clearly louder than the echo.
+        expectTrue(feed(-10, 0.6).contains(.speechStarted))
+        // Loud echo from the very first reading must not trigger during calibration.
+        var early = SpeechEndpointer(settings: .bargeIn)
+        var first: [SpeechEndpointer.Event] = []
+        for _ in 0..<40 { first.append(early.observe(power: -20, duration: 0.05)) }
+        expectFalse(first.contains(.speechStarted))
     }
     func testConfigurationDecodesFilesWrittenBeforeNewFields() throws {
         let older = """

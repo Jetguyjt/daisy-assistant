@@ -108,6 +108,7 @@ swift run jarvis-check --spoken answer.md  # print what the voice would say for 
 swift run jarvis-check --endpoint clip.wav  # replay a WAV through the silence endpointer
 swift run jarvis-check --wake-gate clip.wav # transcribe a WAV and show whether the wake phrase fires
 swift run jarvis-check --voice-timing clip.wav # persistent whisper-server and Kokoro worker versus one-shot processes
+swift run jarvis-check --mic [plain] [clip.wav] # the app's audio engine on the real microphone; with a clip, checks Jarvis does not interrupt itself
 ```
 
 The focused tests use a small standalone Swift runner because the installed Command Line Tools do not ship XCTest. Tests exit nonzero on failure. They cover persisted corrections, idempotency, deletion/retrieval, query escaping, scope boundaries, symlink exclusion, disabled/unknown tools, malformed responses, local-model checks, and cancellation/timeouts. The smoke test creates only synthetic files, task drafts and preferences in a temporary folder, generates local speech, transcribes it, and writes measurements under `.runtime/benchmark-*.json`.

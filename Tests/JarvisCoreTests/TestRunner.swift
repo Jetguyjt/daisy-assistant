@@ -387,6 +387,18 @@ import Foundation
             count += 1
             print("\(TestLog.failures == before ? "PASS" : "FAIL") testStandbyPresetWaitsIndefinitelyAndClosesUtterances")
         }
+        do {
+            let before = TestLog.failures
+            VoiceTests().testDownsamplerKeepsChannelZeroOfMultichannelInput()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testDownsamplerKeepsChannelZeroOfMultichannelInput")
+        }
+        do {
+            let before = TestLog.failures
+            VoiceTests().testBargeInCalibratesToEchoAndIgnoresSentenceGaps()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testBargeInCalibratesToEchoAndIgnoresSentenceGaps")
+        }
         print("\(count) tests completed in \(String(format: "%.2f", Date().timeIntervalSince(started)))s; \(TestLog.failures) failures")
         if TestLog.failures > 0 { exit(1) }
     }

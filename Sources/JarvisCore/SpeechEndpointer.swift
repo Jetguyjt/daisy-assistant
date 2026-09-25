@@ -17,6 +17,11 @@ public struct SpeechEndpointer: Sendable {
         public var noSpeechTimeout: TimeInterval = 10
         /// Hard cap on utterance length.
         public var maximumDuration: TimeInterval = 60
+        /// Readings at the start used only to learn the floor; no events fire meanwhile.
+        public var calibration: TimeInterval = 0
+        /// How fast the floor follows a quieter room. Barge-in keeps it slow so the gaps between
+        /// Jarvis's sentences do not drag the floor under its own echo.
+        public var floorFall: Float = 0.3
         public init() { }
         public static let standard = Settings()
         /// After Jarvis answers: a shorter wait for a follow-up before returning to rest.
@@ -27,7 +32,9 @@ public struct SpeechEndpointer: Sendable {
         }
         /// While Jarvis speaks: only a clear, sustained voice over the echo residue interrupts.
         public static var bargeIn: Settings {
-            var s = Settings(); s.speechStart = 0.35; s.margin = 15; s.noSpeechTimeout = .infinity; s.maximumDuration = .infinity; return s
+            var s = Settings(); s.speechStart = 0.35; s.margin = 15; s.noSpeechTimeout = .infinity; s.maximumDuration = .infinity
+            s.calibration = 0.6; s.floorFall = 0.02
+            return s
         }
     }
     public enum Event: Equatable, Sendable { case none, speechStarted, finished, timedOut }
@@ -39,6 +46,8 @@ public struct SpeechEndpointer: Sendable {
     /// Time since speech began; the length cap applies to the utterance, not to a long quiet wait.
     public private(set) var spokenFor: TimeInterval = 0
     private var aboveRun: TimeInterval = 0
+    private var calibrationSum: Float = 0
+    private var calibrationCount = 0
     private var belowRun: TimeInterval = 0
     private var done = false
 
@@ -51,6 +60,11 @@ public struct SpeechEndpointer: Sendable {
     public mutating func observe(power: Float, duration: TimeInterval) -> Event {
         guard !done, duration > 0 else { return .none }
         elapsed += duration
+        if elapsed <= settings.calibration {
+            calibrationSum += power; calibrationCount += 1
+            noiseFloor = calibrationSum / Float(calibrationCount)
+            return .none
+        }
         if spoke { spokenFor += duration }
         // The first reading may already be speech (wake-word pre-roll), so never start the floor
         // above a level a quiet room would produce.
@@ -59,7 +73,7 @@ public struct SpeechEndpointer: Sendable {
         let loud = power > threshold
         if !loud {
             // Fall fast, rise slowly: a fan that starts up moves the floor over a couple of seconds.
-            let alpha: Float = power < floor ? 0.3 : 0.05
+            let alpha: Float = power < floor ? settings.floorFall : 0.05
             noiseFloor = floor + (power - floor) * alpha
         }
         var event = Event.none
