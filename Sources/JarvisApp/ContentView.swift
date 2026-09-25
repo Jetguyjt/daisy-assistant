@@ -1,240 +1,605 @@
 import SwiftUI
 import JarvisCore
 
-let accent = Color(red: 0.35, green: 0.88, blue: 0.91)
-let surface = Color(red: 0.052, green: 0.064, blue: 0.083)
-let muted = Color(red: 0.49, green: 0.55, blue: 0.61)
-
 struct ContentView: View {
     @ObservedObject var model: AppModel
     @FocusState private var inputFocused: Bool
+    @Namespace private var orbSpace
+
+    private static let tabs: [(id: String, label: String, symbol: String)] = [
+        ("Assistant", "JARVIS", "circle.hexagongrid"), ("Tasks", "TASKS", "checklist"),
+        ("Memory", "MEMORY", "square.stack.3d.up"), ("Connections", "LINKS", "point.3.connected.trianglepath.dotted"),
+        ("Capabilities", "TOOLS", "square.grid.2x2"), ("Settings", "SETUP", "slider.horizontal.3")
+    ]
+
     var body: some View {
-        HStack(spacing: 0) {
-            sidebar
-            Divider().opacity(0.3)
-            VStack(spacing: 0) {
-                header
-                Divider().opacity(0.3)
-                if model.tab == "Memory" { MemoryView(model: model) }
-                else if model.tab == "Tasks" { TasksView(model: model) }
-                else if model.tab == "Connections" { ConnectionsView(model: model) }
-                else if model.tab == "Settings" { SettingsView(model: model) }
-                else if model.tab == "Capabilities" { CapabilitiesView(model: model) }
-                else { assistant }
+        ZStack {
+            HUDBackground()
+            HStack(spacing: 0) {
+                rail
+                VStack(spacing: 0) {
+                    topBar
+                    Group {
+                        switch model.tab {
+                        case "Memory": MemoryView(model: model)
+                        case "Tasks": TasksView(model: model)
+                        case "Connections": ConnectionsView(model: model)
+                        case "Settings": SettingsView(model: model)
+                        case "Capabilities": CapabilitiesView(model: model)
+                        default: assistant
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
             }
         }
-        .background(Color(red: 0.025, green: 0.034, blue: 0.049))
-        .tint(accent)
+        .foregroundStyle(HUD.ice)
+        .tint(HUD.cyan)
         .onExitCommand { model.interrupt() }
     }
-    private var sidebar: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 9) {
-                Image(systemName: "waveform.circle").font(.system(size: 28, weight: .ultraLight)).foregroundStyle(accent)
-                Text("JARVIS").font(.system(size: 17, weight: .semibold, design: .rounded)).tracking(3)
-            }.padding(.top, 43).padding(.bottom, 48)
-            Text("WORKSPACE").font(.system(size: 9, weight: .semibold, design: .monospaced)).tracking(2).foregroundStyle(muted).padding(.bottom, 18)
-            ForEach([("Assistant", "sparkle"), ("Tasks", "checklist"), ("Memory", "square.stack.3d.up"), ("Connections", "point.3.connected.trianglepath.dotted"), ("Capabilities", "square.grid.2x2"), ("Settings", "slider.horizontal.3")], id: \.0) { item in
-                Button { model.tab = item.0 } label: {
-                    HStack(spacing: 11) {
-                        Image(systemName: item.1).frame(width: 17)
-                        Text(item.0).font(.system(size: 13, weight: .medium))
-                        Spacer()
-                        if item.0 == "Memory", !model.memories.isEmpty { Text("\(model.memories.count)").font(.system(size: 10, design: .monospaced)) }
-                    }.foregroundStyle(model.tab == item.0 ? accent : muted)
-                        .padding(.horizontal, 12).padding(.vertical, 12)
-                        .background(model.tab == item.0 ? accent.opacity(0.08) : .clear, in: RoundedRectangle(cornerRadius: 8))
-                }.buttonStyle(.plain).padding(.horizontal, -12).padding(.bottom, 5)
+
+    // MARK: Frame
+
+    private var rail: some View {
+        VStack(spacing: 4) {
+            Color.clear.frame(height: 40)
+            ForEach(Self.tabs, id: \.id) { tab in
+                RailButton(label: tab.label, symbol: tab.symbol, selected: model.tab == tab.id,
+                           badge: tab.id == "Memory" && !model.memories.isEmpty ? "\(model.memories.count)" : nil) { model.tab = tab.id }
             }
             Spacer()
-            Rectangle().fill(.white.opacity(0.08)).frame(height: 1).padding(.bottom, 18)
-            Label("ON YOUR MAC", systemImage: "lock.shield").font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(1).foregroundStyle(accent)
-            Text("Local inference\nPrivate by design").font(.system(size: 11)).lineSpacing(5).foregroundStyle(muted).padding(.top, 10)
-            Text("LOCAL ASSISTANT  /  0.3").font(.system(size: 8, design: .monospaced)).tracking(1.2).foregroundStyle(muted.opacity(0.6)).padding(.top, 22)
-        }.padding(.horizontal, 27).padding(.bottom, 26).frame(width: 184)
-            .background(Color(red: 0.036, green: 0.045, blue: 0.060))
+        }
+        .frame(width: 76)
+        .background(HUD.void.opacity(0.6))
+        .overlay(alignment: .trailing) { Rectangle().fill(HUD.line.opacity(0.1)).frame(width: 1) }
     }
-    private var header: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 5) {
-                Text(model.tab).font(.system(size: 16, weight: .medium))
-                Text(model.tab == "Assistant" ? "A clear mind. A little more room for yours." : model.tab == "Memory" ? "What you choose to remember." : "Your assistant, on your terms.")
-                    .font(.system(size: 11)).foregroundStyle(muted)
-            }
+
+    private var topBar: some View {
+        HStack(spacing: 10) {
+            Text("JARVIS").font(HUD.wordmark).tracking(5).foregroundStyle(HUD.ice)
+            Text("/").font(HUD.label(11)).foregroundStyle(HUD.dim)
+            Text(sectionLabel).font(HUD.label(10)).tracking(2).foregroundStyle(HUD.steel)
             Spacer()
-            HStack(spacing: 7) {
-                Circle().fill(model.connected ? accent : Color.orange).frame(width: 5, height: 5)
-                Text(model.connected ? "LOCAL ENGINE READY" : model.connecting ? "CONNECTING" : "ENGINE OFFLINE")
-                    .font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(0.8)
-            }.foregroundStyle(muted).padding(.horizontal, 12).padding(.vertical, 8)
-                .overlay(Capsule().stroke(.white.opacity(0.08)))
-            Button { model.clearConversation() } label: { Image(systemName: "square.and.pencil") }.buttonStyle(.plain).padding(.leading, 12).help("New conversation (⌘N)")
-        }.padding(.horizontal, 28).padding(.top, 27).padding(.bottom, 20)
+            StatusPill(text: linkText, color: linkColor, lit: model.connected)
+            MicPill(audio: model.audio, phase: model.phase, standby: model.standby)
+            Button { model.clearConversation() } label: { Image(systemName: "plus.bubble") }
+                .buttonStyle(HUDButtonStyle(kind: .ghost, compact: true))
+                .help("New conversation (⌘N)")
+                .accessibilityLabel("New conversation")
+        }
+        .padding(.leading, 20).padding(.trailing, 18).frame(height: 54)
     }
-    private var assistant: some View {
-        HStack(spacing: 0) {
-            VStack(spacing: 0) {
-                if model.messages.isEmpty {
-                    Spacer(minLength: 8)
-                    OrbView(audio: model.audio, phase: model.phase).frame(height: 262)
-                    phaseLabel
-                    Text("What’s on your mind?").font(.system(size: 27, weight: .light)).padding(.top, 16)
-                    Text("Speak freely. Start somewhere.").font(.system(size: 12)).foregroundStyle(muted).padding(.top, 9)
-                    HStack(spacing: 8) {
-                        suggestion("Find a file", symbol: "doc.text.magnifyingglass", prompt: "/find resume")
-                        suggestion("Remember something", symbol: "brain", prompt: "Remember that ")
-                    }.padding(.top, 28)
-                    Spacer(minLength: 16)
-                } else {
-                    HStack(spacing: 0) {
-                        OrbView(audio: model.audio, phase: model.phase).frame(width: 78, height: 78)
-                        phaseLabel
-                        Spacer()
-                        if model.busy { Button("Stop", systemImage: "stop.fill") { model.interrupt() }.buttonStyle(.bordered).controlSize(.small) }
-                    }.padding(.horizontal, 20)
-                    ScrollViewReader { proxy in
-                        ScrollView {
-                            LazyVStack(alignment: .leading, spacing: 23) {
-                                ForEach(model.messages) { item in message(item).id(item.id) }
-                                Color.clear.frame(height: 1).id("bottom")
-                            }.padding(.horizontal, 28).padding(.vertical, 8)
-                        }.onChange(of: model.messages.count) { withAnimation { proxy.scrollTo("bottom", anchor: .bottom) } }
-                    }
-                }
-                composer
-            }
-            Divider().opacity(0.3)
-            contextPanel
+
+    private var sectionLabel: String {
+        model.tab == "Assistant" ? "ASSISTANT" : Self.tabs.first { $0.id == model.tab }?.label ?? ""
+    }
+    private var linkText: String {
+        switch model.agentLink {
+        case .ready(let detail): return (model.usesHermes ? "HERMES" : "LOCAL") + " · " + (detail ?? model.config.model).uppercased()
+        case .starting: return "CONNECTING"
+        case .needsSetup: return "SETUP NEEDED"
+        case .offline: return "OFFLINE"
         }
     }
-    private var phaseLabel: some View {
-        HStack(spacing: 7) {
-            Circle().fill(accent).frame(width: 4, height: 4)
-            Text((model.currentStep ?? model.phase.rawValue).uppercased()).font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(2)
-        }.foregroundStyle(accent)
+    private var linkColor: Color {
+        switch model.agentLink {
+        case .ready: return HUD.cyan
+        case .starting: return HUD.blue
+        case .needsSetup: return HUD.amber
+        case .offline: return HUD.crimson
+        }
     }
-    private func suggestion(_ text: String, symbol: String, prompt: String) -> some View {
-        Button { model.input = prompt; inputFocused = true } label: {
-            Label(text, systemImage: symbol).font(.system(size: 11)).foregroundStyle(muted)
-                .padding(.horizontal, 12).padding(.vertical, 10).background(surface, in: RoundedRectangle(cornerRadius: 8))
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(.white.opacity(0.05)))
-        }.buttonStyle(.plain)
+
+    // MARK: Assistant
+
+    private var conversationEmpty: Bool { model.messages.isEmpty }
+    private var setupShowing: Bool {
+        switch model.agentLink { case .needsSetup, .offline: return model.phase == .idle; default: return false }
     }
-    private func message(_ item: ConversationItem) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(item.role == "user" ? "YOU" : item.role == "status" ? "STATUS" : "JARVIS")
-                .font(.system(size: 9, weight: .semibold, design: .monospaced)).tracking(1.6)
-                .foregroundStyle(item.role == "assistant" ? accent : muted)
-            Text(item.text).font(.system(size: 14)).lineSpacing(5).textSelection(.enabled)
-                .foregroundStyle(item.role == "status" ? Color.orange.opacity(0.8) : Color.white.opacity(0.86))
-            ForEach(item.receipts) { receipt in
-                VStack(alignment: .leading, spacing: 5) {
-                    Label(receipt.title + " · " + receipt.status.rawValue,
-                          systemImage: receipt.status == .succeeded ? "checkmark.circle" : "exclamationmark.circle")
-                        .font(.system(size: 11, weight: .medium))
-                    Text(receipt.output.summary).font(.system(size: 11)).textSelection(.enabled)
-                }.foregroundStyle(receipt.status == .succeeded ? accent : .orange)
-                    .padding(10).frame(maxWidth: .infinity, alignment: .leading)
-                    .background(surface, in: RoundedRectangle(cornerRadius: 8))
+
+    private var assistant: some View {
+        HStack(alignment: .top, spacing: 14) {
+            VStack(spacing: 12) {
+                if conversationEmpty { hero } else { transcript }
+                composer
             }
-            ForEach(item.receipts.compactMap(\.output.review)) { review in
-                ReviewCard(model: model, review: review)
+            corePanel.frame(width: 264)
+        }
+        .padding(.horizontal, 16).padding(.bottom, 16)
+        .animation(.spring(response: 0.55, dampingFraction: 0.86), value: conversationEmpty)
+    }
+
+    private var mood: OrbMood {
+        switch model.phase {
+        case .idle:
+            if case .offline = model.agentLink { return .offline }
+            return model.standby ? .standby : .idle
+        case .preparing, .listening: return .listening
+        case .transcribing, .thinking, .searching, .working, .responding: return .thinking
+        case .awaitingApproval: return .approval
+        case .synthesizing, .speaking: return .speaking
+        }
+    }
+    private var moodColor: Color { mood == .idle || mood == .standby ? HUD.cyan : mood.tint }
+
+    private var phaseTitle: String {
+        switch model.phase {
+        case .idle:
+            if case .needsSetup = model.agentLink { return "SETUP NEEDED" }
+            return mood == .offline ? "OFFLINE" : model.standby ? "STANDING BY" : "READY"
+        case .preparing: return "OPENING MIC"
+        case .searching, .working: return (model.currentStep ?? "Working").uppercased()
+        case .awaitingApproval: return "NEEDS YOUR OK"
+        default: return model.phase.rawValue.uppercased()
+        }
+    }
+    private var phaseDetail: String? {
+        switch model.phase {
+        case .idle:
+            if case .offline(let reason) = model.agentLink { return reason }
+            if case .needsSetup = model.agentLink { return nil }
+            return model.standby ? "Say “Hey Jarvis”" : "Type below or press Talk"
+        case .thinking: return model.currentStep
+        case .listening: return "Pause to send"
+        default: return nil
+        }
+    }
+
+    private func orb(_ size: CGFloat) -> some View {
+        OrbView(audio: model.audio, mood: mood, visible: model.appVisible)
+            .matchedGeometryEffect(id: "core", in: orbSpace)
+            .frame(width: size, height: size)
+    }
+
+    private func phaseReadout(large: Bool) -> some View {
+        VStack(spacing: large ? 8 : 5) {
+            Text(phaseTitle).font(HUD.label(large ? 12 : 10)).tracking(large ? 4 : 2.5).foregroundStyle(moodColor)
+                .lineLimit(1).contentTransition(.opacity)
+            if let detail = phaseDetail {
+                Text(detail).font(.system(size: large ? 13 : 11)).foregroundStyle(HUD.steel).lineLimit(2).multilineTextAlignment(.center)
             }
-            if let report = item.files {
-                Text("Verified search · \(report.scanned) entries · \(report.files.count) results\(report.limited ? " · partial results" : "")\(report.unreadableLocations > 0 ? " · \(report.unreadableLocations) unreadable locations" : "")")
-                    .font(.system(size: 10)).foregroundStyle(accent)
-                ForEach(report.files.prefix(8)) { file in
-                    HStack {
-                        Image(systemName: "doc.text").foregroundStyle(accent)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(file.name).font(.system(size: 12, weight: .medium))
-                            Text(file.path).font(.system(size: 9)).foregroundStyle(muted).lineLimit(2).textSelection(.enabled)
-                            Text(file.modified.formatted(date: .abbreviated, time: .shortened)).font(.system(size: 9)).foregroundStyle(muted)
-                        }
-                        Spacer(minLength: 4)
-                        Button { model.openFile(file, reveal: true) } label: { Image(systemName: "folder") }.help("Reveal in Finder")
-                        Button { model.openFile(file, reveal: false) } label: { Image(systemName: "arrow.up.right") }.help("Open file")
-                    }.buttonStyle(.borderless).padding(10).background(surface, in: RoundedRectangle(cornerRadius: 8))
+        }
+        .animation(.easeOut(duration: 0.2), value: phaseTitle)
+    }
+
+    private var hero: some View {
+        VStack(spacing: 22) {
+            Spacer(minLength: 0)
+            orb(setupShowing ? 220 : 300)
+            phaseReadout(large: true)
+            if setupShowing {
+                SetupPanel(model: model)
+            } else {
+                HStack(spacing: 10) {
+                    Button { model.input = "/find "; inputFocused = true } label: { Label("Find a file", systemImage: "doc.text.magnifyingglass") }
+                    Button { model.input = "Remember that "; inputFocused = true } label: { Label("Remember something", systemImage: "brain") }
                 }
-                if report.files.count > 8 { Text("Showing the first 8 of \(report.files.count) matches. Narrow your search for more specific results.").font(.caption).foregroundStyle(muted) }
+                .buttonStyle(HUDButtonStyle(kind: .ghost, compact: true))
             }
-            if let detail = item.detail { Text(detail).font(.system(size: 9, design: .monospaced)).foregroundStyle(muted.opacity(0.75)) }
-        }.frame(maxWidth: .infinity, alignment: .leading)
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+
+    private var transcript: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 20) {
+                    ForEach(model.messages) { item in
+                        MessageView(model: model, item: item).id(item.id)
+                            .transition(.opacity.combined(with: .offset(y: 8)))
+                    }
+                    if !model.liveText.isEmpty || [.thinking, .searching, .working, .responding, .awaitingApproval].contains(model.phase) {
+                        LiveReply(text: model.liveText, step: model.currentStep ?? model.phase.rawValue).id("live")
+                    }
+                    ForEach(model.approvals) { request in ApprovalCard(model: model, request: request).id(request.id) }
+                    if setupShowing { SetupPanel(model: model) }
+                    Color.clear.frame(height: 1).id("bottom")
+                }
+                .padding(.horizontal, 24).padding(.vertical, 20)
+            }
+            .scrollIndicators(.never)
+            .onChange(of: model.messages.count) { withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo("bottom", anchor: .bottom) } }
+            .onChange(of: model.liveText) { proxy.scrollTo("bottom", anchor: .bottom) }
+            .onChange(of: model.approvals.count) { withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo("bottom", anchor: .bottom) } }
+        }
+        .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.035),
+                                     .init(color: .black, location: 0.965), .init(color: .clear, location: 1)],
+                             startPoint: .top, endPoint: .bottom))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .hudPanel(radius: 16)
+    }
+
+    // MARK: Composer
+
     private var composer: some View {
-        VStack(spacing: 10) {
-            RecordingStatusView(audio: model.audio, phase: model.phase, standby: model.standby)
+        VStack(spacing: 8) {
             if let notice = model.notice {
-                HStack(alignment: .top) {
-                    Image(systemName: "info.circle")
-                    Text(notice).textSelection(.enabled)
-                    Spacer(minLength: 2)
-                    Button { model.notice = nil } label: { Image(systemName: "xmark") }.buttonStyle(.plain)
-                }.font(.system(size: 11)).foregroundStyle(Color.orange.opacity(0.85)).padding(10)
-                    .background(Color.orange.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
-            }
-            HStack(alignment: .center, spacing: 10) {
-                TextField("Ask Jarvis anything…", text: $model.input, axis: .vertical).lineLimit(1...5)
-                    .textFieldStyle(.plain).font(.system(size: 13)).focused($inputFocused)
-                    .onSubmit { model.submit() }
-                if model.busy {
-                    Button { model.interrupt() } label: { Image(systemName: "stop.fill").frame(width: 30, height: 30) }.help("Stop (⌘.)")
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(HUD.amber)
+                    Text(notice).foregroundStyle(HUD.ice.opacity(0.85)).textSelection(.enabled)
+                    Spacer(minLength: 4)
+                    Button { model.notice = nil } label: { Image(systemName: "xmark") }.buttonStyle(.plain).foregroundStyle(HUD.dim)
+                        .accessibilityLabel("Dismiss")
                 }
-                Button { model.toggleListening() } label: {
-                    Label(model.phase == .listening ? "Finish" : model.phase == .preparing ? "Cancel" : model.standby ? "Talk" : "Record",
-                          systemImage: model.phase == .listening ? "stop.circle.fill" : "mic")
-                        .font(.system(size: 12, weight: .medium)).padding(.horizontal, 10).frame(height: 34)
-                        .foregroundStyle(model.phase == .listening ? .black : accent)
-                        .background(model.phase == .listening ? accent : accent.opacity(0.06), in: RoundedRectangle(cornerRadius: 7))
-                }.buttonStyle(.plain)
-                    .accessibilityLabel(model.phase == .listening ? "Finish recording and send" : "Start recording")
-                    .help("Click to start. Speak, then pause or click Finish. Keyboard: ⌘⇧Space.")
-                Button { model.submit() } label: {
-                    Image(systemName: "arrow.up").font(.system(size: 13, weight: .semibold)).frame(width: 32, height: 34)
-                        .foregroundStyle(.black).background(accent, in: RoundedRectangle(cornerRadius: 7))
-                }.buttonStyle(.plain).disabled(model.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).help("Send")
-            }.buttonStyle(.plain).padding(12).background(surface, in: RoundedRectangle(cornerRadius: 11))
-                .overlay(RoundedRectangle(cornerRadius: 11).stroke(.white.opacity(0.09)))
-            HStack {
-                Text(model.listeningMode == .wakeWord ? "SAY “HEY JARVIS” · OR CLICK TALK" : model.listeningMode == .handsFree ? "CLICK RECORD · SPEAK · PAUSE TO SEND" : "CLICK RECORD · SPEAK · PAUSE OR CLICK FINISH").tracking(1)
-                Spacer()
-                Text("LOCAL VOICE  ·  ⌘. TO STOP").tracking(0.7)
-            }.font(.system(size: 8, design: .monospaced)).foregroundStyle(muted.opacity(0.7))
-        }.padding(.horizontal, 24).padding(.top, 14).padding(.bottom, 23)
-    }
-    private var contextPanel: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("IN REACH").font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(2).foregroundStyle(muted)
-            VStack(alignment: .leading, spacing: 13) {
-                Label("Your files", systemImage: "folder").font(.system(size: 12, weight: .medium))
-                Text(model.selectedFolder?.lastPathComponent ?? "Choose a starting point")
-                    .font(.system(size: 12)).foregroundStyle(accent).lineLimit(2)
-                Text(model.selectedFolder == nil ? "Give Jarvis a folder to search. You decide what’s in reach." : "Search this folder. Content reading is a separate permission in Capabilities.")
-                    .font(.system(size: 11)).lineSpacing(4).foregroundStyle(muted).fixedSize(horizontal: false, vertical: true)
-                Button(model.selectedFolder == nil ? "Choose folder  +" : "Change folder") { model.chooseFolder() }
-                    .font(.system(size: 11, weight: .medium)).buttonStyle(.plain).foregroundStyle(accent)
-            }.padding(15).frame(maxWidth: .infinity, alignment: .leading).background(surface, in: RoundedRectangle(cornerRadius: 10))
-            VStack(alignment: .leading, spacing: 12) {
-                HStack { Text("EXPLICIT MEMORY").font(.system(size: 9, design: .monospaced)).tracking(1); Spacer(); Text("\(model.memories.count)").font(.system(size: 10, design: .monospaced)).foregroundStyle(accent) }
-                Text(model.memories.isEmpty ? "A fresh start. Tell me what matters, and I’ll keep it here." : model.memories[0].value)
-                    .font(.system(size: 11)).lineSpacing(4).lineLimit(5)
-                Button("View memory →") { model.tab = "Memory" }.buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(accent)
-            }.foregroundStyle(muted)
-            Divider().opacity(0.3)
-            Text("CAPABILITIES").font(.system(size: 9, design: .monospaced)).tracking(2).foregroundStyle(muted)
-            ForEach(Array(model.capabilityEntries.prefix(7)), id: \.definition.id) { entry in
-                HStack(spacing: 8) {
-                    Circle().fill(entry.unavailableReason == nil ? accent : muted).frame(width: 5, height: 5)
-                    Text(entry.definition.title).font(.system(size: 11))
-                    Spacer()
-                }.foregroundStyle(entry.unavailableReason == nil ? accent : muted)
+                .font(.system(size: 11.5)).padding(.horizontal, 12).padding(.vertical, 9)
+                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(HUD.amber.opacity(0.08)))
+                .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(HUD.amber.opacity(0.3), lineWidth: 1))
             }
-            Button("Manage capabilities →") { model.tab = "Capabilities" }.buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(accent)
-            Spacer()
-            Text("One conversation.\nYour own corner of the world.").font(.system(size: 11, weight: .light)).lineSpacing(5).foregroundStyle(muted.opacity(0.6))
-        }.padding(.horizontal, 21).padding(.vertical, 28).frame(width: 236).frame(maxHeight: .infinity)
+            HStack(spacing: 12) {
+                HUDSwitch(title: "ALWAYS LISTENING", isOn: model.alwaysListening,
+                          detail: model.alwaysListening ? (model.standby ? "HEY JARVIS" : "ON") : "OFF") {
+                    model.setAlwaysListening(!model.alwaysListening)
+                }
+                .help("Keep the mic open for “Hey Jarvis” (⌘⇧L)")
+                Rectangle().fill(HUD.line.opacity(0.14)).frame(width: 1, height: 28)
+                if model.phase == .listening || model.phase == .preparing {
+                    ListeningStrip(audio: model.audio, preparing: model.phase == .preparing)
+                } else { inputField }
+                talkButton
+                if model.busy && model.phase != .listening && model.phase != .preparing { stopButton } else { sendButton }
+            }
+            .padding(.horizontal, 14).padding(.vertical, 10)
+            .hudPanel(radius: 14, brackets: false)
+        }
+    }
+
+    private var inputField: some View {
+        TextField("Message Jarvis", text: $model.input, axis: .vertical)
+            .lineLimit(1...5)
+            .textFieldStyle(.plain)
+            .font(.system(size: 14))
+            .foregroundStyle(HUD.ice)
+            .focused($inputFocused)
+            .onSubmit { model.submit() }
+            .frame(maxWidth: .infinity)
+    }
+
+    private var talkButton: some View {
+        let live = model.phase == .listening
+        let preparing = model.phase == .preparing
+        return Button { model.toggleListening() } label: {
+            Image(systemName: live ? "stop.fill" : preparing ? "xmark" : "mic.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .frame(width: 34, height: 34)
+                .foregroundStyle(live ? HUD.void : HUD.cyan)
+                .background(Circle().fill(live ? HUD.crimson : HUD.cyan.opacity(0.1)))
+                .overlay(Circle().strokeBorder(live ? .clear : HUD.cyan.opacity(0.45), lineWidth: 1))
+                .shadow(color: live ? HUD.crimson.opacity(0.7) : .clear, radius: 8)
+        }
+        .buttonStyle(.plain)
+        .help(live ? "Finish and send (⌘⇧Space)" : "Talk (⌘⇧Space)")
+        .accessibilityLabel(live ? "Finish recording and send" : preparing ? "Cancel" : "Start talking")
+    }
+
+    private var sendButton: some View {
+        let empty = model.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return Button { model.submit() } label: {
+            Image(systemName: "arrow.up")
+                .font(.system(size: 13, weight: .bold))
+                .frame(width: 34, height: 34)
+                .foregroundStyle(HUD.void)
+                .background(Circle().fill(HUD.cyan.opacity(empty ? 0.35 : 1)))
+                .shadow(color: empty ? .clear : HUD.cyan.opacity(0.6), radius: 8)
+        }
+        .buttonStyle(.plain).disabled(empty)
+        .help("Send (Return)")
+        .accessibilityLabel("Send")
+    }
+
+    private var stopButton: some View {
+        Button { model.interrupt() } label: {
+            Image(systemName: "stop.fill")
+                .font(.system(size: 12, weight: .bold))
+                .frame(width: 34, height: 34)
+                .foregroundStyle(HUD.void)
+                .background(Circle().fill(HUD.crimson))
+                .shadow(color: HUD.crimson.opacity(0.7), radius: 8)
+        }
+        .buttonStyle(.plain)
+        .help("Stop (⌘.)")
+        .accessibilityLabel("Stop")
+    }
+
+    // MARK: Core panel
+
+    private var corePanel: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if !conversationEmpty {
+                VStack(spacing: 10) {
+                    orb(150)
+                    phaseReadout(large: false)
+                }
+                .frame(maxWidth: .infinity).padding(.top, 16).padding(.bottom, 14)
+                rule
+            }
+            VStack(alignment: .leading, spacing: 10) {
+                Text("ACTIVITY").hudCaption()
+                if model.activity.isEmpty {
+                    Text("Nothing running").font(.system(size: 11)).foregroundStyle(HUD.dim)
+                } else {
+                    ForEach(model.activity.suffix(6)) { item in ActivityRow(item: item) }
+                }
+            }
+            .padding(16)
+            rule
+            VStack(alignment: .leading, spacing: 11) {
+                Text("SYSTEMS").hudCaption()
+                readout("LINK", model.agentLink.isReady ? (model.agentDetail ?? model.linkLabel) : linkText.capitalized, color: model.agentLink.isReady ? HUD.ice : linkColor)
+                readout("REPLY", replyText)
+                MicReadout(audio: model.audio)
+                readout("VOICE", model.config.speakResponses ? voiceName : "Muted")
+                readout("FOLDER", model.selectedFolder?.lastPathComponent ?? "None") { model.chooseFolder() }
+                readout("MEMORY", "\(model.memories.count) saved") { model.tab = "Memory" }
+                readout("TASKS", "\(model.tasks.filter { $0.status != "done" }.count) open") { model.tab = "Tasks" }
+                readout("CHROME", model.chromeConnected ? "Connected" : "Not linked", color: model.chromeConnected ? HUD.ice : HUD.steel) { model.tab = "Connections" }
+            }
+            .padding(16)
+            Spacer(minLength: 0)
+        }
+        .frame(maxHeight: .infinity, alignment: .top)
+        .hudPanel(radius: 16)
+    }
+
+    private var rule: some View { Rectangle().fill(HUD.line.opacity(0.1)).frame(height: 1) }
+
+    private var replyText: String {
+        guard let reply = model.lastReply else { return "—" }
+        if let first = reply.firstText { return String(format: "%.1fs · first word %.1fs", reply.total, first) }
+        return String(format: "%.1fs", reply.total)
+    }
+    private var voiceName: String {
+        let id = model.config.naturalVoice ?? "bm_george"
+        return NaturalSpeech.voices.first { $0.id == id }?.name.components(separatedBy: " ").first ?? id
+    }
+
+    private func readout(_ label: String, _ value: String, color: Color = HUD.ice, action: (() -> Void)? = nil) -> some View {
+        HStack(spacing: 8) {
+            Text(label).font(HUD.label(9)).tracking(1.4).foregroundStyle(HUD.dim).frame(width: 58, alignment: .leading)
+            Text(value).font(HUD.readout(11)).foregroundStyle(color).lineLimit(1).truncationMode(.middle)
+            Spacer(minLength: 0)
+            if let action {
+                Button(action: action) { Image(systemName: "chevron.right").font(.system(size: 9, weight: .bold)) }
+                    .buttonStyle(.plain).foregroundStyle(HUD.dim)
+                    .accessibilityLabel("Open \(label.lowercased())")
+            }
+        }
     }
 }
+
+// MARK: - Pieces
+
+/// These watch the audio controller directly so levels and timers stay live.
+private struct MicPill: View {
+    @ObservedObject var audio: AudioController
+    let phase: AssistantPhase
+    let standby: Bool
+    var body: some View {
+        let live = phase == .listening
+        StatusPill(text: live ? "MIC LIVE" : standby ? "HEY JARVIS" : audio.engineRunning ? "MIC OPEN" : "MIC OFF",
+                   color: live ? HUD.crimson : audio.engineRunning ? HUD.cyan : HUD.dim, lit: audio.engineRunning)
+    }
+}
+
+private struct MicReadout: View {
+    @ObservedObject var audio: AudioController
+    var body: some View {
+        HStack(spacing: 8) {
+            Text("MIC").font(HUD.label(9)).tracking(1.4).foregroundStyle(HUD.dim).frame(width: 58, alignment: .leading)
+            if audio.engineRunning { LevelBars(level: audio.level, bars: 10) } else {
+                Text("Off").font(HUD.readout(11)).foregroundStyle(HUD.steel)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+private struct ListeningStrip: View {
+    @ObservedObject var audio: AudioController
+    let preparing: Bool
+    var body: some View {
+        HStack(spacing: 10) {
+            Circle().fill(HUD.crimson).frame(width: 8, height: 8).shadow(color: HUD.crimson, radius: 5)
+            Text(preparing ? "OPENING MIC" : "LISTENING · \(Int(audio.elapsed))S")
+                .font(HUD.label(10)).tracking(1.6).foregroundStyle(HUD.ice)
+            LevelBars(level: audio.level, bars: 16)
+            Spacer(minLength: 6)
+            Text(audio.inputDeviceName).font(.system(size: 11)).foregroundStyle(HUD.dim).lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, minHeight: 30)
+    }
+}
+
+private struct RailButton: View {
+    let label: String
+    let symbol: String
+    let selected: Bool
+    var badge: String?
+    let action: () -> Void
+    @State private var hovering = false
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 5) {
+                Image(systemName: symbol).font(.system(size: 16, weight: selected ? .semibold : .regular))
+                    .shadow(color: selected ? HUD.cyan.opacity(0.8) : .clear, radius: 6)
+                Text(label).font(HUD.label(7.5)).tracking(1.1)
+            }
+            .foregroundStyle(selected ? HUD.cyan : hovering ? HUD.ice : HUD.dim)
+            .frame(width: 60, height: 54)
+            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(selected ? HUD.cyan.opacity(0.1) : hovering ? Color.white.opacity(0.04) : .clear))
+            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(selected ? HUD.cyan.opacity(0.35) : .clear, lineWidth: 1))
+            .overlay(alignment: .topTrailing) {
+                if let badge {
+                    Text(badge).font(HUD.label(8)).foregroundStyle(HUD.void)
+                        .padding(.horizontal, 4).frame(minWidth: 15, minHeight: 15)
+                        .background(Capsule().fill(HUD.cyan)).offset(x: 2, y: -2)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .accessibilityLabel(label.capitalized)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+}
+
+private struct ActivityRow: View {
+    let item: ActivityItem
+    var body: some View {
+        HStack(spacing: 8) {
+            Group {
+                switch item.state {
+                case .running: ProgressView().controlSize(.mini).tint(HUD.cyan)
+                case .done: Image(systemName: "checkmark.circle.fill").foregroundStyle(HUD.cyan)
+                case .failed: Image(systemName: "xmark.octagon.fill").foregroundStyle(HUD.crimson)
+                }
+            }
+            .font(.system(size: 11)).frame(width: 14)
+            (Text(item.title).foregroundStyle(item.state == .running ? HUD.ice : HUD.steel)
+             + Text(item.detail.map { "  " + $0 } ?? "").foregroundStyle(HUD.dim))
+                .font(.system(size: 11.5)).lineLimit(1).truncationMode(.middle)
+            Spacer(minLength: 4)
+            if let finished = item.finished {
+                Text(String(format: "%.1fs", finished.timeIntervalSince(item.started))).font(HUD.readout(9.5)).foregroundStyle(HUD.dim)
+            }
+        }
+    }
+}
+
+/// The answer while it is still being written, or a working line before any words arrive.
+private struct LiveReply: View {
+    let text: String
+    let step: String
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            speaker("JARVIS", color: HUD.cyan)
+            if text.isEmpty {
+                TimelineView(.periodic(from: .now, by: 0.35)) { timeline in
+                    let dots = Int(timeline.date.timeIntervalSinceReferenceDate / 0.35) % 4
+                    Text(step + String(repeating: ".", count: dots)).font(.system(size: 13)).foregroundStyle(HUD.steel)
+                }
+            } else {
+                Text(rich(text) + caret)
+                    .font(.system(size: 14)).lineSpacing(5).foregroundStyle(HUD.ice.opacity(0.94))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    private var caret: AttributedString {
+        var caret = AttributedString(" ▍")
+        caret.foregroundColor = HUD.cyan
+        return caret
+    }
+}
+
+private func speaker(_ name: String, color: Color, detail: String? = nil) -> some View {
+    HStack(spacing: 7) {
+        Circle().fill(color).frame(width: 5, height: 5).shadow(color: color, radius: 3)
+        Text(name).font(HUD.label(9)).tracking(1.8).foregroundStyle(color)
+        if let detail { Text(detail).font(HUD.readout(9)).foregroundStyle(HUD.dim).lineLimit(1) }
+    }
+}
+
+/// Inline Markdown (bold, italics, code, links) with line breaks kept, instead of raw asterisks.
+func rich(_ text: String) -> AttributedString {
+    (try? AttributedString(markdown: text, options: AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(text)
+}
+
+private struct MessageView: View {
+    @ObservedObject var model: AppModel
+    let item: ConversationItem
+    var body: some View {
+        switch item.role {
+        case "user": user
+        case "status": status
+        default: assistant
+        }
+    }
+
+    private var user: some View {
+        HStack {
+            Spacer(minLength: 80)
+            VStack(alignment: .trailing, spacing: 7) {
+                Text("YOU").font(HUD.label(9)).tracking(1.8).foregroundStyle(HUD.dim)
+                Text(item.text).font(.system(size: 14)).lineSpacing(4).foregroundStyle(HUD.ice).textSelection(.enabled)
+                    .padding(.horizontal, 14).padding(.vertical, 10)
+                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(HUD.cyan.opacity(0.09)))
+                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(HUD.cyan.opacity(0.22), lineWidth: 1))
+            }
+        }
+    }
+
+    private var status: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(HUD.amber)
+            Text(item.text).foregroundStyle(HUD.amber.opacity(0.92)).textSelection(.enabled)
+        }
+        .font(.system(size: 12))
+    }
+
+    private var assistant: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            speaker("JARVIS", color: HUD.cyan, detail: item.detail)
+            ForEach(item.decisions, id: \.self) { decision in
+                HStack(spacing: 6) {
+                    Image(systemName: decision.hasPrefix("Approved") ? "checkmark.shield.fill" : "xmark.shield.fill")
+                        .foregroundStyle(decision.hasPrefix("Approved") ? HUD.cyan : HUD.amber)
+                    Text(decision).foregroundStyle(HUD.steel)
+                }
+                .font(.system(size: 11))
+            }
+            Text(rich(item.text)).font(.system(size: 14)).lineSpacing(5).foregroundStyle(HUD.ice.opacity(0.94)).textSelection(.enabled)
+            if !item.receipts.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(item.receipts) { receipt in
+                        HStack(alignment: .top, spacing: 7) {
+                            Image(systemName: receipt.status == .succeeded ? "checkmark.circle" : "exclamationmark.circle")
+                                .foregroundStyle(receipt.status == .succeeded ? HUD.cyan : HUD.amber)
+                            Text(receipt.title).foregroundStyle(HUD.steel) + Text("  " + receipt.output.summary).foregroundStyle(HUD.dim)
+                        }
+                        .font(.system(size: 11)).textSelection(.enabled)
+                    }
+                }
+            }
+            ForEach(item.receipts.compactMap(\.output.review)) { review in ReviewCard(model: model, review: review) }
+            if let report = item.files { files(report) }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func files(_ report: SearchReport) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("\(report.files.count) RESULTS · \(report.scanned) SCANNED\(report.limited ? " · PARTIAL" : "")\(report.unreadableLocations > 0 ? " · \(report.unreadableLocations) UNREADABLE" : "")")
+                .font(HUD.label(8.5)).tracking(1.3).foregroundStyle(HUD.dim).padding(.bottom, 8)
+            ForEach(report.files.prefix(8)) { file in
+                HStack(spacing: 10) {
+                    Image(systemName: "doc.text").foregroundStyle(HUD.cyan).frame(width: 16)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(file.name).font(.system(size: 12, weight: .medium)).foregroundStyle(HUD.ice)
+                        Text(file.path).font(.system(size: 10)).foregroundStyle(HUD.dim).lineLimit(1).truncationMode(.middle).textSelection(.enabled)
+                    }
+                    Spacer(minLength: 6)
+                    Text(file.modified.formatted(date: .abbreviated, time: .omitted)).font(HUD.readout(9.5)).foregroundStyle(HUD.dim)
+                    Button { model.openFile(file, reveal: true) } label: { Image(systemName: "folder") }.help("Show in Finder")
+                        .accessibilityLabel("Show \(file.name) in Finder")
+                    Button { model.openFile(file, reveal: false) } label: { Image(systemName: "arrow.up.forward.square") }.help("Open")
+                        .accessibilityLabel("Open \(file.name)")
+                }
+                .buttonStyle(.plain).foregroundStyle(HUD.steel)
+                .padding(.vertical, 8)
+                .overlay(alignment: .top) { Rectangle().fill(HUD.line.opacity(0.08)).frame(height: 1) }
+            }
+            if report.files.count > 8 {
+                Text("Showing 8 of \(report.files.count). Narrow the search for the rest.").font(.system(size: 11)).foregroundStyle(HUD.dim).padding(.top, 6)
+            }
+        }
+        .padding(.horizontal, 12).padding(.vertical, 10)
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.black.opacity(0.22)))
+    }
+}
+
+// MARK: - Memory
 
 private struct MemoryView: View {
     @ObservedObject var model: AppModel
@@ -242,165 +607,267 @@ private struct MemoryView: View {
     @State private var adding = false
     @State private var key = ""
     @State private var value = ""
+    @State private var profile: [String] = []
+    @State private var notes: [String] = []
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                HStack { Text("Remember deliberately.").font(.system(size: 27, weight: .light)); Spacer(); Button("Add memory", systemImage: "plus") { key = ""; value = ""; adding = true } }
-                Text("Only information you explicitly save lives here. Edit the same key to correct a fact. Nothing is inferred from computer activity. Deleting a memory also clears the current conversation so it cannot be reused there.")
-                    .font(.system(size: 13)).foregroundStyle(muted).lineSpacing(5)
-                Text("Try: /remember response_style = Keep spoken answers short")
-                    .font(.system(size: 11, design: .monospaced)).foregroundStyle(accent).textSelection(.enabled)
-                if model.memories.isEmpty { ContentUnavailableView("A clean slate", systemImage: "brain", description: Text("Save a preference or a project’s next step.")) }
-                ForEach(model.memories) { memory in
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Text(memory.key).font(.system(size: 11, design: .monospaced)).foregroundStyle(accent)
-                            Spacer()
-                            Button("Edit") { editing = memory; key = memory.key; value = memory.value; adding = true }
-                            Button("Delete", role: .destructive) { model.deleteMemory(memory) }
-                        }
-                        Text(memory.value).font(.system(size: 14)).textSelection(.enabled)
-                        Text("Explicit · revision \(memory.revision) · \(memory.updatedAt.formatted())").font(.system(size: 10)).foregroundStyle(muted)
-                        Text("Source: \(memory.source)").font(.system(size: 10)).foregroundStyle(muted).textSelection(.enabled)
-                    }.padding(18).background(surface, in: RoundedRectangle(cornerRadius: 10))
+        HUDPage {
+            if model.usesHermes { hermes }
+            HStack {
+                Text(model.usesHermes ? "ON-DEVICE MEMORY · OLD ENGINE" : "\(model.memories.count) SAVED").hudCaption(model.usesHermes ? HUD.dim : HUD.cyan)
+                Spacer()
+                if !model.usesHermes {
+                    Button { key = ""; value = ""; editing = nil; adding = true } label: { Label("Add memory", systemImage: "plus") }
+                        .buttonStyle(HUDButtonStyle(kind: .primary, compact: true))
                 }
-                if let notice = model.notice { Text(notice).font(.caption).foregroundStyle(.orange) }
-            }.padding(32)
-        }.sheet(isPresented: $adding, onDismiss: { editing = nil }) {
-            VStack(alignment: .leading, spacing: 17) {
-                Text(editing == nil ? "New explicit memory" : "Correct memory").font(.title2)
-                TextField("Key, e.g. response_style", text: $key).disabled(editing != nil)
-                TextEditor(text: $value).frame(height: 140).font(.body)
-                Text("Saving an existing key replaces its value. Freeform ‘Remember that’ notes can be corrected here.").font(.caption).foregroundStyle(.secondary)
-                HStack { Button("Cancel") { adding = false }; Spacer(); Button("Save") { Task { if await model.saveMemory(key: key, value: value) { adding = false } } }.keyboardShortcut(.defaultAction) }
-                if let notice = model.notice { Text(notice).font(.caption).foregroundStyle(.orange) }
-            }.padding(25).frame(width: 470)
+            }
+            .padding(.top, model.usesHermes ? 10 : 0)
+            if model.memories.isEmpty {
+                Text("Nothing saved. Say “Remember that …” or use /remember key = value.").font(.system(size: 12)).foregroundStyle(HUD.dim)
+            }
+            ForEach(model.memories) { memory in
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text(memory.key).font(HUD.readout(11)).foregroundStyle(HUD.cyan).textSelection(.enabled)
+                        Spacer()
+                        if model.usesHermes {
+                            Button("Tell Hermes") { model.tab = "Assistant"; model.run("Remember this about me: \(memory.key) — \(memory.value)") }
+                                .buttonStyle(HUDButtonStyle(kind: .ghost, compact: true)).disabled(!model.agentLink.isReady)
+                                .help("Hermes decides how to store it in its own memory")
+                        } else {
+                            Button("Edit") { editing = memory; key = memory.key; value = memory.value; adding = true }
+                                .buttonStyle(HUDButtonStyle(kind: .ghost, compact: true))
+                        }
+                        Button("Delete") { model.deleteMemory(memory) }
+                            .buttonStyle(HUDButtonStyle(kind: .danger, compact: true))
+                    }
+                    Text(memory.value).font(.system(size: 14)).foregroundStyle(HUD.ice).textSelection(.enabled)
+                    Text("Revision \(memory.revision) · \(memory.updatedAt.formatted(date: .abbreviated, time: .shortened)) · \(memory.source)")
+                        .font(.system(size: 10.5)).foregroundStyle(HUD.dim).lineLimit(2).textSelection(.enabled)
+                }
+                .padding(.vertical, 12)
+                .overlay(alignment: .top) { Rectangle().fill(HUD.line.opacity(0.09)).frame(height: 1) }
+            }
+            if let notice = model.notice { Text(notice).font(.system(size: 11)).foregroundStyle(HUD.amber) }
+        }
+        .onAppear(perform: reload)
+        .sheet(isPresented: $adding, onDismiss: { editing = nil }) {
+            VStack(alignment: .leading, spacing: 14) {
+                Text(editing == nil ? "New memory" : "Correct memory").font(.system(size: 17, weight: .semibold))
+                TextField("Key, e.g. response_style", text: $key).hudField().disabled(editing != nil)
+                TextEditor(text: $value).font(.system(size: 13)).scrollContentBackground(.hidden).padding(6)
+                    .frame(height: 140).background(RoundedRectangle(cornerRadius: 8).fill(Color.black.opacity(0.28)))
+                    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(HUD.line.opacity(0.2), lineWidth: 1))
+                Text("Saving an existing key replaces its value.").font(.system(size: 11)).foregroundStyle(HUD.dim)
+                HStack {
+                    Button("Cancel") { adding = false }.buttonStyle(HUDButtonStyle(kind: .ghost))
+                    Spacer()
+                    Button("Save") { Task { if await model.saveMemory(key: key, value: value) { adding = false } } }
+                        .buttonStyle(HUDButtonStyle(kind: .primary)).keyboardShortcut(.defaultAction)
+                }
+                if let notice = model.notice { Text(notice).font(.system(size: 11)).foregroundStyle(HUD.amber) }
+            }
+            .padding(24).frame(width: 470)
+            .background(HUD.deep)
         }
     }
+    /// Hermes's own memory, read straight from its files. Hermes curates it; ask Jarvis to change it.
+    private var hermes: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("HERMES MEMORY").hudCaption(HUD.cyan)
+                Spacer()
+                Button { reload() } label: { Image(systemName: "arrow.clockwise") }
+                    .buttonStyle(HUDButtonStyle(kind: .ghost, compact: true)).help("Reload")
+                Button("Show files") { NSWorkspace.shared.open(HermesMemory.directory) }
+                    .buttonStyle(HUDButtonStyle(kind: .ghost, compact: true))
+            }
+            if profile.isEmpty && notes.isEmpty {
+                Text("Nothing yet. Say “Remember that …” and Hermes keeps it across sessions and models.")
+                    .font(.system(size: 12)).foregroundStyle(HUD.dim)
+            }
+            group("ABOUT YOU", profile)
+            group("NOTES", notes)
+        }
+    }
+    @ViewBuilder private func group(_ title: String, _ entries: [String]) -> some View {
+        if !entries.isEmpty {
+            Text(title).font(HUD.label(8.5)).tracking(1.4).foregroundStyle(HUD.dim).padding(.top, 4)
+            ForEach(Array(entries.enumerated()), id: \.offset) { _, entry in
+                Text(rich(entry)).font(.system(size: 13.5)).foregroundStyle(HUD.ice).textSelection(.enabled)
+                    .padding(.vertical, 9).frame(maxWidth: .infinity, alignment: .leading)
+                    .overlay(alignment: .top) { Rectangle().fill(HUD.line.opacity(0.09)).frame(height: 1) }
+            }
+        }
+    }
+    private func reload() { profile = HermesMemory.profile(); notes = HermesMemory.notes() }
 }
+
+// MARK: - Settings
 
 private struct SettingsView: View {
     @ObservedObject var model: AppModel
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                Text("Built to stay close.").font(.system(size: 27, weight: .light))
-                GroupBox("Local model") {
-                    VStack(alignment: .leading, spacing: 14) {
-                        TextField("Model tag", text: $model.config.model)
-                        Text("Downloaded: \(model.availableModels.isEmpty ? "none found" : model.availableModels.joined(separator: ", "))")
-                        Text("127.0.0.1:11435 · redirects blocked · cloud models rejected").font(.system(size: 10, design: .monospaced)).foregroundStyle(accent)
-                        Button(model.connecting ? "Connecting…" : "Save & reconnect") { model.saveSettings() }.disabled(model.connecting)
-                    }.padding(10)
+        HUDPage(width: 760) {
+            section("AGENT") {
+                field("Brain") {
+                    Picker("", selection: Binding(get: { model.usesHermes ? "hermes" : "local" }, set: { model.config.agentBackend = $0 })) {
+                        Text("Hermes Agent · ChatGPT").tag("hermes")
+                        Text("On-device model (fallback)").tag("local")
+                    }
+                    .labelsHidden().fixedSize()
                 }
-                GroupBox("Voice") {
-                    VStack(alignment: .leading, spacing: 14) {
-                        Toggle("Read responses aloud", isOn: $model.config.speakResponses)
-                        Picker("Listening", selection: Binding(get: { model.listeningMode }, set: { model.config.listeningMode = $0.rawValue })) {
-                            ForEach(ListeningMode.allCases) { mode in Text(mode.title).tag(mode) }
+                note(status)
+                if model.usesHermes {
+                    field("hermes-acp") {
+                        TextField("~/.hermes/hermes-agent/venv/bin/hermes-acp", text: Binding(get: { model.config.hermesExecutable ?? "" },
+                                                                                             set: { model.config.hermesExecutable = $0.isEmpty ? nil : $0 })).hudField()
+                    }
+                    HStack {
+                        Button(model.connecting ? "Connecting…" : "Reconnect") { model.startAgent() }
+                            .buttonStyle(HUDButtonStyle(kind: .ghost, compact: true)).disabled(model.connecting)
+                        Button("Copy sign-in command") {
+                            NSPasteboard.general.clearContents(); NSPasteboard.general.setString(HermesBackend.signInCommand, forType: .string)
                         }
-                        Text(model.listeningMode == .wakeWord
-                             ? "The microphone stays open while Jarvis runs. Every pause is transcribed locally and thrown away unless it starts with “Hey Jarvis”. After an answer, Jarvis keeps listening for a follow-up."
-                             : model.listeningMode == .handsFree
-                             ? "Click Record once. Recording ends when you pause, and after each answer Jarvis listens again until you stay quiet."
-                             : "Click Record, speak, then pause or click Finish. The microphone is off otherwise.")
-                            .font(.system(size: 11)).foregroundStyle(muted).lineSpacing(3)
-                        Text(model.audio.microphoneStatus).font(.system(size: 11)).foregroundStyle(accent)
-                        Text("Input: " + model.audio.inputDeviceName).font(.system(size: 11)).foregroundStyle(muted)
-                        Button("Open macOS sound input settings") {
-                            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.sound?input")!)
+                        .buttonStyle(HUDButtonStyle(kind: .ghost, compact: true))
+                        Button("Open Hermes folder") {
+                            NSWorkspace.shared.open(FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".hermes"))
                         }
-                        Picker("Natural voice", selection: Binding(get: { model.config.naturalVoice ?? "bm_george" }, set: { model.config.naturalVoice = $0 })) {
-                            ForEach(NaturalSpeech.voices) { voice in Text(voice.name).tag(voice.id) }
-                        }
-                        HStack {
-                            Text("Speed")
-                            Slider(value: Binding(get: { model.config.speechRate ?? 1 }, set: { model.config.speechRate = $0 }), in: 0.75...1.3, step: 0.05)
-                            Text(String(format: "%.2f×", model.config.speechRate ?? 1)).monospacedDigit().frame(width: 50)
-                        }
-                        HStack {
-                            Button("Preview voice") { model.previewVoice() }.disabled(model.busy)
-                            if model.busy { Text(model.phase.rawValue).font(.caption); Button("Stop") { model.interrupt() } }
-                        }
-                        Text("Kokoro neural speech runs entirely on your Mac. Choose a voice, preview it, then save settings.").font(.system(size: 11)).foregroundStyle(muted)
-                        TextField("whisper-cli executable", text: $model.config.whisperExecutable)
-                        TextField("Whisper .bin model", text: $model.config.whisperModel)
-                        Text("English local recording · up to 60 seconds per utterance · whisper.cpp on your Mac, kept loaded while Jarvis runs. Audio is temporary and deleted after transcription. Press ⌘⇧Space to start / finish; ⌘. stops speech and work. You can talk over Jarvis to interrupt it.")
-                            .font(.system(size: 11)).foregroundStyle(muted)
-                    }.padding(10)
+                        .buttonStyle(HUDButtonStyle(kind: .ghost, compact: true))
+                    }
+                    note("Reasoning runs on OpenAI through Hermes, so what you ask and what tools return for that request leave this Mac. Voice, the wake word, tools, sessions and memory files stay here.")
                 }
-                GroupBox("Permissions") {
-                    VStack(alignment: .leading, spacing: 14) {
-                        Toggle("Allow filename search in my chosen folder", isOn: $model.config.allowFileSearch)
-                        Text(model.selectedFolder?.path ?? "No folder selected").font(.system(size: 11)).textSelection(.enabled)
-                        HStack { Button("Choose folder…") { model.chooseFolder() }; if model.selectedFolder != nil { Button("Remove access") { model.revokeFolder() } } }
-                        Text("Choose the folder for searching, reading text and saving reviewed drafts. Connect Chrome separately for websites. Browser form editing, sending messages and arbitrary app control are not enabled. No Full Disk Access or Accessibility permission is needed.")
-                            .font(.system(size: 11)).foregroundStyle(muted)
-                    }.padding(10)
+            }
+            if !model.usesHermes {
+                section("LOCAL MODEL") {
+                    field("Model tag") { TextField("qwen3.5:4b", text: $model.config.model).hudField() }
+                    note("Downloaded: \(model.availableModels.isEmpty ? "none found" : model.availableModels.joined(separator: ", "))")
                 }
-                HStack { Button("Save settings") { model.saveSettings() }.buttonStyle(.borderedProminent); Spacer(); Button("Show local data") { NSWorkspace.shared.open(Configuration.dataDirectory) } }
-                Text("Memories are stored in SQLite on this Mac. Conversations stay in memory until cleared or the app quits. Settings and the folder bookmark are stored alongside the database. No telemetry or hosted inference is configured.")
-                    .font(.system(size: 11)).foregroundStyle(muted).lineSpacing(4)
-                if let notice = model.notice { Text(notice).font(.caption).foregroundStyle(.orange).textSelection(.enabled) }
-            }.textFieldStyle(.roundedBorder).padding(32).frame(maxWidth: 760, alignment: .leading)
-        }.frame(maxWidth: .infinity, alignment: .leading)
+            }
+            section("VOICE") {
+                Toggle("Read answers aloud", isOn: $model.config.speakResponses).toggleStyle(.switch)
+                field("Listening") {
+                    Picker("", selection: Binding(get: { model.listeningMode }, set: { model.config.listeningMode = $0.rawValue })) {
+                        ForEach(ListeningMode.allCases) { mode in Text(mode.title).tag(mode) }
+                    }
+                    .labelsHidden().fixedSize()
+                }
+                field("Voice") {
+                    Picker("", selection: Binding(get: { model.config.naturalVoice ?? "bm_george" }, set: { model.config.naturalVoice = $0 })) {
+                        ForEach(NaturalSpeech.voices) { voice in Text(voice.name).tag(voice.id) }
+                    }
+                    .labelsHidden().fixedSize()
+                }
+                field("Speed") {
+                    HStack {
+                        Slider(value: Binding(get: { model.config.speechRate ?? 1 }, set: { model.config.speechRate = $0 }), in: 0.75...1.3, step: 0.05).frame(maxWidth: 220)
+                        Text(String(format: "%.2f×", model.config.speechRate ?? 1)).font(HUD.readout(11)).foregroundStyle(HUD.steel)
+                    }
+                }
+                HStack {
+                    Button("Preview voice") { model.previewVoice() }.buttonStyle(HUDButtonStyle(kind: .ghost, compact: true)).disabled(model.busy)
+                    if model.busy { Button("Stop") { model.interrupt() }.buttonStyle(HUDButtonStyle(kind: .danger, compact: true)) }
+                }
+                note("\(model.audio.microphoneStatus) · Input: \(model.audio.inputDeviceName)")
+                Button("Sound input settings") {
+                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.sound?input")!)
+                }
+                .buttonStyle(HUDButtonStyle(kind: .ghost, compact: true))
+                field("whisper-cli") { TextField("whisper-cli executable", text: $model.config.whisperExecutable).hudField() }
+                field("Whisper model") { TextField("ggml .bin model", text: $model.config.whisperModel).hudField() }
+            }
+            section("FILES") {
+                Toggle("Filename search in the chosen folder", isOn: $model.config.allowFileSearch).toggleStyle(.switch)
+                note(model.selectedFolder?.path ?? "No folder selected")
+                HStack {
+                    Button("Choose folder…") { model.chooseFolder() }.buttonStyle(HUDButtonStyle(kind: .ghost, compact: true))
+                    if model.selectedFolder != nil {
+                        Button("Remove access") { model.revokeFolder() }.buttonStyle(HUDButtonStyle(kind: .danger, compact: true))
+                    }
+                }
+            }
+            HStack {
+                Button("Save settings") { model.saveSettings() }.buttonStyle(HUDButtonStyle(kind: .primary))
+                Spacer()
+                Button("Show local data") { NSWorkspace.shared.open(Configuration.dataDirectory) }.buttonStyle(HUDButtonStyle(kind: .ghost, compact: true))
+            }
+            if let notice = model.notice { Text(notice).font(.system(size: 11)).foregroundStyle(HUD.amber).textSelection(.enabled) }
+        }
+    }
+    private var status: String {
+        switch model.agentLink {
+        case .ready: return "Connected · " + model.linkLabel
+        case .starting: return "Connecting…"
+        case .needsSetup(let issue): return issue.title
+        case .offline(let reason): return "Offline · " + reason
+        }
+    }
+    private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title).hudCaption(HUD.cyan)
+            content()
+        }
+        .padding(.vertical, 14)
+        .overlay(alignment: .top) { Rectangle().fill(HUD.line.opacity(0.09)).frame(height: 1) }
+    }
+    private func field<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
+        HStack(spacing: 12) {
+            Text(label).font(.system(size: 12)).foregroundStyle(HUD.steel).frame(width: 110, alignment: .leading)
+            content()
+        }
+    }
+    private func note(_ text: String) -> some View {
+        Text(text).font(.system(size: 11)).foregroundStyle(HUD.dim).textSelection(.enabled)
     }
 }
 
-private struct RecordingStatusView: View {
-    @ObservedObject var audio: AudioController
-    let phase: AssistantPhase
-    let standby: Bool
-    var body: some View {
-        if phase == .listening {
-            HStack(spacing: 10) {
-                Circle().fill(.red).frame(width: 7, height: 7)
-                Text("Listening · \(Int(audio.elapsed))s").font(.system(size: 11, weight: .medium))
-                ProgressView(value: audio.level).frame(width: 80).tint(accent)
-                Text(audio.inputDeviceName).font(.system(size: 10)).foregroundStyle(muted).lineLimit(1)
-                Spacer()
-                Text("Pause to send, or click Finish").font(.system(size: 10)).foregroundStyle(accent)
-            }.padding(9).background(surface, in: RoundedRectangle(cornerRadius: 8))
-        } else if phase == .preparing {
-            Text("Waiting for microphone permission…").font(.caption).foregroundStyle(accent)
-        } else if standby && phase == .idle {
-            HStack(spacing: 8) {
-                Image(systemName: "ear").font(.system(size: 11))
-                Text("Listening for “Hey Jarvis”").font(.system(size: 11, weight: .medium))
-                ProgressView(value: audio.level).frame(width: 60).tint(accent.opacity(0.6))
-                Spacer()
-                Text("Local · nothing is kept unless you address Jarvis").font(.system(size: 10)).foregroundStyle(muted)
-            }.padding(9).foregroundStyle(accent).background(surface, in: RoundedRectangle(cornerRadius: 8))
-        }
-    }
-}
+// MARK: - Capabilities
 
 private struct CapabilitiesView: View {
     @ObservedObject var model: AppModel
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                Text("Choose what Jarvis can use.").font(.system(size: 27, weight: .light))
-                Text("Jarvis combines enabled capabilities to work through a request. Each connection provides its own tools; the same assistant chooses and combines them. Only installed capabilities appear here.")
-                    .font(.system(size: 13)).foregroundStyle(muted).lineSpacing(4)
-                ForEach(model.capabilityEntries, id: \.definition.id) { entry in
-                    VStack(alignment: .leading, spacing: 10) {
-                        Toggle(isOn: Binding(get: { model.capabilityEnabled(entry.definition.name) },
-                                             set: { model.setCapability(entry.definition.name, enabled: $0) })) {
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(entry.definition.title).font(.system(size: 14, weight: .medium))
-                                Text(entry.definition.provider + " · " + (entry.definition.effect == .readOnly ? "Read only" : "Review required"))
-                                    .font(.system(size: 10)).foregroundStyle(muted)
-                            }
+        HUDPage {
+            ForEach(model.capabilityEntries, id: \.definition.id) { entry in
+                HStack(alignment: .top, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack(spacing: 8) {
+                            Text(entry.definition.title).font(.system(size: 13.5, weight: .medium)).foregroundStyle(HUD.ice)
+                            Text(entry.definition.effect == .readOnly ? "READ" : "REVIEW")
+                                .font(HUD.label(8)).tracking(1.2)
+                                .foregroundStyle(entry.definition.effect == .readOnly ? HUD.cyan : HUD.amber)
+                                .padding(.horizontal, 6).padding(.vertical, 2)
+                                .overlay(Capsule().strokeBorder((entry.definition.effect == .readOnly ? HUD.cyan : HUD.amber).opacity(0.45), lineWidth: 1))
                         }
-                        Text(entry.definition.description).font(.system(size: 11)).foregroundStyle(muted)
-                        Text(entry.unavailableReason ?? "Available").font(.system(size: 11)).foregroundStyle(entry.unavailableReason == nil ? accent : .orange)
-                    }.padding(18).background(surface, in: RoundedRectangle(cornerRadius: 10))
+                        Text(entry.definition.description).font(.system(size: 11.5)).foregroundStyle(HUD.steel).fixedSize(horizontal: false, vertical: true)
+                        Text(entry.definition.provider + (entry.unavailableReason.map { " · " + $0 } ?? ""))
+                            .font(.system(size: 10.5)).foregroundStyle(entry.unavailableReason == nil ? HUD.dim : HUD.amber)
+                    }
+                    Spacer(minLength: 10)
+                    Toggle("", isOn: Binding(get: { model.capabilityEnabled(entry.definition.name) },
+                                             set: { model.setCapability(entry.definition.name, enabled: $0) }))
+                        .toggleStyle(.switch).labelsHidden()
+                        .accessibilityLabel(entry.definition.title)
                 }
-                Text("Connections to other apps and accounts require installed adapters and your permission. Jarvis cannot invent access. Local task and new-file changes appear as review cards. Apply a card to commit its exact contents. Browser sending, form editing and arbitrary code execution are not enabled. Wake-word listening is also not enabled.")
-                    .font(.system(size: 12)).foregroundStyle(muted).lineSpacing(4)
-                if let notice = model.notice { Text(notice).font(.caption).foregroundStyle(.orange) }
-            }.padding(32).frame(maxWidth: 760, alignment: .leading)
-        }.frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 12)
+                .overlay(alignment: .top) { Rectangle().fill(HUD.line.opacity(0.09)).frame(height: 1) }
+            }
+            if let notice = model.notice { Text(notice).font(.system(size: 11)).foregroundStyle(HUD.amber) }
+        }
+    }
+}
+
+/// Scrolling page body for the non-assistant tabs: one glass panel, rows inside.
+struct HUDPage<Content: View>: View {
+    var width: CGFloat = .infinity
+    @ViewBuilder var content: Content
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) { content }
+                .padding(24)
+                .frame(maxWidth: width, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .scrollIndicators(.never)
+        .hudPanel(radius: 16)
+        .padding(.horizontal, 16).padding(.bottom, 16)
     }
 }

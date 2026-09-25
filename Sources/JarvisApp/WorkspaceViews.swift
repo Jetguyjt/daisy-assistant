@@ -1,61 +1,91 @@
 import SwiftUI
 import JarvisCore
 
+/// A prepared change waiting for a yes. Amber corners mark anything that needs a decision.
 struct ReviewCard: View {
     @ObservedObject var model: AppModel
     let review: ReviewedAction
     @State private var expanded = true
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label(review.title, systemImage: "doc.text.magnifyingglass").font(.headline)
-            DisclosureGroup("Review exact contents", isExpanded: $expanded) {
-                ScrollView { Text(review.preview).font(.system(size: 12, design: .monospaced)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }
-                    .frame(maxHeight: 240).padding(.top, 8)
+            HStack(spacing: 8) {
+                Image(systemName: "hand.raised.fill").foregroundStyle(HUD.amber)
+                Text(review.title).font(.system(size: 13.5, weight: .semibold)).foregroundStyle(HUD.ice)
             }
-            if let status = model.reviewStatus(review) { Text(status).font(.caption).foregroundStyle(accent).textSelection(.enabled) }
-            else {
-                Text("Prepared only. Apply saves this exact change on your Mac.").font(.caption).foregroundStyle(muted)
-                HStack {
+            DisclosureGroup(isExpanded: $expanded) {
+                ScrollView {
+                    Text(review.preview).font(.system(size: 12, design: .monospaced)).foregroundStyle(HUD.ice.opacity(0.9))
+                        .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxHeight: 240).padding(.top, 8)
+            } label: {
+                Text("EXACT CONTENTS").font(HUD.label(8.5)).tracking(1.4).foregroundStyle(HUD.steel)
+            }
+            if let status = model.reviewStatus(review) {
+                Text(status).font(.system(size: 11.5)).foregroundStyle(HUD.cyan).textSelection(.enabled)
+            } else {
+                HStack(spacing: 10) {
+                    Button("Discard") { model.discardReview(review) }
+                        .buttonStyle(HUDButtonStyle(kind: .ghost, compact: true))
+                        .disabled(model.applyingReviews.contains(review.id))
                     Button(model.applyingReviews.contains(review.id) ? "Applying…" : "Apply") { model.applyReview(review) }
-                        .disabled(model.busy || model.applyingReviews.contains(review.id)).buttonStyle(.borderedProminent)
-                    Button("Discard") { model.discardReview(review) }.disabled(model.applyingReviews.contains(review.id))
+                        .buttonStyle(HUDButtonStyle(kind: .critical, compact: true))
+                        .disabled(model.busy || model.applyingReviews.contains(review.id))
+                    Text("Nothing changes until you apply it.").font(.system(size: 11)).foregroundStyle(HUD.dim)
                 }
             }
-        }.padding(16).background(surface, in: RoundedRectangle(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(accent.opacity(0.3)))
+        }
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(HUD.amber.opacity(0.06)))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(HUD.amber.opacity(0.25), lineWidth: 1))
+        .overlay(CornerBrackets(radius: 12, length: 10).stroke(HUD.amber.opacity(0.8), style: StrokeStyle(lineWidth: 1.5, lineCap: .round)))
     }
 }
+
 struct ConnectionsView: View {
     @ObservedObject var model: AppModel
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                Text("One browser. Many possibilities.").font(.system(size: 27, weight: .light))
-                Text("Use your Chrome session for research and supported signed-in pages, including Gmail and Google Drive. The assistant runs locally; browsing and searches still contact the websites you use.")
-                    .foregroundStyle(muted).lineSpacing(5)
-                VStack(alignment: .leading, spacing: 16) {
-                    Label("Google Chrome", systemImage: "globe").font(.title3)
-                    Text(model.chromeConnected ? "Connected for this app session" : "Not connected").foregroundStyle(model.chromeConnected ? accent : .orange)
-                    Text("1. Open Chrome connection settings below.\n2. Enable remote debugging in Chrome.\n3. Click Connect here, then allow Chrome’s connection prompt.").lineSpacing(7)
-                    HStack {
-                        Button("Open Chrome connection settings") { model.openChromeSetup() }
-                        if model.chromeConnected || model.chromeConnecting {
-                            Button(model.chromeConnecting ? "Cancel connection" : "Disconnect") { model.disconnectChrome() }
-                        } else { Button("Connect Chrome") { model.connectChrome() }.buttonStyle(.borderedProminent) }
-                    }
-                    Text("This grants the local Chrome DevTools connection access to your browser session. Jarvis exposes finding tabs, reading page text and opening new tabs. It does not expose JavaScript execution, form input, network inspection or sending. Disconnect here when finished.")
-                        .font(.caption).foregroundStyle(muted).lineSpacing(4)
-                    Text("Some sites and Google Docs canvases do not expose their full text. Jarvis must report that limitation instead of guessing. Full Drive/Gmail APIs and document editing are not connected.")
-                        .font(.caption).foregroundStyle(muted)
-                    if let status = model.connectionNotice { Text(status).font(.callout).foregroundStyle(accent).textSelection(.enabled) }
-                }.padding(22).background(surface, in: RoundedRectangle(cornerRadius: 12))
-                Text("Try after connecting: “Research this topic and cite sources”, “Summarize my open Gmail tab”, or “Find my Drive tab and tell me what files are visible.”")
-                    .font(.callout).foregroundStyle(muted)
-                Text("Connections do not reconnect automatically after quitting Jarvis.").font(.caption).foregroundStyle(muted)
-            }.padding(32).frame(maxWidth: 800, alignment: .leading)
-        }.frame(maxWidth: .infinity, alignment: .leading)
+        HUDPage {
+            HStack(spacing: 12) {
+                Image(systemName: "globe").font(.system(size: 18)).foregroundStyle(HUD.cyan)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Google Chrome").font(.system(size: 15, weight: .semibold)).foregroundStyle(HUD.ice)
+                    Text(model.chromeConnected ? "CONNECTED" : model.chromeConnecting ? "WAITING FOR CHROME" : "NOT CONNECTED")
+                        .font(HUD.label(9)).tracking(1.4).foregroundStyle(model.chromeConnected ? HUD.cyan : HUD.amber)
+                }
+                Spacer()
+                if model.chromeConnected || model.chromeConnecting {
+                    Button(model.chromeConnecting ? "Cancel" : "Disconnect") { model.disconnectChrome() }
+                        .buttonStyle(HUDButtonStyle(kind: .danger, compact: true))
+                } else {
+                    Button("Connect") { model.connectChrome() }.buttonStyle(HUDButtonStyle(kind: .primary, compact: true))
+                }
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                step(1, "Open Chrome's remote debugging page.")
+                step(2, "Turn on remote debugging.")
+                step(3, "Click Connect, then allow Chrome's prompt.")
+                Button("Open Chrome setup") { model.openChromeSetup() }.buttonStyle(HUDButtonStyle(kind: .ghost, compact: true)).padding(.top, 4)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 12)
+            .overlay(alignment: .top) { Rectangle().fill(HUD.line.opacity(0.09)).frame(height: 1) }
+            Text("Jarvis can list tabs, read page text and open new tabs. It can't type, click, run scripts or send anything. Pages without readable text are reported as such. Reconnect after relaunching.")
+                .font(.system(size: 11.5)).foregroundStyle(HUD.dim).lineSpacing(3)
+            if let status = model.connectionNotice {
+                Text(status).font(.system(size: 12)).foregroundStyle(HUD.cyan).textSelection(.enabled)
+            }
+        }
+    }
+    private func step(_ number: Int, _ text: String) -> some View {
+        HStack(spacing: 10) {
+            Text("\(number)").font(HUD.readout(10)).foregroundStyle(HUD.cyan)
+                .frame(width: 20, height: 20).overlay(Circle().strokeBorder(HUD.cyan.opacity(0.4), lineWidth: 1))
+            Text(text).font(.system(size: 12.5)).foregroundStyle(HUD.ice.opacity(0.9))
+        }
     }
 }
+
 struct TasksView: View {
     @ObservedObject var model: AppModel
     @State private var query = ""
@@ -63,51 +93,157 @@ struct TasksView: View {
     @State private var deleting: WorkItem?
     var filtered: [WorkItem] { model.tasks.filter { query.isEmpty || ($0.title + " " + $0.project + " " + $0.notes).localizedCaseInsensitiveContains(query) } }
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                HStack {
-                    Text("Keep your work in view.").font(.system(size: 27, weight: .light))
-                    Spacer(); Button("Add task", systemImage: "plus") { editing = WorkItem(title: "") }
-                }
-                Text("Track homework, college essays, coding and anything else. Group work by project, keep links and next steps in notes, and set your own dates. These are local tasks; reminders are not scheduled.")
-                    .foregroundStyle(muted).font(.callout).lineSpacing(4)
-                TextField("Search tasks, projects and notes", text: $query).textFieldStyle(.roundedBorder)
-                if filtered.isEmpty { ContentUnavailableView("Nothing here yet", systemImage: "checklist", description: Text("Add a task, or ask Jarvis to prepare one in the conversation.")) }
-                ForEach(filtered) { item in
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Image(systemName: item.status == "done" ? "checkmark.circle.fill" : item.status == "in_progress" ? "circle.lefthalf.filled" : "circle").foregroundStyle(accent)
-                            Text(item.title).font(.headline); Spacer()
-                            Button("Edit") { editing = item }
-                            Button("Delete", role: .destructive) { deleting = item }
-                        }
-                        HStack { Text(item.project.isEmpty ? "Unsorted" : item.project); Text("·"); Text(item.status.replacingOccurrences(of: "_", with: " ")); if !item.due.isEmpty { Text("· Due " + item.due) } }.font(.caption).foregroundStyle(accent)
-                        if !item.notes.isEmpty { Text(item.notes).lineLimit(6).font(.callout).textSelection(.enabled) }
-                    }.padding(18).frame(maxWidth: .infinity, alignment: .leading).background(surface, in: RoundedRectangle(cornerRadius: 10))
-                }
-                if let notice = model.notice { Text(notice).font(.caption).foregroundStyle(.orange) }
-            }.padding(32)
-        }.sheet(item: $editing) { item in TaskEditor(model: model, item: item) }
-            .confirmationDialog("Delete this task?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
-                Button("Delete task", role: .destructive) { if let item = deleting { model.deleteTask(item) }; deleting = nil }
+        HUDPage {
+            HStack(spacing: 10) {
+                TextField("Search tasks, projects and notes", text: $query).hudField()
+                Button { editing = WorkItem(title: "") } label: { Label("Add task", systemImage: "plus") }
+                    .buttonStyle(HUDButtonStyle(kind: .primary, compact: true))
             }
+            if filtered.isEmpty {
+                Text(model.tasks.isEmpty ? "No tasks yet." : "No matches.").font(.system(size: 12)).foregroundStyle(HUD.dim).padding(.vertical, 6)
+            }
+            ForEach(filtered) { item in
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 10) {
+                        Image(systemName: item.status == "done" ? "checkmark.circle.fill" : item.status == "in_progress" ? "circle.lefthalf.filled" : "circle")
+                            .foregroundStyle(item.status == "done" ? HUD.dim : HUD.cyan)
+                        Text(item.title).font(.system(size: 14, weight: .medium)).foregroundStyle(item.status == "done" ? HUD.steel : HUD.ice)
+                        Spacer()
+                        Button("Edit") { editing = item }.buttonStyle(HUDButtonStyle(kind: .ghost, compact: true))
+                        Button("Delete") { deleting = item }.buttonStyle(HUDButtonStyle(kind: .danger, compact: true))
+                    }
+                    HStack(spacing: 6) {
+                        Text((item.project.isEmpty ? "Unsorted" : item.project).uppercased())
+                        Text("·")
+                        Text(item.status.replacingOccurrences(of: "_", with: " ").uppercased())
+                        if !item.due.isEmpty { Text("· DUE " + item.due) }
+                    }
+                    .font(HUD.label(9)).tracking(1.1).foregroundStyle(HUD.cyan.opacity(0.8))
+                    if !item.notes.isEmpty {
+                        Text(item.notes).lineLimit(6).font(.system(size: 12.5)).foregroundStyle(HUD.steel).textSelection(.enabled)
+                    }
+                }
+                .padding(.vertical, 12)
+                .overlay(alignment: .top) { Rectangle().fill(HUD.line.opacity(0.09)).frame(height: 1) }
+            }
+            if let notice = model.notice { Text(notice).font(.system(size: 11)).foregroundStyle(HUD.amber) }
+        }
+        .sheet(item: $editing) { item in TaskEditor(model: model, item: item) }
+        .confirmationDialog("Delete this task?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
+            Button("Delete task", role: .destructive) { if let item = deleting { model.deleteTask(item) }; deleting = nil }
+        }
     }
 }
+
 private struct TaskEditor: View {
     @ObservedObject var model: AppModel
     @State var item: WorkItem
     @Environment(\.dismiss) private var dismiss
     var body: some View {
-        VStack(alignment: .leading, spacing: 15) {
-            Text(item.revision == 0 ? "New task" : "Edit task").font(.title2)
-            TextField("Title", text: $item.title)
-            TextField("Project, e.g. College essays", text: $item.project)
-            TextField("Due date · YYYY-MM-DD · optional", text: $item.due)
-            Picker("Status", selection: $item.status) { Text("Planned").tag("planned"); Text("In progress").tag("in_progress"); Text("Done").tag("done") }
-            Text("Notes, links and next steps").font(.caption).foregroundStyle(muted)
-            TextEditor(text: $item.notes).frame(height: 180)
-            HStack { Button("Cancel") { dismiss() }; Spacer(); Button("Save task") { Task { if await model.saveTask(item) { dismiss() } } }.keyboardShortcut(.defaultAction) }
-            if let notice = model.notice { Text(notice).font(.caption).foregroundStyle(.orange) }
-        }.textFieldStyle(.roundedBorder).padding(25).frame(width: 510)
+        VStack(alignment: .leading, spacing: 13) {
+            Text(item.revision == 0 ? "New task" : "Edit task").font(.system(size: 17, weight: .semibold)).foregroundStyle(HUD.ice)
+            TextField("Title", text: $item.title).hudField()
+            TextField("Project, e.g. College essays", text: $item.project).hudField()
+            TextField("Due date, YYYY-MM-DD (optional)", text: $item.due).hudField()
+            Picker("Status", selection: $item.status) {
+                Text("Planned").tag("planned"); Text("In progress").tag("in_progress"); Text("Done").tag("done")
+            }
+            .pickerStyle(.segmented)
+            Text("NOTES").font(HUD.label(9)).tracking(1.4).foregroundStyle(HUD.dim)
+            TextEditor(text: $item.notes).font(.system(size: 13)).scrollContentBackground(.hidden).padding(6)
+                .frame(height: 170).background(RoundedRectangle(cornerRadius: 8).fill(Color.black.opacity(0.28)))
+                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(HUD.line.opacity(0.2), lineWidth: 1))
+            HStack {
+                Button("Cancel") { dismiss() }.buttonStyle(HUDButtonStyle(kind: .ghost))
+                Spacer()
+                Button("Save task") { Task { if await model.saveTask(item) { dismiss() } } }
+                    .buttonStyle(HUDButtonStyle(kind: .primary)).keyboardShortcut(.defaultAction)
+            }
+            if let notice = model.notice { Text(notice).font(.system(size: 11)).foregroundStyle(HUD.amber) }
+        }
+        .padding(24).frame(width: 510)
+        .background(HUD.deep)
+    }
+}
+
+/// Shown while the agent can't answer: what's wrong, the one command that fixes it, and a retry.
+struct SetupPanel: View {
+    @ObservedObject var model: AppModel
+    @State private var copied = false
+    var body: some View {
+        let offline: String? = { if case .offline(let reason) = model.agentLink { return reason }; return nil }()
+        let issue: AgentSetupIssue? = { if case .needsSetup(let issue) = model.agentLink { return issue }; return nil }()
+        let tint = offline == nil ? HUD.amber : HUD.crimson
+        let firstRun = model.usesHermes && model.config.hermesConnected != true
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 9) {
+                Image(systemName: offline == nil ? "key.horizontal.fill" : "bolt.horizontal.circle.fill").foregroundStyle(tint)
+                Text(issue?.title ?? "Jarvis can't reach its agent").font(.system(size: 15, weight: .semibold)).foregroundStyle(HUD.ice)
+            }
+            Text(issue?.detail ?? offline ?? "").font(.system(size: 12.5)).foregroundStyle(HUD.steel).fixedSize(horizontal: false, vertical: true)
+            if let command = issue?.command {
+                HStack(spacing: 10) {
+                    Text(command).font(HUD.readout(12)).foregroundStyle(HUD.ice).textSelection(.enabled).lineLimit(2)
+                    Spacer(minLength: 6)
+                    Button(copied ? "Copied" : "Copy") {
+                        NSPasteboard.general.clearContents(); NSPasteboard.general.setString(command, forType: .string); copied = true
+                    }
+                    .buttonStyle(HUDButtonStyle(kind: .ghost, compact: true))
+                }
+                .padding(.horizontal, 12).padding(.vertical, 9)
+                .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.black.opacity(0.35)))
+            }
+            HStack(spacing: 10) {
+                if issue?.command != nil {
+                    Button("Open Terminal") { NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app")) }
+                        .buttonStyle(HUDButtonStyle(kind: .ghost, compact: true))
+                }
+                Button(firstRun ? "Connect" : "Retry") { model.startAgent() }
+                    .buttonStyle(HUDButtonStyle(kind: .primary, compact: true)).disabled(model.connecting)
+                if model.connecting { ProgressView().controlSize(.small) }
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: 540, alignment: .leading)
+        .hudPanel(radius: 14, tint: tint)
+    }
+}
+
+/// A step the agent won't take without a yes: sending, deleting, running something risky.
+struct ApprovalCard: View {
+    @ObservedObject var model: AppModel
+    let request: AgentApproval
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "hand.raised.fill").foregroundStyle(HUD.amber)
+                Text("NEEDS YOUR OK").font(HUD.label(9)).tracking(1.6).foregroundStyle(HUD.amber)
+            }
+            Text(request.title).font(.system(size: 15, weight: .semibold)).foregroundStyle(HUD.ice)
+            if let detail = request.detail, !detail.isEmpty {
+                Text(detail).font(looksLikeCode ? .system(size: 12, design: .monospaced) : .system(size: 14))
+                    .foregroundStyle(HUD.ice.opacity(0.92)).textSelection(.enabled).lineLimit(14)
+                    .padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.black.opacity(0.3)))
+            }
+            HStack(spacing: 10) {
+                Button("Cancel") { model.answer(request, allow: false) }.buttonStyle(HUDButtonStyle(kind: .ghost))
+                Button(verb) { model.answer(request, allow: true) }.buttonStyle(HUDButtonStyle(kind: .critical))
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: 560, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(HUD.amber.opacity(0.07)))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(HUD.amber.opacity(0.3), lineWidth: 1))
+        .overlay(CornerBrackets(radius: 12, length: 10).stroke(HUD.amber.opacity(0.85), style: StrokeStyle(lineWidth: 1.5, lineCap: .round)))
+    }
+    /// The button says what will happen: Send, Delete, Run… or Allow.
+    private var verb: String {
+        let first = request.title.split(separator: " ").first.map(String.init) ?? ""
+        return ["Send", "Delete", "Create", "Change", "Run", "Move", "Post", "Update", "Open", "Edit"].contains(first) ? first : "Allow"
+    }
+    private var looksLikeCode: Bool {
+        guard let detail = request.detail else { return false }
+        return detail.hasPrefix("/") || detail.contains("$ ") || detail.contains(" --") || detail.contains("\n\n")
     }
 }

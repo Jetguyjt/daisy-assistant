@@ -130,6 +130,15 @@ import JarvisCore
     func speak(_ text: String, voice: String, speed: Double = 1, onReady: (() -> Void)? = nil) async throws {
         let chunks = SpeechText.sentences(from: text)
         guard !chunks.isEmpty else { return }
+        let stream = AsyncStream<String> { continuation in
+            for chunk in chunks { continuation.yield(chunk) }
+            continuation.finish()
+        }
+        try await speak(stream, voice: voice, speed: speed, onReady: onReady)
+    }
+    /// Same, for chunks that arrive while the answer is still being written. Returns once the
+    /// stream has finished and the last chunk has played.
+    func speak(_ chunks: AsyncStream<String>, voice: String, speed: Double = 1, onReady: (() -> Void)? = nil) async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("jarvis-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         defer { try? FileManager.default.removeItem(at: folder) }
@@ -137,9 +146,11 @@ import JarvisCore
         let files = AsyncThrowingStream<URL, Error> { continuation in
             let producer = Task {
                 do {
-                    for (index, chunk) in chunks.enumerated() {
+                    var index = 0
+                    for await chunk in chunks {
                         try Task.checkCancellation()
                         let url = folder.appendingPathComponent("\(index).wav")
+                        index += 1
                         try await NaturalSpeech.synthesize(text: chunk, voice: voice, speed: speed, output: url, worker: worker)
                         continuation.yield(url)
                     }

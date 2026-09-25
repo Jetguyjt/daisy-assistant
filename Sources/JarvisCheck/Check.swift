@@ -8,6 +8,37 @@ import JarvisCore
         let runtime = LocalRuntime()
         do {
             let args = CommandLine.arguments
+            if args.dropFirst().first == "--hermes" {
+                // Live run through the same ACP bridge the app uses. Approvals are always declined,
+                // so a check can never send, delete or change anything.
+                let hermes = HermesBackend(settings: .init(workingDirectory: FileManager.default.homeDirectoryForCurrentUser,
+                    sessionFile: FileManager.default.temporaryDirectory.appendingPathComponent("jarvis-check-hermes-session"),
+                    environment: ["JARVIS_SESSION": "1"]))
+                let started = Date()
+                let link = await hermes.connect()
+                print(String(format: "link after %.1fs: %@", Date().timeIntervalSince(started), "\(link)"))
+                guard case .ready = link else { await hermes.shutdown(); exit(1) }
+                for prompt in args.dropFirst(2) {
+                    print("\n> \(prompt)")
+                    let turnStart = Date()
+                    var first: TimeInterval?
+                    for try await event in hermes.send(prompt) {
+                        switch event {
+                        case .text(let text):
+                            if first == nil { first = Date().timeIntervalSince(turnStart) }
+                            print(text, terminator: "")
+                        case .tool(let tool): print("\n  [\(tool.state.rawValue)] \(tool.title)\(tool.detail.map { " · " + $0 } ?? "")")
+                        case .approval(let request):
+                            print("\n  [approval declined by check] \(request.title) — \(request.detail ?? "")")
+                            await hermes.resolve(approval: request.id, optionID: nil)
+                        case .finished(let reason): print(String(format: "\n  (%@; first text %.1fs, total %.1fs)", reason, first ?? -1, Date().timeIntervalSince(turnStart)))
+                        default: break
+                        }
+                    }
+                }
+                await hermes.shutdown()
+                return
+            }
             if args.dropFirst().first == "--browser-metadata" {
                 let connection = MCPConnection()
                 let script = Configuration.dataDirectory.appendingPathComponent("Runtime/browser/node_modules/chrome-devtools-mcp/build/src/bin/chrome-devtools-mcp.js")

@@ -1,5 +1,19 @@
 # Integration investigation
 
+## With Hermes (0.4)
+
+Integrations now belong to Hermes, not Jarvis code: skills for procedures, MCP servers or Hermes plugins for code and credentials. Checked against the installed Hermes 0.21.0 on 2026-09-25:
+
+| Need | Hermes route | State on this Mac |
+| --- | --- | --- |
+| Find files | built-in `search_files` and terminal tools | Works. A live check found a resume by name in about 30 s |
+| Memory | built-in `memory` tool, `USER.md` / `MEMORY.md` | Works. Saved a preference in one session and recalled it in a new one |
+| Text someone | `imessage` skill (`imsg` CLI) | `imsg` not installed; "Dad" needs a contact mapping |
+| Calendar | `google-workspace` skill (`gws` or its bundled Python, Google OAuth token) | No Google token yet; no Apple Calendar skill exists |
+| Reminders, Notes | `apple-reminders` (`remindctl`), `apple-notes` (`memo`) | CLIs not installed |
+
+Hermes only asks before dangerous commands and file edits; skills send with no prompt. In Jarvis sessions the `hermes/jarvis` plugin stops sends, email, calendar writes, posts and deletes at an approval card first ([architecture](ARCHITECTURE.md#approvals)). The rest of this document is the original investigation for the on-device engine, kept for the Contacts, EventKit and Messages details that still apply.
+
 These are adapter examples, not a fixed feature roadmap. New services plug into the common [capability system](CAPABILITIES.md).
 
 Status as of the verified macOS 26.5.1 development environment. The following integrations are **not wired into the application**. No account credentials were accessed and no real messages or contacts were read during investigation.

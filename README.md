@@ -1,16 +1,23 @@
 # Jarvis for Mac
 
-A native, local-first personal assistant. Version 0.3 provides local conversation and neural voice, an audio-reactive orb, editable memory, persistent tasks/projects, reviewed document/code drafts, app launching, and an optional general Chrome connection. New app connections are adapters to the same assistant, not separate hard-coded workflows.
+A native Mac assistant. Version 0.4 splits the work: Jarvis is the face and the voice (a HUD, an audio-reactive core, the "Hey Jarvis" wake word, local speech in and out), [Hermes Agent](https://github.com/NousResearch/hermes-agent) is the agent runtime (tool loop, sessions, memory, skills, MCP, approvals), and OpenAI is the reasoning model through Hermes's ChatGPT/Codex subscription sign-in. Jarvis talks to Hermes over ACP and never sees the model or its credentials. The original on-device engine (Ollama plus a Swift tool loop) is still there as an optional fallback. See [architecture](docs/ARCHITECTURE.md).
 
 Built and tested on an **M3 MacBook Air, 24 GB, macOS 26.5.1**. Minimum deployment target is macOS 14, but older systems have not been tested. Uses the installed Swift Command Line Tools; full Xcode is not required.
 
 ## Run
 
-The installed app is at `~/Applications/Jarvis.app`. Double-click it, or run:
+One-time Hermes setup:
 
 ```sh
-open ~/Applications/Jarvis.app
+curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash   # only if Hermes isn't installed
+hermes auth add openai-codex      # device-code login in Terminal; Hermes keeps the tokens
+bash scripts/setup-hermes.sh      # Jarvis plugin: persona, and approval before sends, deletes and calendar changes
+open ~/Applications/Jarvis.app    # first launch: press Connect
 ```
+
+After the first connection Jarvis starts Hermes on launch and resumes the last conversation. If Hermes is missing, signed out, or has no provider, the HUD says so and shows the command that fixes it. **Setup → Agent** switches between Hermes and the on-device model, and **New conversation** (⌘N) starts a fresh Hermes session; Hermes's memory carries over.
+
+### On-device fallback
 
 Jarvis checks and starts its dedicated local Ollama server before each model request. It monitors connectivity while open and stops a server it owns on exit. The first answer after the model unloads may take longer. The installer copies downloaded model assets into `~/Library/Application Support/Jarvis/Runtime` (APFS clones when available). Startup does not depend on Documents access. Homebrew binaries are still required; this is not a self-contained distributable yet.
 
@@ -35,9 +42,10 @@ This installs Ollama, whisper.cpp and Python 3.11 through Homebrew, downloads Qw
 
 | Capability | This build |
 | --- | --- |
-| Local conversation | Ollama on `127.0.0.1:11435`; downloaded Qwen models; no hosted fallback |
-| Voice | AVAudioRecorder → whisper.cpp → local model → Kokoro ONNX neural voice → AVAudioPlayer |
-| Orb | Animated SwiftUI Canvas; microphone and playback levels drive its movement; respects Reduce Motion |
+| Conversation | Hermes Agent over ACP (`hermes-acp`), model and provider chosen in Hermes; answers stream into the transcript. Optional on-device Ollama fallback |
+| Voice | Mic → wake word or Talk → whisper.cpp → agent → Kokoro, starting on the first finished sentence while the answer is still streaming |
+| Approvals | Sends, deletes, calendar changes and posts wait on an amber card with the exact content (Hermes plugin in `hermes/jarvis`); dangerous commands and file edits use Hermes's own prompts |
+| HUD | Reactor-style core that follows the mic and the voice, live tool activity, link and mic status, always-listening switch; respects Reduce Motion and pauses when hidden |
 | Memory | SQLite + FTS5; explicit save, edit, delete, source, revision; retrieved locally |
 | Files | One chosen folder; recursive filename matching; newest first; click to open/reveal; optional bounded UTF-8 content reading |
 | Tasks/projects | Persistent local title, project, due date, status and notes; UI editing and model-prepared review cards |
@@ -47,8 +55,9 @@ This installs Ollama, whisper.cpp and Python 3.11 through Homebrew, downloads Qw
 | Utilities | Validated arithmetic and date/time with timezone support |
 | Capability system | Dynamic schemas, per-capability permissions, multi-step execution, deduplication, cancellation, verified result cards |
 | Permissions | Folder selection/revocation, individual capability toggles, content reading off by default, microphone on first use |
-| Calendar, Contacts, Messages | **Unavailable**; investigated and documented in [integration plan](docs/INTEGRATIONS.md) |
-| Wake word, embeddings, inferred habits, fine-tuning, proactive suggestions | **Not implemented** |
+| Calendar, Contacts, Messages | **Not wired yet.** Hermes's `imessage` and `google-workspace` skills are installed but need `imsg` and a Google sign-in; see [integration plan](docs/INTEGRATIONS.md) |
+| Wake word | "Hey Jarvis", transcribed locally; on/off switch on the main screen (⌘⇧L) |
+| Proactive suggestions, fine-tuning | **Not implemented** |
 
 Search does not inspect document contents, determine which resume is substantively correct, query all of Spotlight, or download cloud-only file contents. It excludes hidden entries, symlinks, and app/package contents; caps work at 50,000 entries or 10 seconds and returns up to 30 matches (the interface displays 8). Partial/inaccessible results are identified. Narrow the folder or query when needed. A filename match is not evidence of a file's meaning.
 
@@ -71,6 +80,8 @@ Use **Connections → Open Chrome connection settings**, enable remote debugging
 After connecting, try “Research this topic and cite sources” or “Summarize my open Gmail tab.” Full Gmail and Drive APIs are not connected. Reading a Drive listing does not prove a document’s contents were read. Some sites and document canvases expose little accessible text; the assistant must report that limitation. No signed-in browser workflow is claimed as validated until tested with your permission.
 
 ## Memory and privacy
+
+With Hermes, personal memory is Hermes's: `~/.hermes/memories/USER.md` and `MEMORY.md`, curated by Hermes and shown read-only in the Memory tab. It doesn't depend on which model is selected, and ChatGPT's own memory is not used. Reasoning is remote: each turn sends OpenAI the request, that session's conversation, Hermes's system prompt (with its memory snapshot) and the results of tools it ran. Speech, the wake word, tools, sessions and memory files stay on this Mac. The rest of this section describes the on-device engine's memory.
 
 Only direct `Remember that …` and `/remember key = value` commands, or edits in the Memory tab, write memories. The model cannot write memory or execute arbitrary code. Reusing a key updates its value and provenance. Repeating the same value is idempotent. Freeform notes get a stable content-based key; correct contradictory freeform notes in the Memory tab. Automatic conflict merging and inferred habits are deliberately deferred.
 
@@ -103,6 +114,8 @@ bash scripts/install-app.sh            # quit Jarvis first when updating
 bash scripts/serve-model.sh            # diagnostic standalone server
 swift run jarvis-check qwen3.5:4b       # actual local inference and synthetic speech round trip
 swift run jarvis-check --runtime       # quit Jarvis/external server first; owned startup/shutdown twice
+swift run jarvis-check --hermes "What is 37 × 18?" "Find my resume."  # real Hermes over ACP; approvals always declined
+python3 hermes/test_jarvis_guard.py    # what the approval guard stops and lets through
 swift run jarvis-check --browser-metadata # real MCP handshake only; no browser/account access
 swift run jarvis-check --spoken answer.md  # print what the voice would say for a Markdown answer
 swift run jarvis-check --endpoint clip.wav  # replay a WAV through the silence endpointer

@@ -309,6 +309,30 @@ import Foundation
         }
         do {
             let before = TestLog.failures
+            SpeechTests().testFeedStartsEarlyAndMatchesOneShot()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testFeedStartsEarlyAndMatchesOneShot")
+        }
+        do {
+            let before = TestLog.failures
+            SpeechTests().testFeedHoldsListMarkersAndShortFragments()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testFeedHoldsListMarkersAndShortFragments")
+        }
+        do {
+            let before = TestLog.failures
+            SpeechTests().testFeedRestartsForANewTurnAndKeepsCodeOffTheVoice()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testFeedRestartsForANewTurnAndKeepsCodeOffTheVoice")
+        }
+        do {
+            let before = TestLog.failures
+            SpeechTests().testFeedRespectsTheSpokenLimit()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testFeedRespectsTheSpokenLimit")
+        }
+        do {
+            let before = TestLog.failures
             let suite = OllamaTests()
             defer { suite.tearDown() }
             try await suite.testSpokenHintReachesSystemPromptOnlyWhenSpeaking()
@@ -399,6 +423,54 @@ import Foundation
             count += 1
             print("\(TestLog.failures == before ? "PASS" : "FAIL") testBargeInCalibratesToEchoAndIgnoresSentenceGaps")
         }
+        do {
+            let before = TestLog.failures
+            let suite = HermesTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testBasicReasoningStreamsThroughHermes()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testBasicReasoningStreamsThroughHermes")
+        } catch { fail("testBasicReasoningStreamsThroughHermes: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = HermesTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testFileSearchShowsAsPlainActivity()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testFileSearchShowsAsPlainActivity")
+        } catch { fail("testFileSearchShowsAsPlainActivity: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = HermesTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testSendingAMessageWaitsForApproval()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testSendingAMessageWaitsForApproval")
+        } catch { fail("testSendingAMessageWaitsForApproval: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = HermesTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testCancelStopsTheTurnAndTheNextOneStillWorks()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testCancelStopsTheTurnAndTheNextOneStillWorks")
+        } catch { fail("testCancelStopsTheTurnAndTheNextOneStillWorks: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = HermesTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testMissingSignInAndProviderBecomeSetupSteps()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testMissingSignInAndProviderBecomeSetupSteps")
+        } catch { fail("testMissingSignInAndProviderBecomeSetupSteps: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = HermesTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testResumedSessionReplaysHistoryAndUnknownOnesStartFresh()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testResumedSessionReplaysHistoryAndUnknownOnesStartFresh")
+        } catch { fail("testResumedSessionReplaysHistoryAndUnknownOnesStartFresh: \(error)") }
         print("\(count) tests completed in \(String(format: "%.2f", Date().timeIntervalSince(started)))s; \(TestLog.failures) failures")
         if TestLog.failures > 0 { exit(1) }
     }

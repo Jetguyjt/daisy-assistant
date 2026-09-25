@@ -2,7 +2,22 @@ import AppKit
 import SwiftUI
 import JarvisCore
 
-enum AssistantPhase: String { case idle = "Ready", preparing = "Preparing microphone", listening = "Listening", thinking = "Thinking", searching = "Searching files", transcribing = "Transcribing", synthesizing = "Preparing voice", speaking = "Speaking" }
+enum AssistantPhase: String { case idle = "Ready", preparing = "Preparing microphone", listening = "Listening", thinking = "Thinking", searching = "Searching files", working = "Working", awaitingApproval = "Waiting for approval", responding = "Responding", transcribing = "Transcribing", synthesizing = "Preparing voice", speaking = "Speaking" }
+/// One step the assistant took during a turn, for the activity readout.
+struct ActivityItem: Identifiable, Equatable {
+    enum State: Equatable { case running, done, failed }
+    let id: String
+    var title: String
+    var detail: String? = nil
+    var state: State = .running
+    let started = Date()
+    var finished: Date?
+}
+/// How long the last answer took: to the first streamed words, and in total.
+struct ReplyTiming: Equatable {
+    let firstText: TimeInterval?
+    let total: TimeInterval
+}
 enum ListeningMode: String, CaseIterable, Identifiable {
     case manual, handsFree, wakeWord
     var id: String { rawValue }
@@ -21,6 +36,8 @@ struct ConversationItem: Identifiable {
     var files: SearchReport? = nil
     var detail: String? = nil
     var receipts: [CapabilityReceipt] = []
+    /// Approvals given or refused during this answer, e.g. "Approved: Send an iMessage to Dad".
+    var decisions: [String] = []
 }
 
 @MainActor final class AppModel: ObservableObject {
@@ -45,6 +62,26 @@ struct ConversationItem: Identifiable {
     @Published var applyingReviews = Set<UUID>()
     /// Wake-word mode is armed: the mic is open and an utterance starting with the phrase opens a turn.
     @Published var standby = false
+    /// The answer as it streams in, before it becomes a message.
+    @Published var liveText = ""
+    /// Steps taken during the current (or last) turn.
+    @Published var activity: [ActivityItem] = []
+    @Published var lastReply: ReplyTiming?
+    /// False while every window is hidden or covered, so animation can pause.
+    @Published var appVisible = true
+    /// Where the agent stands: starting, ready, waiting on setup, or offline.
+    @Published var agentLink: AgentLink = .starting
+    /// Decisions the agent is waiting on during this turn.
+    @Published var approvals: [AgentApproval] = []
+    /// The listening mode to return to when always-listening is switched off.
+    private var quietMode: ListeningMode = .handsFree
+    private lazy var backend: AgentBackend = makeBackend()
+    private var backendSignature = ""
+    private var turnHistory: [ChatMessage] = []
+    private var decisions: [String] = []
+    private var feed = SpeechFeed()
+    private var voiceChunks: AsyncStream<String>.Continuation?
+    private var voicePlayback: Task<Void, Error>?
     private var expiredReviews = Set<UUID>()
     private var taskStore: TaskStore?
     private let chrome = ChromeConnection()
@@ -52,11 +89,9 @@ struct ConversationItem: Identifiable {
     private var chromeHealth: Task<Void, Never>?
     let audio = AudioController()
     private var store: MemoryStore?
-    private let client = OllamaClient()
     private var work: Task<Void, Never>?
     private var generation = UUID()
     private var holdRequested = false
-    private let runtime = LocalRuntime()
     private let speech = SpeechRuntime()
     private let speechWorker = SpeechWorker()
     private var healthMonitor: Task<Void, Never>?
@@ -69,6 +104,9 @@ struct ConversationItem: Identifiable {
     private var standbyWork: Task<Void, Never>?
     var busy: Bool { phase != .idle }
     var listeningMode: ListeningMode { ListeningMode(rawValue: config.listeningMode ?? "") ?? .wakeWord }
+    var alwaysListening: Bool { listeningMode == .wakeWord }
+    /// Hermes is the default brain; the on-device engine is an opt-in fallback.
+    var usesHermes: Bool { (config.agentBackend ?? "hermes") != "local" }
     var bookmarkURL: URL { Configuration.dataDirectory.appendingPathComponent("folder.bookmark") }
     func capabilityRegistry() throws -> CapabilityRegistry {
         var entries = try BuiltInCapabilities.registry(root: selectedFolder, allowFiles: config.allowFileSearch,
@@ -107,6 +145,7 @@ struct ConversationItem: Identifiable {
                 if stale { try saveBookmark(folder) }
             }
         } catch { notice = "Setup needs attention: \(error.localizedDescription)" }
+        if listeningMode != .wakeWord { quietMode = listeningMode }
         audio.speechWorker = speechWorker
         audio.onChunk = { [weak self] power, duration in self?.observe(power: power, duration: duration) }
         audio.onEngineLost = { [weak self] in self?.engineLost() }
@@ -115,33 +154,101 @@ struct ConversationItem: Identifiable {
             if config.speakResponses { await speechWorker.warmUp() }
             applyListeningMode()
         }
-        startRuntime()
+        backendSignature = signature
+        connectWhenAllowed()
     }
 
-    func startRuntime() {
+    /// Connects, except on the first Hermes run: then it waits for Connect, so Jarvis never
+    /// starts Hermes (and a provider token refresh) without a click.
+    private func connectWhenAllowed() {
+        if usesHermes && config.hermesConnected != true {
+            agentLink = .needsSetup(AgentSetupIssue(title: "Connect Jarvis to Hermes",
+                detail: "Jarvis thinks with Hermes Agent and your ChatGPT sign-in. Sign in to Hermes first if you haven't recently, then press Connect.",
+                command: HermesBackend.signInCommand))
+            connected = false
+        } else {
+            startAgent()
+        }
+    }
+
+    private var signature: String { "\(usesHermes)|\(config.hermesExecutable ?? "")" }
+
+    private func makeBackend() -> AgentBackend {
+        if usesHermes {
+            let path = config.hermesExecutable?.trimmingCharacters(in: .whitespaces) ?? ""
+            return HermesBackend(settings: .init(
+                executable: path.isEmpty ? nil : URL(fileURLWithPath: path),
+                // A home-folder cwd keeps Hermes in assistant mode; a repo would switch it to coding mode.
+                workingDirectory: FileManager.default.homeDirectoryForCurrentUser,
+                sessionFile: Configuration.dataDirectory.appendingPathComponent("hermes-session"),
+                environment: ["JARVIS_SESSION": "1"]))
+        }
+        return LocalBackend { [weak self] text in
+            guard let self else { throw CancellationError() }
+            return try await self.localContext(for: text)
+        }
+    }
+
+    /// What the on-device engine needs for one turn.
+    func localContext(for text: String) async throws -> LocalBackend.Context {
+        var context = capabilityEnabled("search_memories") ? Array(memories.prefix(12)) : []
+        if capabilityEnabled("search_memories"), let store, !text.isEmpty {
+            let hits = try await store.relevant(to: text)
+            context = hits + context.filter { candidate in !hits.contains { $0.key == candidate.key } }
+        }
+        return LocalBackend.Context(configuration: config, registry: try capabilityRegistry(), history: turnHistory,
+                                    memories: context, store: store)
+    }
+
+    /// Starts the agent or reconnects to it, then keeps an eye on it.
+    func startAgent() {
         guard !connecting else { return }
-        connected = false; connecting = true
+        connected = false; connecting = true; agentLink = .starting
+        let backend = self.backend
         startup = Task {
             defer { connecting = false }
-            do {
-                try await runtime.ensureRunning(configuration: config)
-                availableModels = try await client.models()
-                try await client.verifyLocal(model: config.model)
-                connected = true
-            } catch is CancellationError { }
-            catch { connected = false; notice = error.localizedDescription }
+            let link = await backend.connect()
+            guard !Task.isCancelled else { return }
+            agentLink = link; connected = link.isReady
+            if link.isReady, usesHermes, config.hermesConnected != true {
+                config.hermesConnected = true
+                try? config.save()
+            }
+            if let local = backend as? LocalBackend { availableModels = await local.models() }
+            if link.isReady, messages.isEmpty {
+                let earlier = await backend.history().suffix(40)
+                if messages.isEmpty, !earlier.isEmpty {
+                    messages = earlier.map { ConversationItem(role: $0.role == "user" ? "user" : "assistant", text: $0.text) }
+                }
+            }
         }
         if healthMonitor == nil {
+            // Brings a crashed agent back between turns. Setup problems wait for the user.
             healthMonitor = Task { [weak self] in
                 while !Task.isCancelled {
-                    do { try await Task.sleep(nanoseconds: 4_000_000_000) } catch { return }
+                    do { try await Task.sleep(nanoseconds: 20_000_000_000) } catch { return }
                     guard let self else { return }
-                    let reachable = await self.client.isReachable()
-                    if !reachable { self.connected = false }
+                    if self.busy || self.connecting { continue }
+                    if case .needsSetup = self.agentLink { continue }
+                    let link = await self.backend.connect()
+                    if !self.connecting { self.agentLink = link; self.connected = link.isReady }
                 }
             }
         }
     }
+
+    /// Answers a pending approval from its card. Sends and deletes only ever get "once".
+    func answer(_ request: AgentApproval, allow: Bool) {
+        let option = allow ? (request.options.first { $0.kind == .allowOnce } ?? request.options.first { $0.allows })
+                           : request.options.first { $0.kind == .rejectOnce }
+        let backend = self.backend
+        Task { await backend.resolve(approval: request.id, optionID: option?.id) }
+    }
+
+    var linkLabel: String {
+        usesHermes ? "Hermes" + (agentDetail.map { " · " + $0 } ?? "") : "Local · " + config.model
+    }
+    var agentDetail: String? { if case .ready(let detail) = agentLink { return detail }; return nil }
 
     func submit() {
         let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -153,92 +260,174 @@ struct ConversationItem: Identifiable {
         stop(clearNotice: true)
         standby = false; voiceTurn = spoken
         let token = generation
-        let history = messages.filter { $0.role == "user" || $0.role == "assistant" }.suffix(8).map { ChatMessage(role: $0.role, content: $0.text) }
+        turnHistory = messages.filter { $0.role == "user" || $0.role == "assistant" }.suffix(8).map { ChatMessage(role: $0.role, content: $0.text) }
         messages.append(ConversationItem(role: "user", text: text))
         if messages.count > 100 { messages.removeFirst(messages.count - 100) }
         phase = .thinking
+        activity = []; liveText = ""; approvals = []; decisions = []; feed = SpeechFeed()
+        let started = Date()
+        let backend = self.backend
+        let direct = text.hasPrefix("/find ")
         work = Task {
+            var firstText: TimeInterval?
+            var receipts: [CapabilityReceipt] = []
             do {
-                let answer: String
-                var report: SearchReport?; var detail: String?
-                var receipts: [CapabilityReceipt] = []
-                if let command = try MemoryCommand.parse(text) {
-                    guard let store else { throw JarvisError.message("Memory storage is unavailable. Restart after fixing the setup error.") }
-                    let memory = try await store.put(key: command.key, value: command.value, source: "Explicit user request: \(text)")
-                    answer = "Remembered: \(memory.value)"
-                    detail = "Saved locally · \(memory.key) · revision \(memory.revision)"
-                    await reloadMemories()
-                } else if text.hasPrefix("/find ") {
+                if direct {
+                    // A plain filename search runs here without the agent, so it works offline too.
                     phase = .searching
+                    updateProgress("Search your files", token: token)
                     let session = CapabilitySession(registry: try capabilityRegistry())
                     let receipt = try await session.execute(.init(name: "search_files", arguments: ["query": .string(String(text.dropFirst(6)))]))
-                    receipts = [receipt]; report = receipt.output.files
-                    answer = receipt.output.summary
-                    detail = "Direct capability request"
+                    receipts = [receipt]; liveText = receipt.output.summary
                 } else {
-                    // Always preflight, even if the badge was previously green. Do not replay an action after dispatch.
-                    connecting = true
-                    do {
-                        try await runtime.ensureRunning(configuration: config)
-                        try await client.verifyLocal(model: config.model)
+                    for try await event in backend.send(text) {
                         try Task.checkCancellation()
-                        guard generation == token else { throw CancellationError() }
-                        connected = true; connecting = false
-                    } catch {
-                        connected = false; connecting = false; throw error
+                        guard generation == token else { return }
+                        switch event {
+                        case .text(let delta):
+                            if firstText == nil { firstText = Date().timeIntervalSince(started) }
+                            liveText += delta
+                            if [.thinking, .working, .searching].contains(phase) { phase = .responding }
+                            if config.speakResponses { say(feed.update(liveText), token: token) }
+                        case .tool(let tool):
+                            track(tool)
+                        case .approval(let request):
+                            approvals.append(request); phase = .awaitingApproval
+                        case .approvalResolved(let id, let allowed):
+                            if let request = approvals.first(where: { $0.id == id }) {
+                                decisions.append((allowed ? "Approved: " : "Declined: ") + request.title)
+                            }
+                            approvals.removeAll { $0.id == id }
+                            if phase == .awaitingApproval { phase = approvals.isEmpty ? .working : .awaitingApproval }
+                        case .receipts(let more):
+                            receipts += more
+                        case .finished:
+                            break
+                        }
                     }
-                    var contextMemories = capabilityEnabled("search_memories") ? Array(memories.prefix(12)) : []
-                    if capabilityEnabled("search_memories"), let store {
-                        let hits = try await store.relevant(to: text)
-                        contextMemories = hits + contextMemories.filter { candidate in !hits.contains { $0.key == candidate.key } }
-                    }
-                    let result = try await AssistantEngine(client: client).respond(text: text, history: Array(history), memories: contextMemories,
-                        model: config.model, registry: try capabilityRegistry(), spoken: config.speakResponses, onProgress: { [weak self] step in
-                            await self?.updateProgress(step, token: token)
-                        })
-                    answer = result.text; report = result.search
-                    receipts = result.receipts
-                    detail = String(format: "Local · %@ · %.1fs", config.model, result.elapsed)
                 }
                 try Task.checkCancellation()
                 guard generation == token else { return }
+                let report = receipts.compactMap(\.output.files).last
                 if let report { recentSearch = report }
-                currentStep = nil
-                messages.append(ConversationItem(role: "assistant", text: answer, files: report, detail: detail, receipts: receipts))
-                let speech = config.speakResponses ? SpeechText.spoken(from: answer) : ""
-                if !speech.isEmpty {
-                    phase = .synthesizing
-                    bargeEndpointer = SpeechEndpointer(settings: .bargeIn)
-                    do {
-                        try await audio.speak(speech, voice: config.naturalVoice ?? "bm_george", speed: config.speechRate ?? 1) {
-                            if self.generation == token { self.phase = .speaking }
-                        }
-                    }
-                    catch is CancellationError { throw CancellationError() }
-                    catch { notice = "The answer is ready, but speech failed: \(error.localizedDescription)" }
-                }
+                currentStep = nil; settleActivity(.done); approvals = []
+                let answer = liveText.trimmingCharacters(in: .whitespacesAndNewlines)
+                let total = Date().timeIntervalSince(started)
+                lastReply = ReplyTiming(firstText: firstText, total: total)
+                let detail = direct ? "Direct search" : String(format: "%@ · %.1fs", linkLabel, total)
+                messages.append(ConversationItem(role: "assistant", text: answer.isEmpty ? "Done." : answer, files: report,
+                                                 detail: detail, receipts: receipts, decisions: decisions))
+                liveText = ""
+                if !usesHermes { await reloadMemories(); await reloadTasks() }
+                if config.speakResponses { say(feed.finish(answer), token: token) }
+                try await finishVoice(token: token)
                 if generation == token { finishTurn() }
-            } catch is CancellationError { if generation == token { phase = .idle } }
-            catch {
+            } catch is CancellationError {
+                if generation == token { phase = .idle }
+            } catch {
                 guard generation == token else { return }
+                endVoice()
                 if (error as? URLError)?.code == .cancelled { phase = .idle; return }
-                if error is URLError { connected = false }
-                currentStep = nil
+                switch error as? AgentFailure {
+                case .setup(let issue): agentLink = .needsSetup(issue); connected = false
+                case .offline(let reason): agentLink = .offline(reason); connected = false
+                default: if error is URLError { connected = false }
+                }
+                currentStep = nil; settleActivity(.failed); approvals = []
+                if !liveText.isEmpty {
+                    messages.append(ConversationItem(role: "assistant", text: liveText, detail: "Cut off", decisions: decisions))
+                    liveText = ""
+                }
                 notice = error.localizedDescription; phase = .idle
                 messages.append(ConversationItem(role: "status", text: error.localizedDescription))
                 rest()
             }
         }
     }
+
+    /// Keeps the activity readout in step with the agent's tools.
+    private func track(_ tool: AgentToolActivity) {
+        let state: ActivityItem.State = tool.state == .failed ? .failed : tool.state == .completed ? .done : .running
+        if let index = activity.firstIndex(where: { $0.id == tool.id }) {
+            activity[index].title = tool.title
+            activity[index].detail = tool.detail ?? activity[index].detail
+            if state != .running, activity[index].state == .running { activity[index].state = state; activity[index].finished = Date() }
+        } else {
+            // The on-device engine reports only starts: a new step means the last one is done.
+            if !usesHermes { settleActivity(.done) }
+            activity.append(ActivityItem(id: tool.id, title: tool.title, detail: tool.detail, state: state,
+                                         finished: state == .running ? nil : Date()))
+        }
+        if state == .running {
+            currentStep = tool.title
+            if [.thinking, .responding, .searching].contains(phase) { phase = .working }
+        }
+    }
+
+    // MARK: Streamed voice
+
+    /// Hands finished sentences to the voice; playback starts with the first one.
+    private func say(_ pieces: [String], token: UUID) {
+        guard !pieces.isEmpty, generation == token else { return }
+        if voiceChunks == nil {
+            let (stream, continuation) = AsyncStream<String>.makeStream()
+            voiceChunks = continuation
+            bargeEndpointer = SpeechEndpointer(settings: .bargeIn)
+            let voice = config.naturalVoice ?? "bm_george", speed = config.speechRate ?? 1
+            voicePlayback = Task { [weak self] in
+                guard let self else { return }
+                try await self.audio.speak(stream, voice: voice, speed: speed) {
+                    if self.generation == token { self.phase = .speaking }
+                }
+            }
+        }
+        for piece in pieces { voiceChunks?.yield(piece) }
+    }
+
+    /// Closes the voice stream and waits for the last sentence to play.
+    private func finishVoice(token: UUID) async throws {
+        voiceChunks?.finish(); voiceChunks = nil
+        guard let playback = voicePlayback else { return }
+        if phase != .speaking { phase = .synthesizing }
+        do { try await playback.value }
+        catch is CancellationError { throw CancellationError() }
+        catch { notice = "The answer is ready, but speech failed: \(error.localizedDescription)" }
+        voicePlayback = nil
+    }
+
+    private func endVoice() {
+        voiceChunks?.finish(); voiceChunks = nil
+        voicePlayback?.cancel(); voicePlayback = nil
+    }
+
     private func updateProgress(_ step: String, token: UUID) {
-        if generation == token { currentStep = step }
+        guard generation == token else { return }
+        currentStep = step
+        settleActivity(.done)
+        activity.append(ActivityItem(id: UUID().uuidString, title: step))
+    }
+    /// Closes whatever step is still running.
+    private func settleActivity(_ state: ActivityItem.State) {
+        for index in activity.indices where activity[index].state == .running {
+            activity[index].state = state; activity[index].finished = Date()
+        }
     }
 
     // MARK: Listening
 
+    /// The main-screen switch. On is wake-word standby; off goes back to the last non-wake mode.
+    /// Saved right away, without the engine restart that saving settings does.
+    func setAlwaysListening(_ on: Bool) {
+        guard on != alwaysListening else { return }
+        if on { quietMode = listeningMode }
+        config.listeningMode = (on ? ListeningMode.wakeWord : quietMode).rawValue
+        do { try config.save() } catch { notice = error.localizedDescription }
+        applyListeningMode()
+    }
     /// Called after settings change and at launch. Wake-word mode keeps the mic open; the others
     /// open it only while a conversation is going.
     func applyListeningMode() {
+        if listeningMode != .wakeWord { quietMode = listeningMode }
         switch listeningMode {
         case .wakeWord: armStandby()
         case .manual, .handsFree:
@@ -424,16 +613,28 @@ struct ConversationItem: Identifiable {
         }
         generation = UUID(); work?.cancel(); work = nil
         standbyWork?.cancel(); standbyWork = nil
+        endVoice(); approvals = []
+        // Whatever was already written stays in the transcript, marked as cut off.
+        if !liveText.isEmpty {
+            messages.append(ConversationItem(role: "assistant", text: liveText, detail: "Stopped", decisions: decisions))
+            liveText = ""
+        }
+        for index in activity.indices where activity[index].state == .running { activity[index].state = .failed; activity[index].finished = Date() }
         audio.stop(); holdRequested = false; phase = .idle; currentStep = nil
         if clearNotice { notice = nil }
-        else if wasBusy { notice = "Stopped. Completed memory saves remain saved; pending responses were discarded." }
+        else if wasBusy { notice = "Stopped." }
     }
     /// The user's Stop: cancel everything and return to rest.
     func interrupt() {
         stop()
         rest()
     }
-    func clearConversation() { stop(clearNotice: true); messages = []; recentSearch = nil; reviewResults = [:]; expiredReviews = []; rest() }
+    func clearConversation() {
+        stop(clearNotice: true); messages = []; recentSearch = nil; reviewResults = [:]; expiredReviews = []; activity = []
+        let backend = self.backend
+        Task { await backend.newSession() }
+        rest()
+    }
     func reviewStatus(_ review: ReviewedAction) -> String? {
         reviewResults[review.id] ?? (expiredReviews.contains(review.id) ? "Expired. Ask Jarvis to prepare this again." : nil)
     }
@@ -561,7 +762,15 @@ struct ConversationItem: Identifiable {
     func saveSettings() {
         stop(clearNotice: true)
         do {
-            try config.save(); connected = false; startRuntime()
+            try config.save()
+            // Switching brains (or where Hermes lives) replaces the backend; other changes just reconnect.
+            if signature != backendSignature {
+                let old = backend
+                Task { await old.shutdown() }
+                backend = makeBackend(); backendSignature = signature
+                messages = []; activity = []
+            }
+            connected = false; connectWhenAllowed()
             if config.speakResponses { Task { await speechWorker.warmUp() } }
             applyListeningMode()
         } catch { notice = error.localizedDescription }
@@ -573,6 +782,6 @@ struct ConversationItem: Identifiable {
         browserWork?.cancel(); await chrome.disconnect()
         await speechWorker.stop()
         await speech.shutdown()
-        await runtime.shutdown()
+        await backend.shutdown()
     }
 }

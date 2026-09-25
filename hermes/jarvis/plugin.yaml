@@ -1,0 +1,6 @@
+name: jarvis
+version: "0.1.0"
+description: "Jarvis desktop client: the Jarvis persona, and a yes-first gate for messages, email, calendar changes, posts and deletes. Only active when Jarvis starts Hermes (JARVIS_SESSION=1); CLI, cron and gateway sessions are untouched."
+author: "Jarvis"
+provides_hooks:
+  - pre_tool_call

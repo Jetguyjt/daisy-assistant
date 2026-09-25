@@ -22,6 +22,13 @@ public struct Configuration: Codable, Sendable {
     public var browserNode: String?
     /// manual, handsFree or wakeWord. Optional so settings saved before it existed still decode.
     public var listeningMode: String?
+    /// "hermes" (default) or "local", the on-device fallback.
+    public var agentBackend: String?
+    /// Overrides where Jarvis looks for `hermes-acp`.
+    public var hermesExecutable: String?
+    /// Set after the first successful Hermes connection. Until then Jarvis waits for a click,
+    /// so it never starts Hermes (and a provider token refresh) on its own.
+    public var hermesConnected: Bool?
     public init() {}
 
     public static var dataDirectory: URL {

@@ -52,4 +52,45 @@ final class SpeechTests {
         expectTrue(spoken.hasSuffix("while."))
         expectTrue(spoken.count > 200)
     }
+
+    // Streaming: the voice starts on the first finished sentence and ends up saying the same thing.
+    func testFeedStartsEarlyAndMatchesOneShot() {
+        let answer = "Sure thing. The capital of France is Paris, on the **Seine**.\nIt has about two million people. Want the history too?"
+        var feed = SpeechFeed()
+        var chunks: [String] = []
+        var firstAt: Int?
+        var text = ""
+        for character in answer {
+            text.append(character)
+            let ready = feed.update(text)
+            if firstAt == nil, !ready.isEmpty { firstAt = text.count }
+            chunks += ready
+        }
+        chunks += feed.finish(answer)
+        expectEqual(chunks.joined(separator: " "), SpeechText.spoken(from: answer))
+        expectTrue((firstAt ?? .max) < answer.count * 2 / 3)
+    }
+    func testFeedHoldsListMarkersAndShortFragments() {
+        var feed = SpeechFeed()
+        expectEqual(feed.update("1. "), [])
+        expectEqual(feed.update("Ok. "), [])
+        expectEqual(feed.update("Ok. Here are the steps.\n"), ["Ok. Here are the steps."])
+        expectEqual(feed.update("Ok. Here are the steps.\n1. Open the folder\n"), ["1. Open the folder."])
+        expectEqual(feed.finish("Ok. Here are the steps.\n1. Open the folder\n"), [])
+    }
+    func testFeedRestartsForANewTurnAndKeepsCodeOffTheVoice() {
+        var feed = SpeechFeed()
+        expectEqual(feed.update("Let me check that for you. "), ["Let me check that for you."])
+        expectEqual(feed.update("Use this:\n```swift\nlet x = 1. y = 2\n"), ["Use this: Code is shown on screen."])
+        expectEqual(feed.finish("Use this:\n```swift\nlet x = 1. y = 2\n```\nThat is all."), ["That is all."])
+    }
+    func testFeedRespectsTheSpokenLimit() {
+        var feed = SpeechFeed(limit: 300)
+        let long = String(repeating: "This is a sentence that keeps going for a while. ", count: 40)
+        var said = feed.update(long)
+        said += feed.finish(long)
+        let total = said.joined(separator: " ")
+        expectTrue(total.count <= 310)
+        expectTrue(total.hasSuffix("while."))
+    }
 }
