@@ -30,7 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             CommandMenu("Voice") {
                 Button("Start / finish recording") { model.toggleListening() }.keyboardShortcut(.space, modifiers: [.command, .shift])
-                Button("Stop Jarvis") { model.stop() }.keyboardShortcut(".", modifiers: [.command])
+                Button("Stop Jarvis") { model.interrupt() }.keyboardShortcut(".", modifiers: [.command])
             }
         }
     }

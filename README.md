@@ -60,7 +60,9 @@ The agent is bounded to eight model rounds and ten tool calls, with strict schem
 
 ## Voice, tasks and Chrome
 
-In **Settings → Voice**, choose George, Fable, Michael, Heart or Emma, use **Preview voice**, then Save settings. Speech synthesis uses the downloaded Kokoro model locally. Run `bash scripts/setup-voice.sh` if the voice runtime is missing. The old macOS voice is not a fallback.
+In **Settings → Voice**, choose George, Fable, Michael, Heart or Emma, use **Preview voice**, then Save settings. Speech synthesis uses the downloaded Kokoro model locally, kept loaded in a worker process while Jarvis runs and spoken sentence by sentence. Run `bash scripts/setup-voice.sh` if the voice runtime is missing. The old macOS voice is not a fallback.
+
+**Listening** has three modes in the same settings group. *Wake word* (the default) keeps the microphone open: every pause is transcribed on this Mac with whisper.cpp and dropped unless it starts with "Hey Jarvis"; after an answer Jarvis listens for a follow-up until you stay quiet. *Hands-free conversation* starts with one click on Record and then runs the same loop. *Click to talk* keeps the microphone off until you click. In every mode a recording ends on its own when you pause, and you can talk over Jarvis to interrupt it (Apple's voice processing cancels its own speech from the mic input). whisper.cpp runs as a `whisper-server` child so the model loads once; if that binary is missing, each utterance falls back to `whisper-cli`.
 
 Use **Tasks → Add task** for homework, essay or coding projects. Or ask “Prepare a task to outline my essay in project College essays.” Jarvis produces a review card; **Apply** saves it. Due dates are tracking fields, not scheduled reminders. Ask “What tasks do I have for College essays?” to retrieve saved work. Notes can contain prompts, source links and next steps. “Prepare a new file study-plan.md with …” creates a review card showing exact content and destination. No existing file is overwritten.
 
@@ -103,6 +105,9 @@ swift run jarvis-check qwen3.5:4b       # actual local inference and synthetic s
 swift run jarvis-check --runtime       # quit Jarvis/external server first; owned startup/shutdown twice
 swift run jarvis-check --browser-metadata # real MCP handshake only; no browser/account access
 swift run jarvis-check --spoken answer.md  # print what the voice would say for a Markdown answer
+swift run jarvis-check --endpoint clip.wav  # replay a WAV through the silence endpointer
+swift run jarvis-check --wake-gate clip.wav # transcribe a WAV and show whether the wake phrase fires
+swift run jarvis-check --voice-timing clip.wav # persistent whisper-server and Kokoro worker versus one-shot processes
 ```
 
 The focused tests use a small standalone Swift runner because the installed Command Line Tools do not ship XCTest. Tests exit nonzero on failure. They cover persisted corrections, idempotency, deletion/retrieval, query escaping, scope boundaries, symlink exclusion, disabled/unknown tools, malformed responses, local-model checks, and cancellation/timeouts. The smoke test creates only synthetic files, task drafts and preferences in a temporary folder, generates local speech, transcribes it, and writes measurements under `.runtime/benchmark-*.json`.

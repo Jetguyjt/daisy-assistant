@@ -79,6 +79,27 @@ With the probe fix installed the user reconnected Chrome and asked for Gmail. Th
 
 Fix: the adapter is now launched with that flag, and the parser also accepts the text form (`3: Title (https://url) [selected]`, optional `isolatedContext=` suffix, extension pages under their own heading ignored). A fixture test covers the text form through `browser_tabs` and `browser_open`, including a title that contains parentheses and a URL that contains parentheses. The check tool's `--browser-metadata` mode uses the same argument list as the app. A live tab read through the installed app after this change has **not** yet been observed.
 
+## Always-listening voice — 2026-09-25
+
+Implemented: three listening modes, an energy endpointer, a Whisper-gated wake word, AVAudioEngine capture with Apple voice processing, engine playback, a persistent `whisper-server` child and a persistent Kokoro worker with sentence-by-sentence playback. Apple's on-device SFSpeechRecognizer was dropped after returning no results on synthesized test audio.
+
+Tested automatically (54 tests, zero failures): endpointer start, trailing-silence finish, no-speech timeout, utterance cap, adaptive floor with a pre-roll that already contains speech, barge-in preset against echo residue, standby preset waiting a quiet minute; wake-phrase matching and stripping; WAV writer validated with `afinfo`; sentence chunking; the Kokoro worker line protocol against a fixture process, including an error reply and a restart; configuration decoding of older files.
+
+Measured with `jarvis-check` on synthesized clips (not a live microphone):
+
+| Check | Result |
+| --- | --- |
+| Endpointer on a 2.3 s utterance padded with silence | speech detected 0.3 s in, finished 0.9 s after speech ended |
+| Wake gate on "Hey Jarvis, what time is it?" | match, request "what time is it?", 0.36 s including server start |
+| Wake gate on a plain request | no match, request passed through unchanged |
+| whisper-cli, one process | 0.26 s |
+| whisper-server, warm request | 0.11 s |
+| Kokoro, one process, 17-word sentence | 2.49 s |
+| Kokoro worker, warm, same sentence | 1.10 s |
+| Kokoro worker, warm, short opening chunk | 0.57 s |
+
+Not yet observed: a live "Hey Jarvis" from across the room, barge-in over real speaker output, the follow-up loop, and whether Apple's voice processing accepts the Studio Display or built-in microphone on this Mac. The mode defaults to wake word, so the first launch of this build asks for the microphone and then shows "Listening for Hey Jarvis" in the composer.
+
 ## Hands-on acceptance
 
 1. Settings → Voice → Preview voice; compare voices, then Save settings. Stop should interrupt playback/preparation.

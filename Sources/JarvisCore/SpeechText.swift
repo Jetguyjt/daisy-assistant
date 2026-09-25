@@ -32,6 +32,35 @@ public enum SpeechText {
         return truncated(joined, limit: limit)
     }
 
+    /// Chunks for sentence-by-sentence synthesis: the first is short so audio starts early, later
+    /// ones are longer so the voice keeps its flow. Boundaries are sentence ends only.
+    public static func sentences(from spoken: String, firstTarget: Int = 60, target: Int = 160, maximum: Int = 600) -> [String] {
+        let text = spoken.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return [] }
+        var pieces: [String] = []
+        var current = ""
+        for scalar in text {
+            current.append(scalar)
+            if ".!?".contains(scalar) { pieces.append(current); current = "" }
+        }
+        if !current.trimmingCharacters(in: .whitespaces).isEmpty { pieces.append(current) }
+        var chunks: [String] = []
+        var chunk = ""
+        for piece in pieces.map({ $0.trimmingCharacters(in: .whitespaces) }) where !piece.isEmpty {
+            let goal = chunks.isEmpty ? firstTarget : target
+            let grown = chunk.count + piece.count + 1
+            if !chunk.isEmpty, chunk.count >= goal || grown > goal + goal / 2 || grown > maximum {
+                chunks.append(chunk); chunk = ""
+            }
+            chunk = chunk.isEmpty ? piece : chunk + " " + piece
+            while chunk.count > maximum, let cut = chunk.prefix(maximum).lastIndex(of: " ") {
+                chunks.append(String(chunk[..<cut])); chunk = String(chunk[chunk.index(after: cut)...])
+            }
+        }
+        if !chunk.isEmpty { chunks.append(chunk) }
+        return chunks
+    }
+
     static func inline(_ text: String) -> String {
         var line = text
         line = line.replacing(pattern: "!?\\[([^\\]]*)\\]\\([^)]*\\)", with: "$1")

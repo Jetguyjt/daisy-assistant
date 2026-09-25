@@ -2,23 +2,51 @@ import AppKit
 import AVFoundation
 import JarvisCore
 
+/// Microphone capture and speech playback on one AVAudioEngine. Voice processing (Apple's echo
+/// cancellation) is enabled on the input so the mic can hear the user while Jarvis speaks. That
+/// only cancels audio played through the same engine, so speech goes through a player node while
+/// the engine runs and falls back to AVAudioPlayer when it does not.
 @MainActor final class AudioController: ObservableObject {
+    struct Chunk: Sendable { let samples: [Int16]; let power: Float; let duration: TimeInterval }
     @Published var level: Double = 0
     @Published var elapsed: TimeInterval = 0
-    private var recorder: AVAudioRecorder?
-    private var player: AVAudioPlayer?
-    private var meter: Timer?
-    private var recordingFolder: URL?
-    var onRecordingLimit: (() -> Void)?
+    @Published private(set) var engineRunning = false
+    /// True when Apple voice processing accepted the input device; barge-in relies on it.
+    private(set) var echoCancellation = false
+    /// Power in dBFS and duration of each 16 kHz chunk, delivered on the main actor.
+    var onChunk: ((Float, TimeInterval) -> Void)?
+    /// The engine stopped because a device changed; the owner decides whether to restart.
+    var onEngineLost: (() -> Void)?
+    /// Warm Kokoro process; nil means one process per sentence.
+    var speechWorker: SpeechWorker?
+
+    static let sampleRate = 16000.0
+    private static let preRollSeconds: TimeInterval = 1.5
+    private let engine = AVAudioEngine()
+    private let player = AVAudioPlayerNode()
+    private let bridge = TapBridge()
+    private var preRoll: [Chunk] = []
+    private var capture: [Int16]?
+    private var gate: PlaybackGate?
+    private var fallback: AVAudioPlayer?
+    private var configurationObserver: NSObjectProtocol?
+
+    init() {
+        engine.attach(player)
+        bridge.deliver = { [weak self] chunk in Task { @MainActor in self?.ingest(chunk) } }
+        bridge.levelSink = { [weak self] power in Task { @MainActor in self?.level = Self.meter(power) } }
+    }
     var microphoneStatus: String {
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .authorized: return "Microphone permission granted"
         case .denied, .restricted: return "Microphone permission blocked in System Settings"
-        case .notDetermined: return "Microphone permission will be requested on Record"
+        case .notDetermined: return "Microphone permission will be requested on first use"
         @unknown default: return "Microphone permission unknown"
         }
     }
     var inputDeviceName: String { AVCaptureDevice.default(for: .audio)?.localizedName ?? "No default audio input device detected" }
+    var capturing: Bool { capture != nil }
+    static func meter(_ power: Float) -> Double { min(1, Double(pow(10, power / 30))) }
 
     func requestMicrophone() async -> Bool {
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
@@ -27,69 +55,244 @@ import JarvisCore
         default: return false
         }
     }
-    func startRecording() throws {
-        stop()
+
+    // MARK: Engine
+
+    func startEngine() throws {
+        if engine.isRunning { return }
+        let input = engine.inputNode
+        if !echoCancellation {
+            do { try input.setVoiceProcessingEnabled(true); echoCancellation = true }
+            catch { echoCancellation = false }
+        }
+        _ = engine.mainMixerNode
+        engine.prepare()
+        let format = input.outputFormat(forBus: 0)
+        guard format.sampleRate > 0, format.channelCount > 0 else { throw JarvisError.message("No audio input device is available.") }
+        guard let target = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: Self.sampleRate, channels: 1, interleaved: true),
+              let converter = AVAudioConverter(from: format, to: target) else {
+            throw JarvisError.message("The microphone format could not be converted for transcription.")
+        }
+        bridge.prepare(converter: converter, target: target)
+        input.removeTap(onBus: 0)
+        let bridge = self.bridge
+        input.installTap(onBus: 0, bufferSize: 4096, format: format) { buffer, _ in bridge.handle(buffer) }
+        do { try engine.start() } catch {
+            input.removeTap(onBus: 0)
+            throw JarvisError.message("The audio engine could not start: \(error.localizedDescription)")
+        }
+        engineRunning = true
+        if configurationObserver == nil {
+            configurationObserver = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { [weak self] _ in
+                Task { @MainActor in self?.engineConfigurationChanged() }
+            }
+        }
+    }
+    private func engineConfigurationChanged() {
+        guard engineRunning else { return }
+        stopEngine()
+        onEngineLost?()
+    }
+    func stopEngine() {
+        stopPlayback()
+        capture = nil; preRoll = []
+        engine.inputNode.removeTap(onBus: 0)
+        if engine.isRunning { engine.stop() }
+        engineRunning = false; level = 0; elapsed = 0
+    }
+
+    // MARK: Capture
+
+    private func ingest(_ chunk: Chunk) {
+        preRoll.append(chunk)
+        var total = preRoll.reduce(0) { $0 + $1.duration }
+        while total > Self.preRollSeconds, !preRoll.isEmpty { total -= preRoll.removeFirst().duration }
+        if capture != nil {
+            capture?.append(contentsOf: chunk.samples)
+            elapsed = Double(capture?.count ?? 0) / Self.sampleRate
+            level = Self.meter(chunk.power)
+        }
+        onChunk?(chunk.power, chunk.duration)
+    }
+    /// Starts an utterance, seeded with up to `seconds` of audio already heard (the wake phrase
+    /// and whatever followed it). Returns those chunks' readings so the caller can feed its endpointer.
+    @discardableResult
+    func beginCapture(preRoll seconds: TimeInterval) -> [(power: Float, duration: TimeInterval)] {
+        var kept: [Chunk] = []
+        var total = 0.0
+        for chunk in preRoll.reversed() {
+            if total >= seconds { break }
+            kept.insert(chunk, at: 0); total += chunk.duration
+        }
+        capture = kept.flatMap(\.samples)
+        elapsed = Double(capture?.count ?? 0) / Self.sampleRate
+        return kept.map { ($0.power, $0.duration) }
+    }
+    /// Writes the utterance for whisper. The caller owns the returned folder.
+    func endCapture() throws -> URL {
+        guard let samples = capture else { throw JarvisError.message("No recording is active.") }
+        capture = nil; elapsed = 0; level = 0
+        guard Double(samples.count) / Self.sampleRate >= 0.35 else {
+            throw JarvisError.message("Recording was too short. Say a few words, then pause.")
+        }
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("jarvis-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-        recordingFolder = folder
-        let audio = folder.appendingPathComponent("input.wav")
-        do {
-            let capture = try AVAudioRecorder(url: audio, settings: [
-                AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: 16000.0,
-                AVNumberOfChannelsKey: 1, AVLinearPCMBitDepthKey: 16,
-                AVLinearPCMIsFloatKey: false, AVLinearPCMIsBigEndianKey: false
-            ])
-            capture.isMeteringEnabled = true
-            guard capture.record() else { throw JarvisError.message("The microphone could not start recording.") }
-            recorder = capture; elapsed = 0
-            let timer = Timer(timeInterval: 0.04, repeats: true) { [weak self] _ in
-                MainActor.assumeIsolated {
-                    guard let self, let recorder = self.recorder else { return }
-                    recorder.updateMeters()
-                    self.elapsed = recorder.currentTime
-                    self.level = min(1, Double(pow(10, recorder.averagePower(forChannel: 0) / 30)))
-                    if recorder.currentTime >= 60 { self.onRecordingLimit?() }
-                }
-            }
-            meter = timer
-            // Mouse tracking/modal loops must not freeze the recording meter or duration limit.
-            RunLoop.main.add(timer, forMode: .common)
-        } catch { stop(); throw error }
-    }
-    func finishRecording() throws -> URL {
-        guard let recorder else { throw JarvisError.message("No recording is active.") }
-        let duration = recorder.currentTime; let url = recorder.url
-        recorder.stop(); self.recorder = nil; meter?.invalidate(); meter = nil; level = 0
-        guard duration >= 0.35 else {
-            stop(); throw JarvisError.message("Recording was too short. Click Record, speak, then click Finish.")
-        }
-        recordingFolder = nil // caller owns deletion after decoding
+        let url = folder.appendingPathComponent("input.wav")
+        try WAVFile.write(samples: samples, sampleRate: Int(Self.sampleRate), to: url)
         return url
     }
+    func discardCapture() { capture = nil; elapsed = 0; level = 0 }
+
+    // MARK: Playback
+
+    /// Speaks sentence by sentence: the next sentence is synthesized while the current one plays.
     func speak(_ text: String, voice: String, speed: Double = 1, onReady: (() -> Void)? = nil) async throws {
+        let chunks = SpeechText.sentences(from: text)
+        guard !chunks.isEmpty else { return }
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("jarvis-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         defer { try? FileManager.default.removeItem(at: folder) }
-        let input = folder.appendingPathComponent("speech.txt")
-        let output = folder.appendingPathComponent("speech.wav")
-        try await NaturalSpeech.synthesize(text: text, voice: voice, speed: speed, input: input, output: output)
-        try Task.checkCancellation()
-        let playback = try AVAudioPlayer(contentsOf: output)
-        playback.isMeteringEnabled = true; player = playback
-        guard playback.play() else { throw JarvisError.message("Audio playback could not start.") }
-        onReady?()
-        defer { playback.stop(); if player === playback { player = nil; level = 0 } }
-        while playback.isPlaying {
+        let worker = speechWorker
+        let files = AsyncThrowingStream<URL, Error> { continuation in
+            let producer = Task {
+                do {
+                    for (index, chunk) in chunks.enumerated() {
+                        try Task.checkCancellation()
+                        let url = folder.appendingPathComponent("\(index).wav")
+                        try await NaturalSpeech.synthesize(text: chunk, voice: voice, speed: speed, output: url, worker: worker)
+                        continuation.yield(url)
+                    }
+                    continuation.finish()
+                } catch { continuation.finish(throwing: error) }
+            }
+            continuation.onTermination = { _ in producer.cancel() }
+        }
+        if engine.isRunning { try await playThroughEngine(files, onReady: onReady) }
+        else { try await playWithFallback(files, onReady: onReady) }
+    }
+    private func playThroughEngine(_ files: AsyncThrowingStream<URL, Error>, onReady: (() -> Void)?) async throws {
+        let player = self.player
+        let bridge = self.bridge
+        player.installTap(onBus: 0, bufferSize: 2048, format: nil) { buffer, _ in bridge.meter(buffer) }
+        defer { player.removeTap(onBus: 0); player.stop(); gate = nil; level = 0 }
+        var connected = false
+        var last: PlaybackGate?
+        for try await url in files {
             try Task.checkCancellation()
-            playback.updateMeters()
-            level = min(1, Double(pow(10, playback.averagePower(forChannel: 0) / 30)))
-            try await Task.sleep(nanoseconds: 40_000_000)
+            let file = try AVAudioFile(forReading: url)
+            if !connected {
+                engine.disconnectNodeOutput(player)
+                engine.connect(player, to: engine.mainMixerNode, format: file.processingFormat)
+                connected = true
+            }
+            let gate = PlaybackGate()
+            self.gate = gate
+            player.scheduleFile(file, at: nil, completionCallbackType: .dataPlayedBack) { _ in gate.finish() }
+            if !player.isPlaying { player.play(); onReady?() }
+            last = gate
+        }
+        guard let last else { return }
+        try await withTaskCancellationHandler(operation: {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                last.arm(continuation)
+                if Task.isCancelled { last.cancel() }
+            }
+        }, onCancel: { player.stop(); last.cancel() })
+        try Task.checkCancellation()
+    }
+    private func playWithFallback(_ files: AsyncThrowingStream<URL, Error>, onReady: (() -> Void)?) async throws {
+        var first = true
+        for try await url in files {
+            let playback = try AVAudioPlayer(contentsOf: url)
+            playback.isMeteringEnabled = true; fallback = playback
+            guard playback.play() else { throw JarvisError.message("Audio playback could not start.") }
+            if first { onReady?(); first = false }
+            defer { playback.stop(); if fallback === playback { fallback = nil; level = 0 } }
+            while playback.isPlaying {
+                try Task.checkCancellation()
+                playback.updateMeters()
+                level = Self.meter(playback.averagePower(forChannel: 0))
+                try await Task.sleep(nanoseconds: 40_000_000)
+            }
         }
     }
+    func stopPlayback() {
+        gate?.cancel(); gate = nil
+        if engine.isRunning { player.stop() }
+        fallback?.stop(); fallback = nil
+        level = 0
+    }
+    /// Stops playback and drops any capture in progress. The engine itself stays as it was.
     func stop() {
-        recorder?.stop(); recorder = nil; player?.stop(); player = nil
-        meter?.invalidate(); meter = nil; level = 0; elapsed = 0
-        if let recordingFolder { try? FileManager.default.removeItem(at: recordingFolder) }
-        recordingFolder = nil
+        stopPlayback()
+        discardCapture()
+    }
+}
+
+/// Resolves a playback continuation exactly once, whichever side finishes first, even when the
+/// file finished before anyone started waiting for it.
+private final class PlaybackGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Void, Error>?
+    private var outcome: Error?? = nil
+    func arm(_ continuation: CheckedContinuation<Void, Error>) {
+        lock.lock()
+        if let outcome {
+            lock.unlock()
+            if let error = outcome { continuation.resume(throwing: error) } else { continuation.resume() }
+            return
+        }
+        self.continuation = continuation
+        lock.unlock()
+    }
+    func finish() { settle(nil) }
+    func cancel() { settle(CancellationError()) }
+    private func settle(_ error: Error?) {
+        lock.lock()
+        guard outcome == nil else { lock.unlock(); return }
+        outcome = .some(error)
+        let waiting = continuation; continuation = nil
+        lock.unlock()
+        if let error { waiting?.resume(throwing: error) } else { waiting?.resume() }
+    }
+}
+
+/// Runs on the audio thread: converts input to 16 kHz Int16, measures power, hands chunks to the
+/// main actor.
+private final class TapBridge: @unchecked Sendable {
+    private let lock = NSLock()
+    private var converter: AVAudioConverter?
+    private var target: AVAudioFormat?
+    var deliver: (@Sendable (AudioController.Chunk) -> Void)?
+    var levelSink: (@Sendable (Float) -> Void)?
+    func prepare(converter: AVAudioConverter, target: AVAudioFormat) {
+        lock.lock(); self.converter = converter; self.target = target; lock.unlock()
+    }
+    func handle(_ buffer: AVAudioPCMBuffer) {
+        lock.lock(); let converter = self.converter; let target = self.target; lock.unlock()
+        guard let converter, let target, let deliver else { return }
+        let ratio = target.sampleRate / buffer.format.sampleRate
+        let capacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 64
+        guard let out = AVAudioPCMBuffer(pcmFormat: target, frameCapacity: capacity) else { return }
+        var supplied = false
+        var error: NSError?
+        let status = converter.convert(to: out, error: &error) { _, outStatus in
+            if supplied { outStatus.pointee = .noDataNow; return nil }
+            supplied = true; outStatus.pointee = .haveData; return buffer
+        }
+        guard status != .error, out.frameLength > 0, let data = out.int16ChannelData else { return }
+        let samples = Array(UnsafeBufferPointer(start: data[0], count: Int(out.frameLength)))
+        var sum = 0.0
+        for sample in samples { let value = Double(sample) / 32768; sum += value * value }
+        let rms = (sum / Double(samples.count)).squareRoot()
+        let power = Float(20 * log10(max(rms, 1e-7)))
+        deliver(AudioController.Chunk(samples: samples, power: power, duration: Double(samples.count) / target.sampleRate))
+    }
+    func meter(_ buffer: AVAudioPCMBuffer) {
+        guard let channel = buffer.floatChannelData?[0], buffer.frameLength > 0 else { return }
+        var sum: Float = 0
+        for i in 0..<Int(buffer.frameLength) { sum += channel[i] * channel[i] }
+        let rms = (sum / Float(buffer.frameLength)).squareRoot()
+        levelSink?(20 * log10(max(rms, 1e-7)))
     }
 }

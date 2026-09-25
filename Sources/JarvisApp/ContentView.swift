@@ -25,7 +25,7 @@ struct ContentView: View {
         }
         .background(Color(red: 0.025, green: 0.034, blue: 0.049))
         .tint(accent)
-        .onExitCommand { model.stop() }
+        .onExitCommand { model.interrupt() }
     }
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -90,7 +90,7 @@ struct ContentView: View {
                         OrbView(audio: model.audio, phase: model.phase).frame(width: 78, height: 78)
                         phaseLabel
                         Spacer()
-                        if model.busy { Button("Stop", systemImage: "stop.fill") { model.stop() }.buttonStyle(.bordered).controlSize(.small) }
+                        if model.busy { Button("Stop", systemImage: "stop.fill") { model.interrupt() }.buttonStyle(.bordered).controlSize(.small) }
                     }.padding(.horizontal, 20)
                     ScrollViewReader { proxy in
                         ScrollView {
@@ -163,7 +163,7 @@ struct ContentView: View {
     }
     private var composer: some View {
         VStack(spacing: 10) {
-            RecordingStatusView(audio: model.audio, phase: model.phase)
+            RecordingStatusView(audio: model.audio, phase: model.phase, standby: model.standby)
             if let notice = model.notice {
                 HStack(alignment: .top) {
                     Image(systemName: "info.circle")
@@ -178,17 +178,17 @@ struct ContentView: View {
                     .textFieldStyle(.plain).font(.system(size: 13)).focused($inputFocused)
                     .onSubmit { model.submit() }
                 if model.busy {
-                    Button { model.stop() } label: { Image(systemName: "stop.fill").frame(width: 30, height: 30) }.help("Stop (⌘.)")
+                    Button { model.interrupt() } label: { Image(systemName: "stop.fill").frame(width: 30, height: 30) }.help("Stop (⌘.)")
                 }
                 Button { model.toggleListening() } label: {
-                    Label(model.phase == .listening ? "Finish" : model.phase == .preparing ? "Cancel" : "Record",
+                    Label(model.phase == .listening ? "Finish" : model.phase == .preparing ? "Cancel" : model.standby ? "Talk" : "Record",
                           systemImage: model.phase == .listening ? "stop.circle.fill" : "mic")
                         .font(.system(size: 12, weight: .medium)).padding(.horizontal, 10).frame(height: 34)
                         .foregroundStyle(model.phase == .listening ? .black : accent)
                         .background(model.phase == .listening ? accent : accent.opacity(0.06), in: RoundedRectangle(cornerRadius: 7))
                 }.buttonStyle(.plain)
                     .accessibilityLabel(model.phase == .listening ? "Finish recording and send" : "Start recording")
-                    .help("Click to start. Speak, then click Finish. Keyboard: ⌘⇧Space.")
+                    .help("Click to start. Speak, then pause or click Finish. Keyboard: ⌘⇧Space.")
                 Button { model.submit() } label: {
                     Image(systemName: "arrow.up").font(.system(size: 13, weight: .semibold)).frame(width: 32, height: 34)
                         .foregroundStyle(.black).background(accent, in: RoundedRectangle(cornerRadius: 7))
@@ -196,7 +196,7 @@ struct ContentView: View {
             }.buttonStyle(.plain).padding(12).background(surface, in: RoundedRectangle(cornerRadius: 11))
                 .overlay(RoundedRectangle(cornerRadius: 11).stroke(.white.opacity(0.09)))
             HStack {
-                Text("CLICK RECORD · SPEAK · CLICK FINISH").tracking(1)
+                Text(model.listeningMode == .wakeWord ? "SAY “HEY JARVIS” · OR CLICK TALK" : model.listeningMode == .handsFree ? "CLICK RECORD · SPEAK · PAUSE TO SEND" : "CLICK RECORD · SPEAK · PAUSE OR CLICK FINISH").tracking(1)
                 Spacer()
                 Text("LOCAL VOICE  ·  ⌘. TO STOP").tracking(0.7)
             }.font(.system(size: 8, design: .monospaced)).foregroundStyle(muted.opacity(0.7))
@@ -296,6 +296,15 @@ private struct SettingsView: View {
                 GroupBox("Voice") {
                     VStack(alignment: .leading, spacing: 14) {
                         Toggle("Read responses aloud", isOn: $model.config.speakResponses)
+                        Picker("Listening", selection: Binding(get: { model.listeningMode }, set: { model.config.listeningMode = $0.rawValue })) {
+                            ForEach(ListeningMode.allCases) { mode in Text(mode.title).tag(mode) }
+                        }
+                        Text(model.listeningMode == .wakeWord
+                             ? "The microphone stays open while Jarvis runs. Every pause is transcribed locally and thrown away unless it starts with “Hey Jarvis”. After an answer, Jarvis keeps listening for a follow-up."
+                             : model.listeningMode == .handsFree
+                             ? "Click Record once. Recording ends when you pause, and after each answer Jarvis listens again until you stay quiet."
+                             : "Click Record, speak, then pause or click Finish. The microphone is off otherwise.")
+                            .font(.system(size: 11)).foregroundStyle(muted).lineSpacing(3)
                         Text(model.audio.microphoneStatus).font(.system(size: 11)).foregroundStyle(accent)
                         Text("Input: " + model.audio.inputDeviceName).font(.system(size: 11)).foregroundStyle(muted)
                         Button("Open macOS sound input settings") {
@@ -311,12 +320,12 @@ private struct SettingsView: View {
                         }
                         HStack {
                             Button("Preview voice") { model.previewVoice() }.disabled(model.busy)
-                            if model.busy { Text(model.phase.rawValue).font(.caption); Button("Stop") { model.stop() } }
+                            if model.busy { Text(model.phase.rawValue).font(.caption); Button("Stop") { model.interrupt() } }
                         }
                         Text("Kokoro neural speech runs entirely on your Mac. Choose a voice, preview it, then save settings.").font(.system(size: 11)).foregroundStyle(muted)
                         TextField("whisper-cli executable", text: $model.config.whisperExecutable)
                         TextField("Whisper .bin model", text: $model.config.whisperModel)
-                        Text("English local recording · click Record, speak, click Finish · up to 60 seconds · whisper.cpp on your Mac. Audio is temporary and deleted after transcription. Press ⌘⇧Space to start / finish; ⌘. stops speech and work.")
+                        Text("English local recording · up to 60 seconds per utterance · whisper.cpp on your Mac, kept loaded while Jarvis runs. Audio is temporary and deleted after transcription. Press ⌘⇧Space to start / finish; ⌘. stops speech and work. You can talk over Jarvis to interrupt it.")
                             .font(.system(size: 11)).foregroundStyle(muted)
                     }.padding(10)
                 }
@@ -325,7 +334,7 @@ private struct SettingsView: View {
                         Toggle("Allow filename search in my chosen folder", isOn: $model.config.allowFileSearch)
                         Text(model.selectedFolder?.path ?? "No folder selected").font(.system(size: 11)).textSelection(.enabled)
                         HStack { Button("Choose folder…") { model.chooseFolder() }; if model.selectedFolder != nil { Button("Remove access") { model.revokeFolder() } } }
-                        Text("Choose the folder for searching, reading text and saving reviewed drafts. Connect Chrome separately for websites. Browser form editing, sending messages, arbitrary app control and wake-word listening are not enabled. No Full Disk Access or Accessibility permission is needed.")
+                        Text("Choose the folder for searching, reading text and saving reviewed drafts. Connect Chrome separately for websites. Browser form editing, sending messages and arbitrary app control are not enabled. No Full Disk Access or Accessibility permission is needed.")
                             .font(.system(size: 11)).foregroundStyle(muted)
                     }.padding(10)
                 }
@@ -341,18 +350,27 @@ private struct SettingsView: View {
 private struct RecordingStatusView: View {
     @ObservedObject var audio: AudioController
     let phase: AssistantPhase
+    let standby: Bool
     var body: some View {
         if phase == .listening {
             HStack(spacing: 10) {
                 Circle().fill(.red).frame(width: 7, height: 7)
-                Text("Recording · \(Int(audio.elapsed))s").font(.system(size: 11, weight: .medium))
+                Text("Listening · \(Int(audio.elapsed))s").font(.system(size: 11, weight: .medium))
                 ProgressView(value: audio.level).frame(width: 80).tint(accent)
                 Text(audio.inputDeviceName).font(.system(size: 10)).foregroundStyle(muted).lineLimit(1)
                 Spacer()
-                Text("Click Finish to send").font(.system(size: 10)).foregroundStyle(accent)
+                Text("Pause to send, or click Finish").font(.system(size: 10)).foregroundStyle(accent)
             }.padding(9).background(surface, in: RoundedRectangle(cornerRadius: 8))
         } else if phase == .preparing {
             Text("Waiting for microphone permission…").font(.caption).foregroundStyle(accent)
+        } else if standby && phase == .idle {
+            HStack(spacing: 8) {
+                Image(systemName: "ear").font(.system(size: 11))
+                Text("Listening for “Hey Jarvis”").font(.system(size: 11, weight: .medium))
+                ProgressView(value: audio.level).frame(width: 60).tint(accent.opacity(0.6))
+                Spacer()
+                Text("Local · nothing is kept unless you address Jarvis").font(.system(size: 10)).foregroundStyle(muted)
+            }.padding(9).foregroundStyle(accent).background(surface, in: RoundedRectangle(cornerRadius: 8))
         }
     }
 }

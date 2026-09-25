@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import JarvisCore
 
@@ -26,6 +27,71 @@ import JarvisCore
                 let text = args.count > 2 ? try String(contentsOfFile: args[2], encoding: .utf8)
                     : String(decoding: FileHandle.standardInput.readDataToEndOfFile(), as: UTF8.self)
                 print(SpeechText.spoken(from: text))
+                return
+            }
+            if args.dropFirst().first == "--endpoint", args.count > 2 {
+                // Replay a WAV through the endpointer in 50 ms steps and print what it would have done.
+                let file = try AVAudioFile(forReading: URL(fileURLWithPath: args[2]))
+                let format = file.processingFormat
+                let step = AVAudioFrameCount(format.sampleRate * 0.05)
+                var endpointer = SpeechEndpointer(settings: args.count > 3 && args[3] == "barge" ? .bargeIn : .standard)
+                var position = 0.0
+                while file.framePosition < file.length {
+                    guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: step) else { break }
+                    try file.read(into: buffer, frameCount: step)
+                    guard buffer.frameLength > 0, let channel = buffer.floatChannelData?[0] else { break }
+                    var sum: Float = 0
+                    for i in 0..<Int(buffer.frameLength) { sum += channel[i] * channel[i] }
+                    let rms = (sum / Float(buffer.frameLength)).squareRoot()
+                    let power = 20 * log10(max(rms, 1e-7))
+                    let duration = Double(buffer.frameLength) / format.sampleRate
+                    let event = endpointer.observe(power: power, duration: duration)
+                    if event != .none { print(String(format: "%.2fs  %@  (power %.1f dB, threshold %.1f dB)", position + duration, "\(event)", power, endpointer.threshold)) }
+                    position += duration
+                }
+                print(String(format: "end of file at %.2fs; spoke=%@", position, endpointer.spoke ? "yes" : "no"))
+                return
+            }
+            if args.dropFirst().first == "--wake-gate", args.count > 2 {
+                // What the wake gate would do with a WAV: transcribe with the installed model, match the phrase.
+                let configuration = try Configuration.load()
+                let speech = SpeechRuntime()
+                defer { Task { await speech.shutdown() } }
+                let started = Date()
+                let text = try await speech.transcribe(audio: URL(fileURLWithPath: args[2]), configuration: configuration)
+                print(String(format: "transcript (%.2fs): %@", Date().timeIntervalSince(started), text))
+                print("wake phrase: \(WakePhrase.matches(text) ? "MATCH" : "no match"); request after stripping: \(WakePhrase.stripping(text))")
+                await speech.shutdown()
+                return
+            }
+            if args.dropFirst().first == "--voice-timing", args.count > 2 {
+                // Persistent transcriber and voice worker against the one-shot paths, on a real WAV.
+                let configuration = try Configuration.load()
+                let wav = URL(fileURLWithPath: args[2])
+                let folder = FileManager.default.temporaryDirectory.appendingPathComponent("jarvis-timing-\(UUID().uuidString)")
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                defer { try? FileManager.default.removeItem(at: folder) }
+                func time(_ label: String, _ body: () async throws -> Void) async {
+                    let started = Date()
+                    do { try await body(); print(String(format: "%-38@ %.2fs", label, Date().timeIntervalSince(started))) }
+                    catch { print("\(label) failed: \(error.localizedDescription)") }
+                }
+                await time("whisper-cli, one process") {
+                    _ = try await SpeechDecoder.transcribe(audio: wav, executable: URL(fileURLWithPath: configuration.whisperExecutable), model: URL(fileURLWithPath: configuration.whisperModel))
+                }
+                let speech = SpeechRuntime()
+                await time("whisper-server, start + first request") { try await speech.ensureRunning(configuration: configuration); _ = try await speech.transcribe(audio: wav) }
+                await time("whisper-server, warm request") { _ = try await speech.transcribe(audio: wav) }
+                await speech.shutdown()
+                let sentence = "The paper draft is due in the middle of October, so the results section comes first."
+                await time("kokoro, one process") {
+                    try await NaturalSpeech.synthesize(text: sentence, voice: "bm_george", speed: 1, input: folder.appendingPathComponent("a.txt"), output: folder.appendingPathComponent("a.wav"))
+                }
+                let worker = SpeechWorker()
+                await time("kokoro worker, start + first sentence") { _ = try await worker.synthesize(text: sentence, voice: "bm_george", speed: 1, output: folder.appendingPathComponent("b.wav")) }
+                await time("kokoro worker, warm sentence") { _ = try await worker.synthesize(text: sentence, voice: "bm_george", speed: 1, output: folder.appendingPathComponent("c.wav")) }
+                await time("kokoro worker, short first chunk") { _ = try await worker.synthesize(text: "Sure. The draft is due mid-October.", voice: "bm_george", speed: 1, output: folder.appendingPathComponent("d.wav")) }
+                await worker.stop()
                 return
             }
             if args.dropFirst().first == "--runtime" {

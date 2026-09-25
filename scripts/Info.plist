@@ -10,6 +10,6 @@
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>NSHighResolutionCapable</key><true/>
-<key>NSMicrophoneUsageDescription</key><string>Jarvis records when you click Record, until you click Finish or Stop. Audio is transcribed locally with whisper.cpp and deleted afterward.</string>
+<key>NSMicrophoneUsageDescription</key><string>Jarvis listens for “Hey Jarvis” when that mode is on, and records when you click Record. Audio is transcribed locally with whisper.cpp on this Mac and deleted afterward.</string>
 <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
 </dict></plist>

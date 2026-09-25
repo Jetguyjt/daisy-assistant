@@ -327,6 +327,66 @@ import Foundation
             count += 1
             print("\(TestLog.failures == before ? "PASS" : "FAIL") testBrowserTabsParseTextPageListWithoutStructuredContent")
         } catch { fail("testBrowserTabsParseTextPageListWithoutStructuredContent: \(error)") }
+        do {
+            let before = TestLog.failures
+            VoiceTests().testEndpointerStartsOnSpeechAndFinishesAfterTrailingSilence()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testEndpointerStartsOnSpeechAndFinishesAfterTrailingSilence")
+        }
+        do {
+            let before = TestLog.failures
+            VoiceTests().testEndpointerTimesOutWithoutSpeechAndCapsDuration()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testEndpointerTimesOutWithoutSpeechAndCapsDuration")
+        }
+        do {
+            let before = TestLog.failures
+            VoiceTests().testEndpointerHandlesPreRollThatAlreadyContainsSpeechAndNoisyRooms()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testEndpointerHandlesPreRollThatAlreadyContainsSpeechAndNoisyRooms")
+        }
+        do {
+            let before = TestLog.failures
+            VoiceTests().testBargeInIgnoresEchoResidueButHearsAVoice()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testBargeInIgnoresEchoResidueButHearsAVoice")
+        }
+        do {
+            let before = TestLog.failures
+            VoiceTests().testWakePhraseMatchingAndStripping()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testWakePhraseMatchingAndStripping")
+        }
+        do {
+            let before = TestLog.failures
+            try await VoiceTests().testWAVFileWritesReadableSixteenKilohertzMono()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testWAVFileWritesReadableSixteenKilohertzMono")
+        } catch { fail("testWAVFileWritesReadableSixteenKilohertzMono: \(error)") }
+        do {
+            let before = TestLog.failures
+            try VoiceTests().testConfigurationDecodesFilesWrittenBeforeNewFields()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testConfigurationDecodesFilesWrittenBeforeNewFields")
+        } catch { fail("testConfigurationDecodesFilesWrittenBeforeNewFields: \(error)") }
+        do {
+            let before = TestLog.failures
+            VoiceTests().testSentencesChunkForEarlyFirstAudio()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testSentencesChunkForEarlyFirstAudio")
+        }
+        do {
+            let before = TestLog.failures
+            try await VoiceTests().testSpeechWorkerSpeaksTheLineProtocolAndSurvivesErrors()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testSpeechWorkerSpeaksTheLineProtocolAndSurvivesErrors")
+        } catch { fail("testSpeechWorkerSpeaksTheLineProtocolAndSurvivesErrors: \(error)") }
+        do {
+            let before = TestLog.failures
+            VoiceTests().testStandbyPresetWaitsIndefinitelyAndClosesUtterances()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testStandbyPresetWaitsIndefinitelyAndClosesUtterances")
+        }
         print("\(count) tests completed in \(String(format: "%.2f", Date().timeIntervalSince(started)))s; \(TestLog.failures) failures")
         if TestLog.failures > 0 { exit(1) }
     }

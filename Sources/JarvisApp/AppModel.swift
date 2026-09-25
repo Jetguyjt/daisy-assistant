@@ -3,6 +3,17 @@ import SwiftUI
 import JarvisCore
 
 enum AssistantPhase: String { case idle = "Ready", preparing = "Preparing microphone", listening = "Listening", thinking = "Thinking", searching = "Searching files", transcribing = "Transcribing", synthesizing = "Preparing voice", speaking = "Speaking" }
+enum ListeningMode: String, CaseIterable, Identifiable {
+    case manual, handsFree, wakeWord
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .manual: return "Click to talk"
+        case .handsFree: return "Hands-free conversation"
+        case .wakeWord: return "Wake word: Hey Jarvis"
+        }
+    }
+}
 struct ConversationItem: Identifiable {
     let id = UUID()
     let role: String
@@ -32,6 +43,8 @@ struct ConversationItem: Identifiable {
     @Published var tasks: [WorkItem] = []
     @Published var reviewResults: [UUID: String] = [:]
     @Published var applyingReviews = Set<UUID>()
+    /// Wake-word mode is armed: the mic is open and an utterance starting with the phrase opens a turn.
+    @Published var standby = false
     private var expiredReviews = Set<UUID>()
     private var taskStore: TaskStore?
     private let chrome = ChromeConnection()
@@ -44,9 +57,18 @@ struct ConversationItem: Identifiable {
     private var generation = UUID()
     private var holdRequested = false
     private let runtime = LocalRuntime()
+    private let speech = SpeechRuntime()
+    private let speechWorker = SpeechWorker()
     private var healthMonitor: Task<Void, Never>?
     private var startup: Task<Void, Never>?
+    private enum ListeningPurpose { case command, followUp }
+    private var purpose: ListeningPurpose = .command
+    private var voiceTurn = false
+    private var endpointer = SpeechEndpointer()
+    private var bargeEndpointer = SpeechEndpointer(settings: .bargeIn)
+    private var standbyWork: Task<Void, Never>?
     var busy: Bool { phase != .idle }
+    var listeningMode: ListeningMode { ListeningMode(rawValue: config.listeningMode ?? "") ?? .wakeWord }
     var bookmarkURL: URL { Configuration.dataDirectory.appendingPathComponent("folder.bookmark") }
     func capabilityRegistry() throws -> CapabilityRegistry {
         var entries = try BuiltInCapabilities.registry(root: selectedFolder, allowFiles: config.allowFileSearch,
@@ -85,8 +107,14 @@ struct ConversationItem: Identifiable {
                 if stale { try saveBookmark(folder) }
             }
         } catch { notice = "Setup needs attention: \(error.localizedDescription)" }
-        audio.onRecordingLimit = { [weak self] in self?.endListening() }
-        Task { await reloadMemories(); await reloadTasks() }
+        audio.speechWorker = speechWorker
+        audio.onChunk = { [weak self] power, duration in self?.observe(power: power, duration: duration) }
+        audio.onEngineLost = { [weak self] in self?.engineLost() }
+        Task {
+            await reloadMemories(); await reloadTasks()
+            if config.speakResponses { await speechWorker.warmUp() }
+            applyListeningMode()
+        }
         startRuntime()
     }
 
@@ -121,8 +149,9 @@ struct ConversationItem: Identifiable {
         guard text.utf8.count <= 4000 else { notice = "Please keep each request under 4,000 UTF-8 bytes so it fits the local context window."; return }
         input = ""; run(text)
     }
-    func run(_ text: String) {
+    func run(_ text: String, spoken: Bool = false) {
         stop(clearNotice: true)
+        standby = false; voiceTurn = spoken
         let token = generation
         let history = messages.filter { $0.role == "user" || $0.role == "assistant" }.suffix(8).map { ChatMessage(role: $0.role, content: $0.text) }
         messages.append(ConversationItem(role: "user", text: text))
@@ -179,6 +208,7 @@ struct ConversationItem: Identifiable {
                 let speech = config.speakResponses ? SpeechText.spoken(from: answer) : ""
                 if !speech.isEmpty {
                     phase = .synthesizing
+                    bargeEndpointer = SpeechEndpointer(settings: .bargeIn)
                     do {
                         try await audio.speak(speech, voice: config.naturalVoice ?? "bm_george", speed: config.speechRate ?? 1) {
                             if self.generation == token { self.phase = .speaking }
@@ -187,7 +217,7 @@ struct ConversationItem: Identifiable {
                     catch is CancellationError { throw CancellationError() }
                     catch { notice = "The answer is ready, but speech failed: \(error.localizedDescription)" }
                 }
-                if generation == token { phase = .idle }
+                if generation == token { finishTurn() }
             } catch is CancellationError { if generation == token { phase = .idle } }
             catch {
                 guard generation == token else { return }
@@ -196,13 +226,96 @@ struct ConversationItem: Identifiable {
                 currentStep = nil
                 notice = error.localizedDescription; phase = .idle
                 messages.append(ConversationItem(role: "status", text: error.localizedDescription))
+                rest()
             }
         }
     }
+    private func updateProgress(_ step: String, token: UUID) {
+        if generation == token { currentStep = step }
+    }
 
-    func beginListening() {
+    // MARK: Listening
+
+    /// Called after settings change and at launch. Wake-word mode keeps the mic open; the others
+    /// open it only while a conversation is going.
+    func applyListeningMode() {
+        switch listeningMode {
+        case .wakeWord: armStandby()
+        case .manual, .handsFree:
+            disarmStandby()
+            if !busy { audio.stopEngine() }
+        }
+    }
+    private func armStandby() {
+        guard listeningMode == .wakeWord, !busy, !standby else { return }
+        standbyWork?.cancel()
+        standbyWork = Task { [weak self] in
+            guard let self else { return }
+            guard await self.audio.requestMicrophone() else {
+                self.notice = "Allow Jarvis in System Settings → Privacy & Security → Microphone to use the wake word."; return
+            }
+            guard !Task.isCancelled, self.listeningMode == .wakeWord, !self.busy else { return }
+            do { try self.audio.startEngine() } catch { self.notice = error.localizedDescription; return }
+            self.endpointer = SpeechEndpointer(settings: .standby)
+            self.standby = true
+            self.warmTranscriber()
+        }
+    }
+    /// Start whisper-server ahead of the first utterance so the wake gate answers at once.
+    private func warmTranscriber() {
+        let speech = self.speech, configuration = self.config
+        Task.detached { try? await speech.ensureRunning(configuration: configuration) }
+    }
+    private func disarmStandby() {
+        standbyWork?.cancel(); standbyWork = nil
+        standby = false
+        if audio.capturing && phase == .idle { audio.discardCapture() }
+    }
+    /// One reading per audio chunk. Which endpointer it feeds depends on what Jarvis is doing.
+    private func observe(power: Float, duration: TimeInterval) {
+        switch phase {
+        case .listening:
+            switch endpointer.observe(power: power, duration: duration) {
+            case .finished: endListening()
+            case .timedOut: abandonListening()
+            default: break
+            }
+        case .speaking:
+            guard listeningMode != .manual, audio.echoCancellation else { return }
+            if bargeEndpointer.observe(power: power, duration: duration) == .speechStarted { bargeIn() }
+        case .idle:
+            guard standby else { return }
+            switch endpointer.observe(power: power, duration: duration) {
+            case .speechStarted: audio.beginCapture(preRoll: 1.0)
+            case .finished: gateStandbyUtterance()
+            default: break
+            }
+        default: break
+        }
+    }
+    /// Standby heard something. Transcribe it; only an utterance that starts with the wake phrase
+    /// becomes a turn, everything else is dropped without a trace.
+    private func gateStandbyUtterance() {
+        endpointer = SpeechEndpointer(settings: .standby)
+        guard let url = try? audio.endCapture() else { return }
+        let token = generation
+        standbyWork = Task { [weak self] in
+            defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+            guard let self else { return }
+            do {
+                let text = try await self.speech.transcribe(audio: url, configuration: self.config)
+                guard !Task.isCancelled, self.generation == token, self.standby, WakePhrase.matches(text) else { return }
+                let request = WakePhrase.stripping(text)
+                self.standby = false
+                if request.isEmpty { self.beginListening(purpose: .command) } else { self.run(request, spoken: true) }
+            } catch { }
+        }
+    }
+    func beginListening() { beginListening(purpose: .command) }
+    private func beginListening(purpose: ListeningPurpose) {
         guard !holdRequested else { return }
-        stop(clearNotice: true); holdRequested = true; phase = .preparing
+        stop(clearNotice: true); standby = false; holdRequested = true; phase = .preparing
+        self.purpose = purpose
         let token = generation
         work = Task {
             guard await audio.requestMicrophone() else {
@@ -210,12 +323,82 @@ struct ConversationItem: Identifiable {
                 return
             }
             guard holdRequested, generation == token, !Task.isCancelled else { return }
-            do { try audio.startRecording(); phase = .listening }
-            catch { notice = error.localizedDescription; phase = .idle; holdRequested = false }
+            do {
+                try audio.startEngine()
+                warmTranscriber()
+                endpointer = SpeechEndpointer(settings: purpose == .followUp ? .followUp : .standard)
+                for reading in audio.beginCapture(preRoll: purpose == .command ? 0.5 : 0) {
+                    _ = endpointer.observe(power: reading.power, duration: reading.duration)
+                }
+                phase = .listening
+            } catch { notice = error.localizedDescription; phase = .idle; holdRequested = false; rest() }
         }
     }
-    private func updateProgress(_ step: String, token: UUID) {
-        if generation == token { currentStep = step }
+    func endListening() {
+        holdRequested = false
+        if phase == .preparing { stop(); rest(); return }
+        guard phase == .listening else { return }
+        let token = generation
+        let quietly = purpose == .followUp
+        do {
+            let url = try audio.endCapture()
+            phase = .transcribing
+            work = Task {
+                defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+                do {
+                    let text = WakePhrase.stripping(try await speech.transcribe(audio: url, configuration: config))
+                    try Task.checkCancellation(); guard generation == token else { return }
+                    guard !text.isEmpty else { abandonListening(); return }
+                    // Recognized requests may prepare changes, but cannot click their review cards.
+                    run(text, spoken: true)
+                } catch is CancellationError { }
+                catch {
+                    guard generation == token else { return }
+                    if !quietly { notice = error.localizedDescription }
+                    phase = .idle; rest()
+                }
+            }
+        } catch {
+            if !quietly { notice = error.localizedDescription }
+            phase = .idle; rest()
+        }
+    }
+    private func abandonListening() {
+        audio.discardCapture(); holdRequested = false
+        if purpose == .command, listeningMode == .manual { notice = "No speech was detected. Click Record, speak, then pause." }
+        phase = .idle; rest()
+    }
+    private func bargeIn() {
+        stop(clearNotice: true)
+        beginListening(purpose: .command)
+    }
+    private func finishTurn() {
+        phase = .idle; currentStep = nil
+        let again = voiceTurn && listeningMode != .manual
+        voiceTurn = false
+        if again { beginListening(purpose: .followUp) } else { rest() }
+    }
+    /// Back to whatever idle means for the current mode: standby with the mic open, or mic off.
+    private func rest() {
+        phase = .idle
+        switch listeningMode {
+        case .wakeWord: armStandby()
+        case .manual, .handsFree: if !audio.capturing { audio.stopEngine() }
+        }
+    }
+    private func engineLost() {
+        standby = false
+        if phase == .listening || phase == .preparing { holdRequested = false; phase = .idle; notice = "The audio device changed. Try again." }
+        guard listeningMode == .wakeWord, !busy else { return }
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            self?.armStandby()
+        }
+    }
+    func toggleListening() {
+        if phase == .listening || phase == .preparing { endListening() }
+        else if busy { stop(clearNotice: true); beginListening(purpose: .command) }
+        else { beginListening(purpose: .command) }
     }
     func previewVoice() {
         stop(clearNotice: true)
@@ -227,42 +410,30 @@ struct ConversationItem: Identifiable {
                                       voice: config.naturalVoice ?? "bm_george", speed: config.speechRate ?? 1) {
                     if self.generation == token { self.phase = .speaking }
                 }
-                if generation == token { phase = .idle }
+                if generation == token { phase = .idle; rest() }
             } catch is CancellationError { }
-            catch { if generation == token { phase = .idle; notice = error.localizedDescription } }
+            catch { if generation == token { phase = .idle; notice = error.localizedDescription; rest() } }
         }
     }
-    func endListening() {
-        holdRequested = false
-        if phase == .preparing { stop(); return }
-        guard phase == .listening else { return }
-        let token = generation
-        do {
-            let url = try audio.finishRecording()
-            phase = .transcribing
-            work = Task {
-                defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
-                do {
-                    let text = try await SpeechDecoder.transcribe(audio: url, executable: URL(fileURLWithPath: config.whisperExecutable), model: URL(fileURLWithPath: config.whisperModel))
-                    try Task.checkCancellation(); guard generation == token else { return }
-                    // Recognized requests may prepare changes, but cannot click their review cards.
-                    run(text)
-                } catch is CancellationError { }
-                catch { if generation == token { notice = error.localizedDescription; phase = .idle } }
-            }
-        } catch { notice = error.localizedDescription; phase = .idle }
-    }
-    func toggleListening() { if phase == .listening || phase == .preparing { endListening() } else { beginListening() } }
+    /// Internal cancel: drops pending work, playback and capture. The engine and standby flag are
+    /// left to the caller, which knows whether it is starting something new or going to rest.
     func stop(clearNotice: Bool = false) {
         let wasBusy = busy
         for review in messages.flatMap({ $0.receipts.compactMap(\.output.review) }) where reviewResults[review.id] == nil && !applyingReviews.contains(review.id) {
             expiredReviews.insert(review.id)
         }
-        generation = UUID(); work?.cancel(); work = nil; audio.stop(); holdRequested = false; phase = .idle; currentStep = nil
+        generation = UUID(); work?.cancel(); work = nil
+        standbyWork?.cancel(); standbyWork = nil
+        audio.stop(); holdRequested = false; phase = .idle; currentStep = nil
         if clearNotice { notice = nil }
         else if wasBusy { notice = "Stopped. Completed memory saves remain saved; pending responses were discarded." }
     }
-    func clearConversation() { stop(clearNotice: true); messages = []; recentSearch = nil; reviewResults = [:]; expiredReviews = [] }
+    /// The user's Stop: cancel everything and return to rest.
+    func interrupt() {
+        stop()
+        rest()
+    }
+    func clearConversation() { stop(clearNotice: true); messages = []; recentSearch = nil; reviewResults = [:]; expiredReviews = []; rest() }
     func reviewStatus(_ review: ReviewedAction) -> String? {
         reviewResults[review.id] ?? (expiredReviews.contains(review.id) ? "Expired. Ask Jarvis to prepare this again." : nil)
     }
@@ -280,6 +451,9 @@ struct ConversationItem: Identifiable {
         }
     }
     func discardReview(_ review: ReviewedAction) { reviewResults[review.id] = "Discarded. No change applied." }
+
+    // MARK: Chrome
+
     func connectChrome() {
         guard !chromeConnecting else { return }
         stop(clearNotice: true); chromeConnecting = true; connectionNotice = "Waiting for Chrome to allow the local connection…"
@@ -291,11 +465,12 @@ struct ConversationItem: Identifiable {
                 startChromeHealth()
             } catch is CancellationError { chromeConnected = false; connectionNotice = "Connection cancelled." }
             catch { chromeConnected = false; connectionNotice = error.localizedDescription }
+            rest()
         }
     }
     func disconnectChrome() {
         stop(clearNotice: true); browserWork?.cancel(); chromeHealth?.cancel(); chromeHealth = nil; chromeConnected = false
-        Task { await chrome.disconnect(); connectionNotice = "Disconnected from Chrome." }
+        Task { await chrome.disconnect(); connectionNotice = "Disconnected from Chrome."; rest() }
     }
     /// Periodically probe the adapter so the badge stops lying when Chrome or the child dies.
     /// A slow reply is left alone: the model may be generating and starving the adapter.
@@ -319,6 +494,9 @@ struct ConversationItem: Identifiable {
         let application = URL(fileURLWithPath: "/Applications/Google Chrome.app")
         NSWorkspace.shared.open([URL(string: "chrome://inspect/#remote-debugging")!], withApplicationAt: application, configuration: NSWorkspace.OpenConfiguration())
     }
+
+    // MARK: Tasks, folder, memory, settings
+
     func reloadTasks() async { tasks = await taskStore?.all() ?? [] }
     func saveTask(_ item: WorkItem) async -> Bool {
         guard let taskStore else { notice = "Task storage is unavailable."; return false }
@@ -339,6 +517,7 @@ struct ConversationItem: Identifiable {
             stop(clearNotice: true); try saveBookmark(url)
             selectedFolder?.stopAccessingSecurityScopedResource()
             _ = url.startAccessingSecurityScopedResource(); selectedFolder = url; recentSearch = nil
+            rest()
         } catch { notice = error.localizedDescription }
     }
     private func saveBookmark(_ url: URL) throws {
@@ -350,6 +529,7 @@ struct ConversationItem: Identifiable {
             stop(clearNotice: true)
             if FileManager.default.fileExists(atPath: bookmarkURL.path) { try FileManager.default.removeItem(at: bookmarkURL) }
             selectedFolder?.stopAccessingSecurityScopedResource(); selectedFolder = nil; recentSearch = nil
+            rest()
         } catch { notice = error.localizedDescription }
     }
     func openFile(_ file: FileMatch, reveal: Bool) {
@@ -368,7 +548,7 @@ struct ConversationItem: Identifiable {
             guard let store else { throw JarvisError.message("Memory database unavailable.") }
             stop(clearNotice: true)
             try await store.put(key: key, value: value, source: "Explicit edit in Memory tab")
-            await reloadMemories(); return true
+            await reloadMemories(); rest(); return true
         } catch { notice = error.localizedDescription; return false }
     }
     func deleteMemory(_ memory: Memory) {
@@ -380,13 +560,19 @@ struct ConversationItem: Identifiable {
     }
     func saveSettings() {
         stop(clearNotice: true)
-        do { try config.save(); connected = false; startRuntime() }
-        catch { notice = error.localizedDescription }
+        do {
+            try config.save(); connected = false; startRuntime()
+            if config.speakResponses { Task { await speechWorker.warmUp() } }
+            applyListeningMode()
+        } catch { notice = error.localizedDescription }
     }
     func shutdown() async {
         startup?.cancel(); healthMonitor?.cancel(); chromeHealth?.cancel(); stop()
+        audio.stopEngine()
         selectedFolder?.stopAccessingSecurityScopedResource()
         browserWork?.cancel(); await chrome.disconnect()
+        await speechWorker.stop()
+        await speech.shutdown()
         await runtime.shutdown()
     }
 }
