@@ -105,7 +105,7 @@ public struct AssistantEngine: Sendable {
     }
 
     public func respond(text: String, history: [ChatMessage], memories: [Memory], model: String,
-                        registry: CapabilityRegistry,
+                        registry: CapabilityRegistry, spoken: Bool = false,
                         onProgress: (@Sendable (String) async -> Void)? = nil) async throws -> AssistantReply {
         let start = Date()
         guard text.utf8.count <= 4000 else { throw JarvisError.message("Please keep each request under 4,000 UTF-8 bytes.") }
@@ -126,7 +126,7 @@ public struct AssistantEngine: Sendable {
         Do not repeat identical calls; reuse their results. Finish when you have enough information.
         Be concise, with detail when requested. Do not recommend unavailable actions as if implemented.
         Explicit memory saves are handled by the app via 'Remember that …', /remember key = value, or the Memory editor.
-        AVAILABLE CONNECTIONS AND CAPABILITIES:
+        \(spoken ? Self.spokenHint : "")AVAILABLE CONNECTIONS AND CAPABILITIES:
         \(registry.catalogue)
         """
         var messages = Self.context(prompt: prompt, text: text, history: history, memories: memories)
@@ -182,6 +182,9 @@ public struct AssistantEngine: Sendable {
         return finish("Stopped at the step limit. Completed results are shown below; the full request may still need another step.", await session.receipts())
     }
 
+    /// Added when the answer will be read aloud. The cleanup in SpeechText still runs; this just
+    /// makes the model write for the ear so less has to be stripped.
+    static let spokenHint = "The answer will be read aloud. Write plain spoken prose: no Markdown, headings, bullet lists, tables, emoji or code unless the user asks for code. Prefer a few sentences unless the user asks for detail.\n"
     /// Conservative UTF-8 byte budgeting keeps system instructions from being truncated by the server.
     /// Initial messages use 6,000 bytes; the remaining context is reserved for schemas and tool rounds.
     public static func context(prompt: String, text: String, history: [ChatMessage], memories: [Memory]) -> [ChatMessage] {

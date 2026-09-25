@@ -164,7 +164,7 @@ struct ConversationItem: Identifiable {
                         contextMemories = hits + contextMemories.filter { candidate in !hits.contains { $0.key == candidate.key } }
                     }
                     let result = try await AssistantEngine(client: client).respond(text: text, history: Array(history), memories: contextMemories,
-                        model: config.model, registry: try capabilityRegistry(), onProgress: { [weak self] step in
+                        model: config.model, registry: try capabilityRegistry(), spoken: config.speakResponses, onProgress: { [weak self] step in
                             await self?.updateProgress(step, token: token)
                         })
                     answer = result.text; report = result.search
@@ -176,10 +176,11 @@ struct ConversationItem: Identifiable {
                 if let report { recentSearch = report }
                 currentStep = nil
                 messages.append(ConversationItem(role: "assistant", text: answer, files: report, detail: detail, receipts: receipts))
-                if config.speakResponses {
+                let speech = config.speakResponses ? SpeechText.spoken(from: answer) : ""
+                if !speech.isEmpty {
                     phase = .synthesizing
                     do {
-                        try await audio.speak(answer, voice: config.naturalVoice ?? "bm_george", speed: config.speechRate ?? 1) {
+                        try await audio.speak(speech, voice: config.naturalVoice ?? "bm_george", speed: config.speechRate ?? 1) {
                             if self.generation == token { self.phase = .speaking }
                         }
                     }
@@ -296,21 +297,21 @@ struct ConversationItem: Identifiable {
         stop(clearNotice: true); browserWork?.cancel(); chromeHealth?.cancel(); chromeHealth = nil; chromeConnected = false
         Task { await chrome.disconnect(); connectionNotice = "Disconnected from Chrome." }
     }
-    /// Periodically probe the adapter so the badge stops lying when Chrome or the child dies silently.
+    /// Periodically probe the adapter so the badge stops lying when Chrome or the child dies.
+    /// A slow reply is left alone: the model may be generating and starving the adapter.
     private func startChromeHealth() {
         chromeHealth?.cancel()
         chromeHealth = Task { [weak self] in
             while !Task.isCancelled {
-                do { try await Task.sleep(nanoseconds: 6_000_000_000) } catch { return }
+                do { try await Task.sleep(nanoseconds: 10_000_000_000) } catch { return }
                 guard let self else { return }
-                let alive = await self.chrome.isAlive()
-                if !alive {
-                    self.chromeConnected = false
-                    if self.connectionNotice?.hasPrefix("Connected.") == true {
-                        self.connectionNotice = "Chrome connection was lost. Reconnect in Connections."
-                    }
-                    return
+                if self.busy || self.chromeConnecting { continue }
+                guard await self.chrome.health() == .lost else { continue }
+                self.chromeConnected = false
+                if self.connectionNotice?.hasPrefix("Connected.") == true {
+                    self.connectionNotice = "The Chrome adapter stopped. Reconnect in Connections."
                 }
+                return
             }
         }
     }

@@ -17,6 +17,7 @@ public actor MCPConnection {
     private var deadlines: [Int: Task<Void, Never>] = [:]
     private var connectionID = UUID()
     public private(set) var stage: Stage = .notStarted
+    public var isRunning: Bool { child?.isRunning == true }
     public init() { }
 
     public func recentStderr() -> String {
@@ -140,6 +141,7 @@ public actor MCPConnection {
     }
     private func closed(token: UUID) {
         guard token == connectionID else { return }
+        if stage == .ready { stage = .closed }
         let waiting = pending; pending = [:]
         deadlines.values.forEach { $0.cancel() }; deadlines = [:]
         waiting.values.forEach { $0.resume(throwing: JarvisError.message("The local connection closed. Reconnect in Connections.")) }

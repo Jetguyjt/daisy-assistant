@@ -35,6 +35,28 @@ final class OllamaTests {
         MockProtocol.handler = { _ in (200, "not JSON") }
         do { _ = try await client().chat(model: "local", messages: [], capabilities: []); fail() } catch { }
     }
+    func testSpokenHintReachesSystemPromptOnlyWhenSpeaking() async throws {
+        final class Seen: @unchecked Sendable { var systems: [String] = [] }
+        let seen = Seen()
+        MockProtocol.handler = { request in
+            if request.url!.path == "/api/show" { return (200, #"{"details":{"parameter_size":"4B"}}"#) }
+            let body = try JSONSerialization.jsonObject(with: request.httpBody ?? request.httpBodyStream.map { stream -> Data in
+                stream.open(); defer { stream.close() }
+                var data = Data(); var buffer = [UInt8](repeating: 0, count: 65536)
+                while stream.hasBytesAvailable { let n = stream.read(&buffer, maxLength: buffer.count); if n <= 0 { break }; data.append(buffer, count: n) }
+                return data
+            } ?? Data()) as! [String: Any]
+            let messages = body["messages"] as! [[String: Any]]
+            seen.systems.append(messages.first { $0["role"] as? String == "system" }?["content"] as? String ?? "")
+            return (200, #"{"done":true,"message":{"role":"assistant","content":"ok"}}"#)
+        }
+        let registry = try CapabilityRegistry(capabilities: [])
+        _ = try await AssistantEngine(client: client()).respond(text: "hi", history: [], memories: [], model: "local", registry: registry)
+        _ = try await AssistantEngine(client: client()).respond(text: "hi", history: [], memories: [], model: "local", registry: registry, spoken: true)
+        expectEqual(seen.systems.count, 2)
+        expectFalse(seen.systems[0].contains("read aloud"))
+        expectTrue(seen.systems[1].contains("read aloud"))
+    }
     func testUnsupportedModelToolCannotExecute() async throws {
         MockProtocol.handler = { request in
             if request.url!.path == "/api/show" { return (200, #"{"details":{"parameter_size":"4B"}}"#) }

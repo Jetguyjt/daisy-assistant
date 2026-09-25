@@ -21,6 +21,13 @@ import JarvisCore
                     await connection.stop(); return
                 } catch { await connection.stop(); throw error }
             }
+            if args.dropFirst().first == "--spoken" {
+                // Print what the voice would say for a Markdown answer (file path or stdin).
+                let text = args.count > 2 ? try String(contentsOfFile: args[2], encoding: .utf8)
+                    : String(decoding: FileHandle.standardInput.readDataToEndOfFile(), as: UTF8.self)
+                print(SpeechText.spoken(from: text))
+                return
+            }
             if args.dropFirst().first == "--runtime" {
                 try await checkRuntime()
                 return

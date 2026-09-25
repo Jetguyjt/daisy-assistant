@@ -9,6 +9,7 @@ public actor ChromeConnection: BrowserTransport {
     private let transport = MCPConnection()
     public private(set) var connected = false
     public init() { }
+    public enum Health: Sendable, Equatable { case alive, slow, lost }
     public func connect(node: String) async throws {
         let script = Configuration.dataDirectory.appendingPathComponent("Runtime/browser/node_modules/chrome-devtools-mcp/build/src/bin/chrome-devtools-mcp.js")
         guard FileManager.default.fileExists(atPath: script.path) else {
@@ -17,12 +18,16 @@ public actor ChromeConnection: BrowserTransport {
         guard FileManager.default.isExecutableFile(atPath: node) else {
             throw JarvisError.message("Node is not executable at \(node). Install Node 22+ or set browserNode in Settings.")
         }
-        // Stage 1: launch the adapter and complete the MCP handshake.
-        // transport.start() throws with spawn- or handshake-specific detail including adapter stderr.
-        try await transport.start(executable: URL(fileURLWithPath: node), arguments: [script.path, "--autoConnect",
+        try await connect(executable: URL(fileURLWithPath: node), arguments: [script.path, "--autoConnect",
             "--no-usage-statistics", "--no-performance-crux", "--no-javascript-evaluation", "--no-source-maps",
             "--category-input=false", "--category-performance=false", "--category-network=false", "--category-emulation=false"],
             environment: ["CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS": "1", "CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS": "1"])
+    }
+    /// The same two stages with any adapter executable, so tests can drive them with a fixture.
+    public func connect(executable: URL, arguments: [String], environment: [String: String] = [:]) async throws {
+        // Stage 1: launch the adapter and complete the MCP handshake.
+        // transport.start() throws with spawn- or handshake-specific detail including adapter stderr.
+        try await transport.start(executable: executable, arguments: arguments, environment: environment)
         // Stage 2: Chrome itself must accept the remote-debugging session. This is where the
         // long-standing "Not connected" case usually fails; treat it as a distinct diagnosis.
         do {
@@ -39,15 +44,21 @@ public actor ChromeConnection: BrowserTransport {
         }
     }
     public func disconnect() async { connected = false; await transport.stop() }
-    /// Short-timeout probe: cheap health check the app can run periodically to catch a silently
-    /// closed Chrome session without invoking a real browser tool.
-    public func isAlive() async -> Bool {
-        guard connected else { return false }
+    /// Periodic probe. A slow reply is not a dead connection: model inference on this fanless
+    /// machine can starve the adapter for seconds. Only a closed transport or an exited child
+    /// counts as lost, and then the child is stopped so nothing lingers.
+    public func health(timeout: Double = 15) async -> Health {
+        guard connected else { return .lost }
         do {
             _ = try await transport.request(method: "tools/call",
-                parameters: .object(["name": .string("list_pages"), "arguments": .object([:])]), timeout: 4)
-            return true
-        } catch { connected = false; return false }
+                parameters: .object(["name": .string("list_pages"), "arguments": .object([:])]), timeout: timeout)
+            return .alive
+        } catch {
+            if await transport.isRunning, await transport.stage == .ready { return .slow }
+            connected = false
+            await transport.stop()
+            return .lost
+        }
     }
     public func call(_ name: String, arguments: [String: JSONValue]) async throws -> JSONValue {
         guard ["list_pages", "take_snapshot", "new_page"].contains(name) else { throw JarvisError.message("This browser action is not enabled.") }

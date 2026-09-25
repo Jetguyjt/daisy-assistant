@@ -60,6 +60,19 @@ The previous 0.2 build's Record/Finish flow was confirmed by the user: “Yes, i
 
 Full Gmail/Drive APIs, arbitrary Mac application control, browser form editing/sending, code execution, existing-document edits, notifications/reminders, wake word, embeddings and proactive automation remain unimplemented. Task tracking, coding assistance and new-file drafts are useful bounded foundations, not those future capabilities.
 
+## Spoken output and Chrome probe — 2026-09-24, later
+
+The user reported that the voice said "asterisk asterisk" and spoke in disconnected fragments. Cause, verified with the installed phonemizer: the model answers in Markdown, espeak reads `**` as "asterisk asterisk" and `#` as "hash", a URL is spelled out, and a bold list header with no end punctuation runs into the next line. Three real Qwen 3.5 4B answers captured from the running server had bold on nearly every list item.
+
+Two changes, both tested:
+
+- `SpeechText.spoken` strips inline Markdown, turns headings, bullets, quotes and table rows into sentences, replaces fenced code with "Code is shown on screen.", reduces URLs to their host, drops emoji and the length-limit marker, and cuts at a sentence boundary within the 2,200-character synthesis limit. Six tests pin these rules; `jarvis-check --spoken` prints the result for any file.
+- When read-aloud is on, the system prompt asks for plain spoken prose. On the same three questions the model then answered in one paragraph each at 64 to 78 tokens instead of 186 to 308.
+
+Measured on this Mac with George: the cleaned Markdown answer produced 49.9 s of audio in 11.7 s; the plain-prose answer 24.0 s of audio in 6.5 s. Samples are in `.runtime/voice-previews/`. Whether the result *sounds* right is the user's call; nothing here rates naturalness.
+
+The user also reported Chrome "doesn't work" in the build with the health probe. Observed process state: the adapter child was alive with an established socket to Chrome's debugging port, so Chrome had accepted the connection. The probe used a 4-second timeout and treated any failure, including a slow reply during model inference, as a lost connection, then stopped probing without stopping the child. `ChromeConnection.health` now returns alive, slow or lost; only a closed transport or exited child counts as lost, and the child is then stopped. The app skips the probe while the model is busy and polls every 10 seconds. A fixture test covers a slow adapter (stays connected) and one that exits (dropped and cleaned up). A live reconnect through the installed app has **not** yet been observed after this change.
+
 ## Hands-on acceptance
 
 1. Settings → Voice → Preview voice; compare voices, then Save settings. Stop should interrupt playback/preparation.

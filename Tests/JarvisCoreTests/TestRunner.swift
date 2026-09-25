@@ -277,6 +277,50 @@ import Foundation
             count += 1
             print("\(TestLog.failures == before ? "PASS" : "FAIL") testLocalProcessCaptureThrowsOnNonzeroExit")
         } catch { fail("testLocalProcessCaptureThrowsOnNonzeroExit: \(error)") }
+        do {
+            let before = TestLog.failures
+            SpeechTests().testSpokenStripsInlineMarkdown()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testSpokenStripsInlineMarkdown")
+        }
+        do {
+            let before = TestLog.failures
+            SpeechTests().testSpokenTurnsListsAndHeadingsIntoSentences()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testSpokenTurnsListsAndHeadingsIntoSentences")
+        }
+        do {
+            let before = TestLog.failures
+            SpeechTests().testSpokenReplacesCodeBlocksAndLinks()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testSpokenReplacesCodeBlocksAndLinks")
+        }
+        do {
+            let before = TestLog.failures
+            SpeechTests().testSpokenDropsLengthMarkerEmojiArrowsAndTables()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testSpokenDropsLengthMarkerEmojiArrowsAndTables")
+        }
+        do {
+            let before = TestLog.failures
+            SpeechTests().testSpokenCutsAtSentenceBoundaryWithinLimit()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testSpokenCutsAtSentenceBoundaryWithinLimit")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = OllamaTests()
+            defer { suite.tearDown() }
+            try await suite.testSpokenHintReachesSystemPromptOnlyWhenSpeaking()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testSpokenHintReachesSystemPromptOnlyWhenSpeaking")
+        } catch { fail("testSpokenHintReachesSystemPromptOnlyWhenSpeaking: \(error)") }
+        do {
+            let before = TestLog.failures
+            try await WorkspaceTests().testChromeHealthKeepsSlowAdapterAndDropsDeadAdapter()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testChromeHealthKeepsSlowAdapterAndDropsDeadAdapter")
+        } catch { fail("testChromeHealthKeepsSlowAdapterAndDropsDeadAdapter: \(error)") }
         print("\(count) tests completed in \(String(format: "%.2f", Date().timeIntervalSince(started)))s; \(TestLog.failures) failures")
         if TestLog.failures > 0 { exit(1) }
     }

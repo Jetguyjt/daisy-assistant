@@ -88,6 +88,35 @@ final class WorkspaceTests {
         let receipt = try await session.execute(.init(name: "project_state", arguments: [:]))
         expectEqual(receipt.status, .blocked)
     }
+    func testChromeHealthKeepsSlowAdapterAndDropsDeadAdapter() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let script = root.appendingPathComponent("chrome_fixture.py")
+        try """
+        import json, sys, time
+        mode = sys.argv[1]; calls = 0
+        for line in sys.stdin:
+            msg = json.loads(line)
+            if 'id' not in msg: continue
+            if msg.get('method') == 'tools/call':
+                calls += 1
+                if calls > 1 and mode == 'die': sys.exit(0)
+                if calls > 1: time.sleep(3)
+            sys.stdout.write(json.dumps({'jsonrpc':'2.0','id':msg['id'],'result':{'content':[]}})+'\\n'); sys.stdout.flush()
+        """.write(to: script, atomically: true, encoding: .utf8)
+        let python = URL(fileURLWithPath: "/usr/bin/python3")
+        let slow = ChromeConnection()
+        try await slow.connect(executable: python, arguments: [script.path, "slow"])
+        let slowConnected = await slow.connected; expectTrue(slowConnected)
+        let slowHealth = await slow.health(timeout: 0.5); expectEqual(slowHealth, ChromeConnection.Health.slow)
+        let stillConnected = await slow.connected; expectTrue(stillConnected)
+        await slow.disconnect()
+        let dying = ChromeConnection()
+        try await dying.connect(executable: python, arguments: [script.path, "die"])
+        let dyingHealth = await dying.health(timeout: 3); expectEqual(dyingHealth, ChromeConnection.Health.lost)
+        let dyingConnected = await dying.connected; expectFalse(dyingConnected)
+    }
     func testMCPCapturesAdapterStderr() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

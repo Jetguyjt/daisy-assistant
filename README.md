@@ -102,6 +102,7 @@ bash scripts/serve-model.sh            # diagnostic standalone server
 swift run jarvis-check qwen3.5:4b       # actual local inference and synthetic speech round trip
 swift run jarvis-check --runtime       # quit Jarvis/external server first; owned startup/shutdown twice
 swift run jarvis-check --browser-metadata # real MCP handshake only; no browser/account access
+swift run jarvis-check --spoken answer.md  # print what the voice would say for a Markdown answer
 ```
 
 The focused tests use a small standalone Swift runner because the installed Command Line Tools do not ship XCTest. Tests exit nonzero on failure. They cover persisted corrections, idempotency, deletion/retrieval, query escaping, scope boundaries, symlink exclusion, disabled/unknown tools, malformed responses, local-model checks, and cancellation/timeouts. The smoke test creates only synthetic files, task drafts and preferences in a temporary folder, generates local speech, transcribes it, and writes measurements under `.runtime/benchmark-*.json`.
