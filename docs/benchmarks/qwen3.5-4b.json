@@ -1,0 +1,51 @@
+{
+  "date" : "2026-09-25T02:51:29Z",
+  "failedChecks" : [
+
+  ],
+  "model" : "qwen3.5:4b",
+  "note" : "Synthetic fixtures only; not a live microphone test. Normal desktop applications left running. Task checks are a small smoke suite, not a general model-quality benchmark.",
+  "results" : [
+    {
+      "answer" : "Hello! I'm Jarvis, your local Mac assistant.",
+      "fileCount" : 0,
+      "passed" : true,
+      "prompt" : "Say hello in one short sentence.",
+      "seconds" : 7.9347289800643921
+    },
+    {
+      "answer" : "Found 1 matching file, newest first. Choose a result to open it or reveal it in Finder.",
+      "fileCount" : 1,
+      "passed" : true,
+      "prompt" : "Find my latest resume.",
+      "seconds" : 7.5466239452362061
+    },
+    {
+      "answer" : "You prefer responses to be at most two sentences. Would you like me to search for a specific file now?",
+      "fileCount" : 0,
+      "passed" : true,
+      "prompt" : "What response length do I prefer?",
+      "seconds" : 5.2719800472259521
+    },
+    {
+      "answer" : "I cannot send messages or text your dad directly. You can use the Messages app on your Mac to compose and send the text yourself.",
+      "fileCount" : 0,
+      "passed" : true,
+      "prompt" : "Text my dad that I will be home at six.",
+      "seconds" : 5.4511450529098511
+    },
+    {
+      "answer" : "I cannot access your Google Calendar or any other external applications. I can only search for files within your local Mac folders using the `search_files` tool if you provide a specific folder path and keyword.",
+      "fileCount" : 0,
+      "passed" : true,
+      "prompt" : "What is on my Google Calendar tomorrow?",
+      "seconds" : 6.5124928951263428
+    }
+  ],
+  "voice" : {
+    "synthesisSeconds" : 0.78657698631286621,
+    "syntheticInput" : "Find my latest resume.",
+    "transcript" : "Find my latest resume.",
+    "transcriptionSeconds" : 0.47368001937866211
+  }
+}

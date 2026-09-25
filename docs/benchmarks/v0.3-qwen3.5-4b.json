@@ -1,0 +1,137 @@
+{
+  "date" : "2026-09-25T04:02:57Z",
+  "failedChecks" : [
+
+  ],
+  "model" : "qwen3.5:4b",
+  "note" : "Synthetic fixtures only; not a live microphone test. Normal desktop applications left running. Task checks are a small smoke suite, not a general model-quality benchmark.",
+  "results" : [
+    {
+      "answer" : "Hello! How can I help you today?",
+      "capabilities" : [
+
+      ],
+      "fileCount" : 0,
+      "passed" : true,
+      "prompt" : "Say hello in one short sentence.",
+      "receipts" : [
+
+      ],
+      "seconds" : 9.4651559591293335
+    },
+    {
+      "answer" : "The latest resume found is a synthetic test file. Would you like me to search for other resumes or help with something else?",
+      "capabilities" : [
+        "search_files:succeeded",
+        "read_text_file:succeeded"
+      ],
+      "fileCount" : 1,
+      "passed" : true,
+      "prompt" : "Find my latest resume.",
+      "receipts" : [
+        "Found 1 matching file, newest first. Choose a result to open it or reveal it in Finder.",
+        "Read resume-2026.txt."
+      ],
+      "seconds" : 7.142504096031189
+    },
+    {
+      "answer" : "You prefer responses to be short, at most two sentences.",
+      "capabilities" : [
+        "search_memories:succeeded"
+      ],
+      "fileCount" : 0,
+      "passed" : true,
+      "prompt" : "What response length do I prefer?",
+      "receipts" : [
+        "Retrieved 1 explicit memory (recent notes; no exact word match)."
+      ],
+      "seconds" : 3.8539490699768066
+    },
+    {
+      "answer" : "I can't send text messages directly. To help you with this, I would need to connect to your messaging app or phone service through Chrome or another integration.\n\nWould you like me to draft a message for you to send yourself? For example: \"Hey Dad, I'll be home at six.\"",
+      "capabilities" : [
+
+      ],
+      "fileCount" : 0,
+      "passed" : true,
+      "prompt" : "Text my dad that I will be home at six.",
+      "receipts" : [
+
+      ],
+      "seconds" : 4.5635010004043579
+    },
+    {
+      "answer" : "I don't have access to your Google Calendar or any calendar data. To check your schedule, you would need to connect Chrome and use a browser extension or web search tool that can access your calendar. Would you like me to help you find your calendar events through another method?",
+      "capabilities" : [
+
+      ],
+      "fileCount" : 0,
+      "passed" : true,
+      "prompt" : "What is on my Google Calendar tomorrow?",
+      "receipts" : [
+
+      ],
+      "seconds" : 4.2505850791931152
+    },
+    {
+      "answer" : "The result of (125 * 0.18) + 2 is 24.5.",
+      "capabilities" : [
+        "calculate:succeeded"
+      ],
+      "fileCount" : 0,
+      "passed" : true,
+      "prompt" : "Calculate (125 * 0.18) + 2 using the calculator.",
+      "receipts" : [
+        "(125 * 0.18) + 2 = 24.5"
+      ],
+      "seconds" : 5.6820219755172729
+    },
+    {
+      "answer" : "The file contains: \"Synthetic test file, not a personal resume.\"",
+      "capabilities" : [
+        "search_files:succeeded",
+        "read_text_file:succeeded"
+      ],
+      "fileCount" : 1,
+      "passed" : true,
+      "prompt" : "Find resume-2026.txt, read its contents, and tell me what it says.",
+      "receipts" : [
+        "Found 1 matching file, newest first. Choose a result to open it or reveal it in Finder.",
+        "Read resume-2026.txt."
+      ],
+      "seconds" : 8.4944109916687012
+    },
+    {
+      "answer" : "I've prepared the task \"Synthetic essay outline\" in project \"College essays\" with due date 2026-10-01. Review it and click Apply to save, or cancel if you'd like changes.",
+      "capabilities" : [
+        "prepare_task:succeeded"
+      ],
+      "fileCount" : 0,
+      "passed" : true,
+      "prompt" : "Prepare a task titled Synthetic essay outline in project College essays due 2026-10-01. Do not save it yet.",
+      "receipts" : [
+        "Prepared a task review card. Nothing has been saved yet."
+      ],
+      "seconds" : 8.8673360347747803
+    },
+    {
+      "answer" : "I've prepared the file `hello.py` with the content `print(2 + 2)`. It's ready for your review but hasn't been saved yet.",
+      "capabilities" : [
+        "prepare_file:succeeded"
+      ],
+      "fileCount" : 0,
+      "passed" : true,
+      "prompt" : "Prepare a new file hello.py containing print(2 + 2). Do not run or save it yet.",
+      "receipts" : [
+        "Prepared hello.py for review. The file has not been saved."
+      ],
+      "seconds" : 6.8054569959640503
+    }
+  ],
+  "voice" : {
+    "synthesisSeconds" : 2.6514630317687988,
+    "syntheticInput" : "Find my latest resume.",
+    "transcript" : "Find my latest resume.",
+    "transcriptionSeconds" : 0.37509095668792725
+  }
+}

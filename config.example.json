@@ -1,0 +1,16 @@
+{
+  "model": "qwen3.5:4b",
+  "whisperExecutable": "/opt/homebrew/bin/whisper-cli",
+  "whisperModel": "/Users/YOUR_NAME/Library/Application Support/Jarvis/Runtime/models/ggml-base.en.bin",
+  "ollamaExecutable": "/opt/homebrew/bin/ollama",
+  "ollamaModels": "/Users/YOUR_NAME/Library/Application Support/Jarvis/Runtime/ollama/models",
+  "speakResponses": true,
+  "allowFileSearch": true,
+  "voice": "Samantha",
+  "capabilityPermissions": {
+    "read_text_file": false
+  },
+  "naturalVoice": "bm_george",
+  "speechRate": 1.0,
+  "browserNode": "/Users/YOUR_NAME/.local/bin/node"
+}

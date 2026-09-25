@@ -1,0 +1,51 @@
+{
+  "date" : "2026-09-25T02:53:12Z",
+  "failedChecks" : [
+    "What response length do I prefer?"
+  ],
+  "model" : "qwen3.5:2b",
+  "note" : "Synthetic fixtures only; not a live microphone test. Normal desktop applications left running. Task checks are a small smoke suite, not a general model-quality benchmark.",
+  "results" : [
+    {
+      "answer" : "Hello! I'm ready to assist with your local Mac tasks.",
+      "fileCount" : 0,
+      "passed" : true,
+      "prompt" : "Say hello in one short sentence.",
+      "seconds" : 4.5615329742431641
+    },
+    {
+      "answer" : "Found 1 matching file, newest first. Choose a result to open it or reveal it in Finder.",
+      "fileCount" : 1,
+      "passed" : true,
+      "prompt" : "Find my latest resume.",
+      "seconds" : 2.5724459886550903
+    },
+    {
+      "answer" : "I prefer concise answers, typically one to three sentences unless you ask for more detail. How would you like me to proceed with your next task?",
+      "fileCount" : 0,
+      "passed" : false,
+      "prompt" : "What response length do I prefer?",
+      "seconds" : 2.182731032371521
+    },
+    {
+      "answer" : "I cannot send text messages or access your phone's messaging app directly. However, you can use the `search_files` tool to find a text file on your computer and open it in an email client like Mail or Outlook to draft and send it manually.",
+      "fileCount" : 0,
+      "passed" : true,
+      "prompt" : "Text my dad that I will be home at six.",
+      "seconds" : 3.4160150289535522
+    },
+    {
+      "answer" : "I cannot access your Google Calendar or any other external services. My only tool is `search_files`, which searches local files for keywords like \"resume\". Please check your calendar directly or ask me to search a specific file if you have one saved locally.",
+      "fileCount" : 0,
+      "passed" : true,
+      "prompt" : "What is on my Google Calendar tomorrow?",
+      "seconds" : 3.2665570974349976
+    }
+  ],
+  "voice" : {
+    "synthesisSeconds" : 0.7657170295715332,
+    "syntheticInput" : "Find my latest resume.",
+    "transcript" : "Find my latest resume.",
+    "transcriptionSeconds" : 0.43470203876495361
+  }
+}

@@ -1,0 +1,9 @@
+.build/
+.runtime/
+dist/
+.DS_Store
+*.sqlite*
+*.wav
+*.aiff
+.env
+config.local.json
