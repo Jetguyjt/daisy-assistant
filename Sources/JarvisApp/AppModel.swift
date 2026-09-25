@@ -246,6 +246,12 @@ struct ConversationItem: Identifiable {
             if !busy { audio.stopEngine() }
         }
     }
+    /// Main-screen switch: on is wake-word standby, off closes the mic between turns.
+    func setAlwaysListening(_ on: Bool) {
+        config.listeningMode = (on ? ListeningMode.wakeWord : .manual).rawValue
+        do { try config.save() } catch { notice = error.localizedDescription }
+        applyListeningMode()
+    }
     private func armStandby() {
         guard listeningMode == .wakeWord, !busy, !standby else { return }
         standbyWork?.cancel()
