@@ -253,7 +253,12 @@ struct ConversationItem: Identifiable {
     func submit() {
         let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
-        guard text.utf8.count <= 4000 else { notice = "Please keep each request under 4,000 UTF-8 bytes so it fits the local context window."; return }
+        // Hermes gets up to 100 KB; the on-device model's small context keeps it at 4,000 bytes.
+        if usesHermes {
+            guard text.utf8.count <= HermesBackend.maxRequestBytes else { notice = "Please keep each message under 100 KB."; return }
+        } else {
+            guard text.utf8.count <= 4000 else { notice = "Please keep each request under 4,000 UTF-8 bytes so it fits the local context window."; return }
+        }
         input = ""; run(text)
     }
     func run(_ text: String, spoken: Bool = false) {

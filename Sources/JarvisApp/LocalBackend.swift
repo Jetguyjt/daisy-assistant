@@ -32,8 +32,10 @@ final class LocalBackend: AgentBackend, @unchecked Sendable {
         }
     }
 
-    func send(_ text: String) -> AsyncThrowingStream<AgentEvent, Error> {
-        AsyncThrowingStream { continuation in
+    /// Attachments aren't supported here; the composer hides them for this backend.
+    func send(_ prompt: AgentPrompt) -> AsyncThrowingStream<AgentEvent, Error> {
+        let text = prompt.text
+        return AsyncThrowingStream { continuation in
             let task = Task {
                 do {
                     let current = try await self.context(text)
@@ -70,6 +72,8 @@ final class LocalBackend: AgentBackend, @unchecked Sendable {
     func resolve(approval id: String, optionID: String?) async { }
     func newSession() async { }
     func history() async -> [AgentMessage] { [] }
+    func sessions() async -> [AgentSession] { [] }
+    func open(session id: String) async -> [AgentMessage]? { nil }
     func shutdown() async { await runtime.shutdown() }
     func models() async -> [String] { (try? await client.models()) ?? [] }
 }

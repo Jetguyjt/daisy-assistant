@@ -19,6 +19,9 @@ public actor HermesBackend: AgentBackend {
     }
 
     public static let installCommand = "curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash"
+    /// Largest message Jarvis sends Hermes in one turn. Hermes's own pipe takes far more; this keeps
+    /// a stray paste from filling the model's context.
+    public static let maxRequestBytes = 100_000
     public static let signInCommand = "hermes auth add openai-codex"
 
     private let settings: Settings
@@ -37,6 +40,8 @@ public actor HermesBackend: AgentBackend {
     private var prompt: Task<JSONValue, Error>?
     private var produced = false
     private var toolTitles: [String: (title: String, detail: String?)] = [:]
+    /// Inbound messages handled so far; compared with the peer's `delivered` count.
+    private var handled = 0
     private var approvals: [String: (request: JSONValue, options: [AgentApproval.Option])] = [:]
 
     public init(settings: Settings) { self.settings = settings }
@@ -66,6 +71,7 @@ public actor HermesBackend: AgentBackend {
                 let messages = try await peer.start(executable: executable, arguments: [], environment: settings.environment,
                                                     directory: settings.workingDirectory)
                 inbound?.cancel()
+                handled = 0
                 inbound = Task { [weak self] in
                     for await message in messages { await self?.handle(message) }
                     await self?.peerClosed()
@@ -142,9 +148,9 @@ public actor HermesBackend: AgentBackend {
 
     // MARK: Turns
 
-    public nonisolated func send(_ text: String) -> AsyncThrowingStream<AgentEvent, Error> {
+    public nonisolated func send(_ prompt: AgentPrompt) -> AsyncThrowingStream<AgentEvent, Error> {
         AsyncThrowingStream { continuation in
-            let task = Task { await self.run(text, continuation) }
+            let task = Task { await self.run(prompt, continuation) }
             continuation.onTermination = { termination in
                 guard case .cancelled = termination else { return }
                 task.cancel()
@@ -153,7 +159,11 @@ public actor HermesBackend: AgentBackend {
         }
     }
 
-    private func run(_ text: String, _ continuation: AsyncThrowingStream<AgentEvent, Error>.Continuation) async {
+    private func run(_ message: AgentPrompt, _ continuation: AsyncThrowingStream<AgentEvent, Error>.Continuation) async {
+        let text = message.text
+        guard text.utf8.count <= Self.maxRequestBytes else {
+            continuation.finish(throwing: AgentFailure.failed("Please keep each message under 100 KB.")); return
+        }
         await settle()
         let state = await connect()
         guard case .ready = state, let session = sessionID else {
@@ -163,12 +173,13 @@ public actor HermesBackend: AgentBackend {
         collectingReplay = false
         let id = UUID()
         turnID = id; turn = continuation; turnSession = session; produced = false; toolTitles = [:]
-        let params: JSONValue = ["sessionId": .string(session), "prompt": .array([["type": "text", "text": .string(text)]])]
+        let params: JSONValue = ["sessionId": .string(session), "prompt": .array(Self.blocks(for: message))]
         let peer = self.peer
         let request = Task { try await peer.request("session/prompt", params) }
         prompt = request
         do {
             let result = try await request.value
+            await catchUp()
             let reason = result["stopReason"]?.stringValue ?? "end_turn"
             // "refusal" with nothing said means Hermes no longer knows this session.
             if reason == "refusal", !produced, turnID == id { sessionID = nil }
@@ -178,6 +189,16 @@ public actor HermesBackend: AgentBackend {
         } catch {
             finishTurn(id, request)
             continuation.finish(throwing: Self.describe(error))
+        }
+    }
+
+    /// Hermes writes the last text chunk just before the prompt's reply, and the two can be handled
+    /// in either order. Waits (briefly) until every message that came before the reply is handled,
+    /// so the end of an answer is never dropped.
+    private func catchUp() async {
+        let target = await peer.delivered
+        for _ in 0..<400 where handled < target {
+            try? await Task.sleep(nanoseconds: 5_000_000)
         }
     }
 
@@ -233,6 +254,47 @@ public actor HermesBackend: AgentBackend {
 
     public func history() async -> [AgentMessage] { replay }
 
+    public func sessions() async -> [AgentSession] {
+        guard case .ready = await connect(),
+              let result = try? await peer.request("session/list", ["cwd": .string(settings.workingDirectory.path)], timeout: 20) else { return [] }
+        let stamps = ISO8601DateFormatter(), precise = ISO8601DateFormatter()
+        precise.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let list: [AgentSession] = (result["sessions"]?.arrayValue ?? []).compactMap { item in
+            guard let id = item["sessionId"]?.stringValue else { return nil }
+            let title = item["title"]?.stringValue.flatMap { $0.isEmpty ? nil : $0 } ?? "Untitled chat"
+            let date = item["updatedAt"]?.stringValue.flatMap { precise.date(from: $0) ?? stamps.date(from: $0) }
+                ?? item["updatedAt"]?.numberValue.map { Date(timeIntervalSince1970: $0 > 1e11 ? $0 / 1000 : $0) }
+            return AgentSession(id: id, title: title, updated: date)
+        }
+        return list.sorted { ($0.updated ?? .distantPast) > ($1.updated ?? .distantPast) }
+    }
+
+    public func open(session id: String) async -> [AgentMessage]? {
+        if prompt != nil { await cancel(); await settle() }
+        guard case .ready = await connect() else { return nil }
+        if id == sessionID { return replay }
+        do { try await load(id) } catch { return nil }
+        guard sessionID == id else { return nil }
+        try? Data(id.utf8).write(to: settings.sessionFile, options: .atomic)
+        return replay
+    }
+
+    /// The prompt as ACP content: attachments first, then the words.
+    static func blocks(for prompt: AgentPrompt) -> [JSONValue] {
+        var blocks: [JSONValue] = prompt.attachments.map { attachment in
+            switch attachment {
+            case .image(_, let mimeType, let data):
+                return ["type": "image", "mimeType": .string(mimeType), "data": .string(data.base64EncodedString())]
+            case .document(_, let uri, let text):
+                return ["type": "resource", "resource": ["uri": .string(uri), "mimeType": "text/plain", "text": .string(text)]]
+            case .file(let url):
+                return ["type": "resource_link", "uri": .string(url.absoluteString), "name": .string(url.lastPathComponent)]
+            }
+        }
+        if !prompt.text.isEmpty || blocks.isEmpty { blocks.append(["type": "text", "text": .string(prompt.text)]) }
+        return blocks
+    }
+
     public func shutdown() async {
         if prompt != nil { await cancel() }
         await stopPeer()
@@ -252,6 +314,7 @@ public actor HermesBackend: AgentBackend {
     // MARK: Inbound
 
     private func handle(_ message: JSONRPCPeer.Inbound) async {
+        defer { handled += 1 }
         switch message {
         case .notification(let method, let params):
             guard method == "session/update" else { return }

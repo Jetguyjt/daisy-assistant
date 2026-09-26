@@ -35,6 +35,7 @@ struct ContentView: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .foregroundStyle(HUD.ice)
         .tint(HUD.cyan)
         .onExitCommand { model.interrupt() }
@@ -352,6 +353,9 @@ struct ContentView: View {
                     .buttonStyle(.plain).foregroundStyle(HUD.dim).help("Hide telemetry")
             }
             .padding(.horizontal, 16).padding(.top, 16).padding(.bottom, 4)
+            // Scrolls instead of growing, so a short window never pushes the composer off screen.
+            ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 10) {
                 Text("ACTIVITY").hudCaption()
                 if model.activity.isEmpty {
@@ -373,7 +377,10 @@ struct ContentView: View {
                 readout("CHROME", model.chromeConnected ? "Connected" : "Not linked", color: model.chromeConnected ? HUD.ice : HUD.steel) { model.tab = "Connections" }
             }
             .padding(16)
-            Spacer(minLength: 0)
+            }
+            }
+            .scrollIndicators(.never)
+            .frame(maxHeight: .infinity)
         }
         .frame(maxHeight: .infinity, alignment: .top)
         .hudPanel(radius: 16)

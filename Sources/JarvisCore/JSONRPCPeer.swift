@@ -26,6 +26,10 @@ public actor JSONRPCPeer {
     private var pending: [Int: CheckedContinuation<JSONValue, Error>] = [:]
     private var generation = UUID()
     private var inboundContinuation: AsyncStream<Inbound>.Continuation?
+    /// How many notifications and requests have gone out on `inbound` since `start`. A reply is
+    /// dispatched after everything received before it, so a caller can wait for its consumer to
+    /// catch up to this count before acting on the reply.
+    public private(set) var delivered = 0
     public var isRunning: Bool { child?.isRunning == true }
     static let lineLimit = 8_000_000
     static let stderrCap = 8000
@@ -50,7 +54,7 @@ public actor JSONRPCPeer {
         process.terminationHandler = { [weak self] _ in Task { await self?.closed(token: token) } }
         do { try process.run() } catch { throw JarvisError.message("Could not start \(executable.lastPathComponent).") }
         child = process; input = stdinPipe.fileHandleForWriting
-        buffer = Data(); stderrRing = Data(); inboundContinuation = continuation
+        buffer = Data(); stderrRing = Data(); inboundContinuation = continuation; delivered = 0
         let output = stdoutPipe.fileHandleForReading, errors = stderrPipe.fileHandleForReading
         reader = Task.detached { [weak self] in
             while !Task.isCancelled {
@@ -154,6 +158,7 @@ public actor JSONRPCPeer {
             let params = object["params"] ?? .object([:])
             if let id, id != .null { inboundContinuation?.yield(.request(id: id, method: method, params: params)) }
             else { inboundContinuation?.yield(.notification(method: method, params: params)) }
+            delivered += 1
             return
         }
         guard case .number(let number) = id, number.rounded() == number, abs(number) < 1e15 else { return }

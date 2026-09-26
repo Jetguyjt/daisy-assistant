@@ -471,6 +471,48 @@ import Foundation
             count += 1
             print("\(TestLog.failures == before ? "PASS" : "FAIL") testResumedSessionReplaysHistoryAndUnknownOnesStartFresh")
         } catch { fail("testResumedSessionReplaysHistoryAndUnknownOnesStartFresh: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = HermesTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testMessagesUpTo100KBGoThroughAndLargerOnesDont()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testMessagesUpTo100KBGoThroughAndLargerOnesDont")
+        } catch { fail("testMessagesUpTo100KBGoThroughAndLargerOnesDont: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = HermesTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testChatListAndReopeningAnEarlierChat()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testChatListAndReopeningAnEarlierChat")
+        } catch { fail("testChatListAndReopeningAnEarlierChat: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = HermesTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testAttachmentsReachHermesAsContentBlocks()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testAttachmentsReachHermesAsContentBlocks")
+        } catch { fail("testAttachmentsReachHermesAsContentBlocks: \(error)") }
+        do {
+            let before = TestLog.failures
+            MarkdownTests().testBlocksCoverTheCommonShapes()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testBlocksCoverTheCommonShapes")
+        }
+        do {
+            let before = TestLog.failures
+            MarkdownTests().testUnclosedFenceStreamsAsCode()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testUnclosedFenceStreamsAsCode")
+        }
+        do {
+            let before = TestLog.failures
+            MarkdownTests().testListContinuationsAndYearsInProse()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testListContinuationsAndYearsInProse")
+        }
         print("\(count) tests completed in \(String(format: "%.2f", Date().timeIntervalSince(started)))s; \(TestLog.failures) failures")
         if TestLog.failures > 0 { exit(1) }
     }

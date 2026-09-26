@@ -9,7 +9,7 @@ public protocol AgentBackend: AnyObject, Sendable {
     func connect() async -> AgentLink
     /// Runs one turn. Events arrive in order; the stream finishes with the turn and throws
     /// `AgentFailure` when it can't complete. Cancelling the consuming task cancels the turn.
-    func send(_ text: String) -> AsyncThrowingStream<AgentEvent, Error>
+    func send(_ prompt: AgentPrompt) -> AsyncThrowingStream<AgentEvent, Error>
     /// Stops the turn in progress, if any.
     func cancel() async
     /// Answers a pending approval. `optionID` nil means no.
@@ -18,7 +18,46 @@ public protocol AgentBackend: AnyObject, Sendable {
     func newSession() async
     /// The conversation so far, when the agent resumed one from an earlier launch.
     func history() async -> [AgentMessage]
+    /// Earlier conversations, newest first. Empty when the backend doesn't keep them.
+    func sessions() async -> [AgentSession]
+    /// Reopens an earlier conversation and returns its messages, or nil if it couldn't.
+    func open(session id: String) async -> [AgentMessage]?
     func shutdown() async
+}
+
+public extension AgentBackend {
+    func send(_ text: String) -> AsyncThrowingStream<AgentEvent, Error> { send(AgentPrompt(text: text)) }
+}
+
+/// What the user sends in one turn.
+public struct AgentPrompt: Sendable, Equatable {
+    public var text: String
+    public var attachments: [AgentAttachment]
+    public init(text: String, attachments: [AgentAttachment] = []) { self.text = text; self.attachments = attachments }
+}
+
+/// A file sent with a message. Its content goes to the model, so the user picks it explicitly.
+public enum AgentAttachment: Sendable, Equatable {
+    /// An image, inlined.
+    case image(name: String, mimeType: String, data: Data)
+    /// Text pulled out of a document on this Mac (PDF, Word) because the agent can't read it raw.
+    case document(name: String, uri: String, text: String)
+    /// A file the agent reads itself.
+    case file(URL)
+    public var name: String {
+        switch self {
+        case .image(let name, _, _), .document(let name, _, _): return name
+        case .file(let url): return url.lastPathComponent
+        }
+    }
+}
+
+/// An earlier conversation, for the chat list.
+public struct AgentSession: Sendable, Equatable, Identifiable {
+    public let id: String
+    public let title: String
+    public let updated: Date?
+    public init(id: String, title: String, updated: Date?) { self.id = id; self.title = title; self.updated = updated }
 }
 
 /// One line of a resumed conversation.

@@ -82,6 +82,44 @@ final class HermesTests {
         await hermes.shutdown()
     }
 
+    func testMessagesUpTo100KBGoThroughAndLargerOnesDont() async throws {
+        let hermes = backend()
+        let big = "BIG:" + String(repeating: "a", count: HermesBackend.maxRequestBytes - 4)
+        let turn = try await run(hermes, big)
+        expectEqual(turn.text, "got \(HermesBackend.maxRequestBytes) bytes")
+        do {
+            _ = try await run(hermes, big + "a")
+            fail("a message over 100 KB should be refused")
+        } catch { expectTrue(error.localizedDescription.contains("100 KB")) }
+        await hermes.shutdown()
+    }
+
+    func testChatListAndReopeningAnEarlierChat() async throws {
+        let hermes = backend(["FAKE_KNOWN_SESSION": "s-known"])
+        let chats = await hermes.sessions()
+        expectEqual(chats.map(\.id), ["s-known", "s-old"])
+        expectEqual(chats.map(\.title), ["Math", "Untitled chat"])
+        let messages = await hermes.open(session: "s-known")
+        expectEqual(messages, [AgentMessage(role: "user", text: "What's 2+2?"), AgentMessage(role: "assistant", text: "It's 4.")])
+        let saved = try String(contentsOf: root.appendingPathComponent("session"), encoding: .utf8)
+        expectEqual(saved, "s-known")
+        let missing = await hermes.open(session: "s-gone")
+        expectEqual(missing, nil)
+        await hermes.shutdown()
+    }
+
+    func testAttachmentsReachHermesAsContentBlocks() async throws {
+        let hermes = backend()
+        var text = ""
+        let prompt = AgentPrompt(text: "ATTACH", attachments: [
+            .image(name: "shot.png", mimeType: "image/png", data: Data([1, 2, 3])),
+            .document(name: "notes.pdf", uri: "file:///tmp/notes.pdf", text: "hello"),
+            .file(URL(fileURLWithPath: "/tmp/plan.txt"))])
+        for try await event in hermes.send(prompt) { if case .text(let chunk) = event { text += chunk } }
+        expectEqual(text, "image,resource,resource_link,text")
+        await hermes.shutdown()
+    }
+
     func testMissingSignInAndProviderBecomeSetupSteps() async throws {
         let signedOut = backend(["FAKE_AUTH": "none"])
         if case .needsSetup(let issue) = await signedOut.connect() {
@@ -154,9 +192,18 @@ final class HermesTests {
                 send({"jsonrpc": "2.0", "id": mid, "result": {"models": models, "modes": {}}})
             else:
                 send({"jsonrpc": "2.0", "id": mid, "result": {}})
+        elif method == "session/list":
+            send({"jsonrpc": "2.0", "id": mid, "result": {"sessions": [
+                  {"sessionId": "s-old", "cwd": params.get("cwd"), "title": "", "updatedAt": "2026-09-24T10:00:00Z"},
+                  {"sessionId": "s-known", "cwd": params.get("cwd"), "title": "Math", "updatedAt": "2026-09-25T10:00:00.250Z"}]}})
         elif method == "session/prompt":
-            sid = params["sessionId"]; text = params["prompt"][0]["text"]; reason = "end_turn"
-            if "37" in text:
+            sid = params["sessionId"]; blocks = params["prompt"]; reason = "end_turn"
+            text = next((b.get("text", "") for b in blocks if b.get("type") == "text"), "")
+            if text == "ATTACH":
+                chunk(sid, ",".join(b["type"] for b in blocks))
+            elif text.startswith("BIG:"):
+                chunk(sid, "got %d bytes" % len(text.encode("utf-8")))
+            elif "37" in text:
                 update(sid, {"sessionUpdate": "agent_thought_chunk", "content": {"type": "text", "text": "hidden reasoning"}})
                 chunk(sid, "37 × 18 "); chunk(sid, "is 666.")
             elif "resume" in text:
