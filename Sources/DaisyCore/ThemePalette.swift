@@ -54,7 +54,7 @@ public struct RGB: Equatable, Codable, Sendable {
 }
 
 /// Every HUD color, worked out from one accent. Grounds and text take the accent's hue at low
-/// saturation; the decision color (gold) and the danger color (pink) stay fixed unless the accent
+/// saturation; stop and delete use a hotter version of the accent itself; the decision color (gold) stays fixed unless the accent
 /// sits close to them, in which case they move so they never blend in.
 public struct ThemePalette: Equatable, Sendable {
     public var accent, line, ember, thinking: RGB
@@ -72,7 +72,6 @@ public struct ThemePalette: Equatable, Sendable {
     ]
 
     public static let gold = RGB(0.96, 0.70, 0.28)
-    public static let pink = RGB(0.98, 0.32, 0.64)
 
     public static func derived(from input: RGB) -> ThemePalette {
         var (h, s, v) = input.hsb
@@ -92,11 +91,12 @@ public struct ThemePalette: Equatable, Sendable {
             steel: RGB(h: h, s: s * 0.17, v: 0.80),
             dim: RGB(h: h, s: s * 0.31, v: 0.62),
             approval: colorful && hueDistance(h, gold.hsb.h) < 30.0 / 360 ? RGB(0.55, 0.62, 1.0) : gold,
-            danger: colorful && hueDistance(h, pink.hsb.h) < 22.0 / 360 ? RGB(1.0, 0.36, 0.22) : pink)
+            // Same hue as the accent, more saturated, so stop reads as urgent without a foreign color.
+            danger: RGB(h: h, s: min(1, max(s * 1.6, s + 0.25)), v: min(1, v * 1.02)))
     }
 
     /// Shortest way around the hue circle, 0...0.5.
-    static func hueDistance(_ a: Double, _ b: Double) -> Double {
+    public static func hueDistance(_ a: Double, _ b: Double) -> Double {
         let d = abs(a - b).truncatingRemainder(dividingBy: 1)
         return min(d, 1 - d)
     }

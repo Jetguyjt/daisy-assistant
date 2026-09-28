@@ -12,7 +12,7 @@ final class ThemeTests {
         expectEqual(p.accent.hex, "#FAEAB7")
         // Cream sits next to the gold approval color, so approvals move to violet to stay distinct.
         expectFalse(p.approval == ThemePalette.gold)
-        expectEqual(p.danger, ThemePalette.pink)
+        expectTrue(ThemePalette.hueDistance(p.danger.hsb.h, p.accent.hsb.h) < 0.01)
     }
 
     func testRedPresetMatchesTheEarlierTheme() {
@@ -24,7 +24,7 @@ final class ThemeTests {
         expectTrue(close(p.dim, RGB(0.62, 0.48, 0.49)))
         expectTrue(close(p.thinking, RGB(1.0, 0.50, 0.30), within: 0.08))
         expectEqual(p.approval, ThemePalette.gold)
-        expectEqual(p.danger, ThemePalette.pink)
+        expectTrue(ThemePalette.hueDistance(p.danger.hsb.h, p.accent.hsb.h) < 0.01)
     }
 
     func testHexRoundTripsAndRejectsJunk() throws {
@@ -45,11 +45,14 @@ final class ThemeTests {
     func testDecisionAndDangerColorsMoveAwayFromTheAccent() {
         let gold = ThemePalette.derived(from: RGB(0.96, 0.72, 0.25))
         expectFalse(gold.approval == ThemePalette.gold)
-        let pink = ThemePalette.derived(from: RGB(0.98, 0.30, 0.62))
-        expectFalse(pink.danger == ThemePalette.pink)
+        // Stop and delete never bring in a color from outside the theme: same hue, more saturated.
+        for accent in ThemePalette.presets.map(\.color) where accent.hsb.s > 0.1 {
+            let p = ThemePalette.derived(from: accent)
+            expectTrue(ThemePalette.hueDistance(p.danger.hsb.h, p.accent.hsb.h) < 0.01)
+            expectTrue(p.danger.hsb.s >= p.accent.hsb.s)
+        }
         let cyan = ThemePalette.derived(from: RGB(0.36, 0.88, 0.90))
         expectEqual(cyan.approval, ThemePalette.gold)
-        expectEqual(cyan.danger, ThemePalette.pink)
     }
 
     func testDarkAccentsAreLiftedAndGroundsStayDark() {

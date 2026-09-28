@@ -44,7 +44,7 @@ struct AppearanceSection: View {
                 swatch("Stop", HUD.crimson)
             }
             Text(hexInvalid ? "That isn't a hex color. Use six digits, like #FAEAB7."
-                 : "Backgrounds, text and the core take this hue. Approve and stop colors change on their own if the accent gets too close to them.")
+                 : "Everything takes this hue, stop buttons included. Approve moves to its own color if the accent gets too close to gold.")
                 .font(.system(size: 11)).foregroundStyle(hexInvalid ? HUD.amber : HUD.dim)
         }
         .padding(.vertical, 14)
