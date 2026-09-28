@@ -10,6 +10,7 @@ Research notes:
 - [speech-in.md](research/speech-in.md): speech in, and Willow Voice
 - [lukebuildsai.md](research/lukebuildsai.md): what his Jarvis does and how it compares
 - [orchestrator.md](research/orchestrator.md): orchestrator design, always-on, guard stress test
+- [persona.md](research/persona.md): American female voice and a new name
 
 ## Guard first
 
@@ -60,10 +61,22 @@ Notes: [orchestrator.md](research/orchestrator.md)
 - [ ] "Check my email": unread headers + snippets, bodies only on request
 - [ ] Keep `~/.hermes/google_token.json` out of every script and sweep
 
+## New voice and name
+
+Notes: [persona.md](research/persona.md)
+
+- [ ] Pick the name (top 3: DAISY, JANET, DORIS)
+- [ ] Rename what I see and hear: wake phrase + misspellings, display name, mic permission text, Hermes persona, UI strings, README
+- [ ] Switch Kokoro to `af_heart` (or a heart/bella 70/30 blend) today
+- [ ] Hosted American female voice: Cartesia "Jacqueline" (Pro $5), or OpenAI "marin"; needs its own API key in the Keychain
+- [ ] Local: design the voice with Qwen3-TTS 1.7B VoiceDesign, then clone from a reference clip
+- [ ] Later: train an openWakeWord model for the new name on Colab
+- [ ] Later: internal rename (bundle ID, targets, `hermes/jarvis`, Application Support folder, repo)
+
 ## Voice out
 
 - [ ] Kokoro quick fixes:
-  - try `bf_emma` and a george/fable blend
+  - try `af_heart` if the name changes, `bf_emma` / a george-fable blend if it stays Jarvis
   - A/B test playback with echo cancellation on and off
   - merge short fragments
   - expand numbers and abbreviations
