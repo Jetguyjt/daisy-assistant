@@ -8,7 +8,7 @@ import Foundation
 ///   one that's corrected a turn later.
 /// - Second chat, a new Hermes session with memory loaded fresh: a question about each, plus one thing
 ///   it was never told, which it should say it doesn't know.
-/// - One PASS or FAIL line per case. Approvals are declined, so nothing is ever sent or changed.
+/// - One PASS or FAIL line per case. Approvals are declined, so nothing that needs a card goes through.
 /// - Afterwards the entries it taught come back out of Hermes's memory files, found by made-up words
 ///   only this run used. If Hermes folded one into an entry that was there before, nothing in that
 ///   file is touched and the entries are listed to tidy by hand. The two chats stay in Hermes's history.
