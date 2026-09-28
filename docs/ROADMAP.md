@@ -93,9 +93,12 @@ Notes: [persona.md](research/persona.md)
 ## Speech in
 
 - [ ] SpeechTranscriber (macOS 26) as the main recognizer, with whisper-server kept as the fallback
+  - built: Apple first, then whisper-server, then whisper-cli, with Apple set aside after repeated failures. Tests transcribed spoken clips with Apple; on 2026-09-28 `daisy-check --speech` found Apple's model not yet installed for that tool and Whisper took over correctly. Not heard live in the app yet
 - [ ] Silero VAD in place of the energy endpointer
+  - built in Swift from the ONNX weights (matches onnxruntime to 6e-7); `daisy-check --speech` on 2026-09-28 gave ~1.0 on speech and ~0.05 in the pause. Not tried on the live mic yet
 - [ ] openWakeWord `hey_daisy` (trained on Colab) so Whisper doesn't run on every pause
-- [ ] Willow stays a push-to-talk typing aid; keep its `autoMuteAudio` off
+  - hook ready: drop `hey_daisy.onnx` into `Runtime/speech` and it becomes the first stage. Training is mine to do, see [wake-word.md](wake-word.md)
+- [x] Willow stays a push-to-talk typing aid; keep its `autoMuteAudio` off (written down in [wake-word.md](wake-word.md))
 
 ## Learning without /remember
 
@@ -118,4 +121,5 @@ Notes: [persona.md](research/persona.md)
 ## Voice loop and app
 
 - [ ] Run the full voice loop live on Hermes: wake word from across the room, barge-in over speakers, follow-up
-- [ ] Find out why `ollama serve` / `whisper-server` outlived the app once
+- [x] Find out why `ollama serve` / `whisper-server` outlived the app once
+  - likely cause, from the code (not reproduced): macOS has no parent-death signal, so a crash or force quit left them running, and the next launch used them on 11437/11435 without owning them. Fixed with a watchdog per child plus a sweep at launch; tested by killing a stand-in owner (its children were gone 0.2s later)

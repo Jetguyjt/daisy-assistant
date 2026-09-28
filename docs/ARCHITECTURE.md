@@ -7,7 +7,7 @@ Daisy is the face and the voice. Hermes Agent is the agent runtime. OpenAI, thro
 │                                                                            │
 │  Daisy.app (SwiftUI)                                                      │
 │    HUD, orb, transcript, approval cards                                    │
-│    mic → wake word → whisper-server (STT)      Kokoro worker (TTS) → speakers
+│    mic → Silero → wake word → Apple speech (whisper fallback)   Kokoro → speakers
 │         │                                            ▲                     │
 │         ▼                                            │ sentences as they   │
 │    AppModel ──► AgentBackend ──────────────────────── stream in            │

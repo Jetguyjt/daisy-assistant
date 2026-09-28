@@ -30,7 +30,7 @@ bash scripts/setup.sh
 open ~/Applications/Daisy.app
 ```
 
-This installs Ollama, whisper.cpp and Python 3.11 through Homebrew, downloads Qwen 3.5 4B (~3.4 GB), Whisper base.en (~148 MB), and Kokoro speech weights (~354 MB), compiles the app, applies a local ad-hoc signature, and installs it in your user Applications folder. Downloads require internet. Normal assistant inference does not. Optional browser access needs Node 22.12+ and npm; run `bash scripts/setup-browser.sh` to install its pinned local adapter. Website access still uses the internet. The setup script does not enable a login service. `dist/Daisy.zip` preserves the signed bundle when the repository is in an iCloud/File Provider folder.
+This installs Ollama, whisper.cpp and Python 3.11 through Homebrew, downloads Qwen 3.5 4B (~3.4 GB), Whisper base.en (~148 MB), Kokoro speech weights (~354 MB) and the speech-in models (Silero voice activity and openWakeWord features, ~3.7 MB from GitHub, via `scripts/setup-speech.sh`), compiles the app, applies a local ad-hoc signature, and installs it in your user Applications folder. Downloads require internet. Normal assistant inference does not. Optional browser access needs Node 22.12+ and npm; run `bash scripts/setup-browser.sh` to install its pinned local adapter. Website access still uses the internet. The setup script does not enable a login service. `dist/Daisy.zip` preserves the signed bundle when the repository is in an iCloud/File Provider folder.
 
 1. Click **Choose folder**. Daisy searches filenames only under that folder.
 2. Type “Find my latest resume”, or `/find resume` for a search without the language model.
@@ -45,7 +45,7 @@ This installs Ollama, whisper.cpp and Python 3.11 through Homebrew, downloads Qw
 | Capability | This build |
 | --- | --- |
 | Conversation | Hermes Agent over ACP (`hermes-acp`), model and provider chosen in Hermes; answers stream into the transcript. Optional on-device Ollama fallback |
-| Voice | Mic → wake word or Talk → whisper.cpp → agent → Kokoro, starting on the first finished sentence while the answer is still streaming |
+| Voice | Mic → Silero voice activity → wake word or Talk → Apple's on-device recognizer (whisper.cpp as the fallback) → agent → Kokoro, starting on the first finished sentence while the answer is still streaming |
 | Approvals | Sends, deletes, calendar changes and posts wait on an amber card with the exact content (Hermes plugin in `hermes/daisy`); dangerous commands and file edits use Hermes's own prompts |
 | HUD | Reactor-style core that follows the mic and the voice, live tool activity, link and mic status, always-listening switch; respects Reduce Motion and pauses when hidden |
 | Memory | SQLite + FTS5; explicit save, edit, delete, source, revision; retrieved locally |
@@ -58,7 +58,7 @@ This installs Ollama, whisper.cpp and Python 3.11 through Homebrew, downloads Qw
 | Capability system | Dynamic schemas, per-capability permissions, multi-step execution, deduplication, cancellation, verified result cards |
 | Permissions | Folder selection/revocation, individual capability toggles, content reading off by default, microphone on first use |
 | Calendar, Contacts, Messages | **Not wired yet.** Hermes's `imessage` and `google-workspace` skills are installed but need `imsg` and a Google sign-in; see [integration plan](docs/INTEGRATIONS.md) |
-| Wake word | "Hey Daisy", transcribed locally; on/off switch on the main screen (⌘⇧L) |
+| Wake word | "Hey Daisy", heard in Apple's streaming transcript (or by a trained openWakeWord model once there is one, see [wake word](docs/wake-word.md)); on/off switch on the main screen (⌘⇧L) |
 | Proactive suggestions, fine-tuning | **Not implemented** |
 
 Search does not inspect document contents, determine which resume is substantively correct, query all of Spotlight, or download cloud-only file contents. It excludes hidden entries, symlinks, and app/package contents; caps work at 50,000 entries or 10 seconds and returns up to 30 matches (the interface displays 8). Partial/inaccessible results are identified. Narrow the folder or query when needed. A filename match is not evidence of a file's meaning.
@@ -73,7 +73,7 @@ The agent is bounded to eight model rounds and ten tool calls, with strict schem
 
 In **Settings → Voice**, choose any American or British Kokoro voice (Heart is the default) or the Heart + Bella blend, use **Preview voice**, then Save settings. Speech synthesis uses the downloaded Kokoro model locally, kept loaded in a worker process while Daisy runs and spoken sentence by sentence. Run `bash scripts/setup-voice.sh` if the voice runtime is missing. The old macOS voice is not a fallback.
 
-**Listening** has three modes in the same settings group. *Wake word* (the default) keeps the microphone open: every pause is transcribed on this Mac with whisper.cpp and dropped unless it starts with "Hey Daisy"; after an answer Daisy listens for a follow-up until you stay quiet. *Hands-free conversation* starts with one click on Record and then runs the same loop. *Click to talk* keeps the microphone off until you click. In every mode a recording ends on its own when you pause, and you can talk over Daisy to interrupt it (Apple's voice processing cancels its own speech from the mic input). whisper.cpp runs as a `whisper-server` child so the model loads once; if that binary is missing, each utterance falls back to `whisper-cli`.
+**Listening** has three modes in the same settings group. *Wake word* (the default) keeps the microphone open: Apple's on-device recognizer streams what it hears, and Daisy wakes mid-sentence when it hears "Hey Daisy" and takes down the rest as the request; anything else is dropped. When Apple's recognizer isn't ready, each pause goes to whisper.cpp instead; after an answer Daisy listens for a follow-up until you stay quiet. *Hands-free conversation* starts with one click on Record and then runs the same loop. *Click to talk* keeps the microphone off until you click. In every mode a recording ends on its own when you pause, and you can talk over Daisy to interrupt it (Apple's voice processing cancels its own speech from the mic input). whisper.cpp runs as a `whisper-server` child so the model loads once; if that binary is missing, each utterance falls back to `whisper-cli`. Silero voice activity detection decides when you've stopped talking, with the old loudness endpointer as the fallback. Helper processes (whisper-server, `ollama serve`, the voice worker) are tied to Daisy and stop with it, even after a crash or force quit.
 
 Use **Tasks → Add task** for homework, essay or coding projects. Or ask “Prepare a task to outline my essay in project College essays.” Daisy produces a review card; **Apply** saves it. Due dates are tracking fields, not scheduled reminders. Ask “What tasks do I have for College essays?” to retrieve saved work. Notes can contain prompts, source links and next steps. “Prepare a new file study-plan.md with …” creates a review card showing exact content and destination. No existing file is overwritten.
 
