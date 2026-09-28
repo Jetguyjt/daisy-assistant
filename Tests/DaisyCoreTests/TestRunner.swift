@@ -743,6 +743,48 @@ import Foundation
         } catch { fail("testWorkerPassesTheVoiceSettingAndArgumentsThrough: \(error)") }
         do {
             let before = TestLog.failures
+            let suite = VoiceSyncTests()
+            suite.testEachStreamedChunkRevealsItsOwnSentence()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testEachStreamedChunkRevealsItsOwnSentence")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = VoiceSyncTests()
+            suite.testChunksFromOneBatchRevealAtSentenceEnds()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testChunksFromOneBatchRevealAtSentenceEnds")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = VoiceSyncTests()
+            suite.testHeldBackTextIsRevealedWithTheChunkThatSaysIt()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testHeldBackTextIsRevealedWithTheChunkThatSaysIt")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = VoiceSyncTests()
+            suite.testTextTheVoiceSkipsShowsWithTheNextSentence()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testTextTheVoiceSkipsShowsWithTheNextSentence")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = VoiceSyncTests()
+            suite.testWhereTheVoiceStopsEverythingShows()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testWhereTheVoiceStopsEverythingShows")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = VoiceSyncTests()
+            suite.testANewReplyStartsCountingFromItsOwnText()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testANewReplyStartsCountingFromItsOwnText")
+        }
+        do {
+            let before = TestLog.failures
             let suite = VoiceTests()
             suite.testEndpointerStartsOnSpeechAndFinishesAfterTrailingSilence()
             count += 1
