@@ -35,8 +35,10 @@ These gaps have to close before the tools below go live. Stress test in [orchest
 
 Notes: [orchestrator.md](research/orchestrator.md)
 
-- [ ] Test live: does a background `delegate_task` over ACP ever return its result? Until it does, tell Hermes not to use it in Daisy sessions
+- [x] Test live: does a background `delegate_task` over ACP ever return its result? Until it does, tell Hermes not to use it in Daisy sessions
+  - 2026-09-27, `daisy-check --delegation`: dispatched in background mode at 3.5s, nothing came back in 94s. The persona keeps the "don't use delegate_task" line
 - [ ] Worker sessions: `session/new` per background job (max 2–3), route updates by session ID, job ledger + jobs panel, speak results when done
+  - built (max 2, roles.json marks them for the guard, `/job` or the JOBS tab); passes against scripted stand-ins, not run live yet
 - [ ] Fix or patch ACP so delegation results come back (read `completion_queue`, or run delegations synchronously)
 - [ ] `hermes gateway` as a LaunchAgent: cron, Kanban, Telegram/iMessage from my phone
 - [ ] Daisy shows cron output (`~/.hermes/cron/output/`) and the Kanban board
