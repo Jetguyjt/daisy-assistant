@@ -18,6 +18,9 @@ if [ -d "$RUNTIME_DIR/voice/venv" ]; then
 else
   echo "Natural speech is not installed yet. Run scripts/setup-voice.sh to enable it."
 fi
+if [ -d "$RUNTIME_DIR/speech" ]; then
+  cp "$REPO_DIR/scripts/speech/wakeword.py" "$RUNTIME_DIR/speech/wakeword.py"
+fi
 if [ -e "$INSTALL_DIR/Daisy.app" ]; then
   EXISTING_ID="$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$INSTALL_DIR/Daisy.app/Contents/Info.plist" 2>/dev/null || true)"
   if [ "$EXISTING_ID" != "com.local.daisy.desktop" ]; then

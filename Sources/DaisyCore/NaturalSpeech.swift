@@ -142,7 +142,9 @@ public actor SpeechWorker {
         child.arguments = [script.path, "--serve"] + arguments
         child.standardInput = stdinPipe; child.standardOutput = stdoutPipe; child.standardError = FileHandle.nullDevice
         child.currentDirectoryURL = script.deletingLastPathComponent()
-        try child.run()
+        // A worker that dies must not take Daisy with it: writing to its closed pipe would raise SIGPIPE.
+        _ = fcntl(stdinPipe.fileHandleForWriting.fileDescriptor, F_SETNOSIGPIPE, 1)
+        try ChildProcesses.shared.launch(child, label: "voice worker")
         process = child; input = stdinPipe.fileHandleForWriting; buffer = Data()
         connectionID = UUID(); let token = connectionID
         let output = stdoutPipe.fileHandleForReading

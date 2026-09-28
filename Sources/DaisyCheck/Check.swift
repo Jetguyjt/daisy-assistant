@@ -70,6 +70,28 @@ import DaisyCore
                 return
             }
             if args.dropFirst().first == "--voice-ab" { try await VoiceAB.run(Array(args.dropFirst(2))); return }
+            if args.dropFirst().first == "--speech", args.count > 2 {
+                // Apple's recognizer (or Whisper when it isn't ready) on a WAV, and Silero's view of it.
+                let configuration = try Configuration.load()
+                let settings = configuration.speechInput ?? SpeechInputSettings()
+                print("Apple recognizer: \(await AppleSpeech.state(locale: settings.localeIdentifier))")
+                let speech = SpeechRuntime()
+                await speech.configure(settings)
+                let started = Date()
+                let text = try await speech.transcribe(audio: URL(fileURLWithPath: args[2]), configuration: configuration)
+                let status = await speech.status
+                print(String(format: "transcript (%.2fs, %@): %@", Date().timeIntervalSince(started), status.active.rawValue, text))
+                if let vad = SileroVAD.installed(settings) {
+                    let file = try AVAudioFile(forReading: URL(fileURLWithPath: args[2]), commonFormat: .pcmFormatInt16, interleaved: true)
+                    if let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length)),
+                       file.processingFormat.sampleRate == 16000, (try? file.read(into: buffer)) != nil, let data = buffer.int16ChannelData {
+                        let steps = vad.process(Array(UnsafeBufferPointer(start: data[0], count: Int(buffer.frameLength))))
+                        print("Silero, one per 32 ms: " + steps.map { String(format: "%.2f", $0) }.joined(separator: " "))
+                    }
+                } else { print("Silero isn't installed (scripts/setup-speech.sh)") }
+                await speech.shutdown()
+                return
+            }
             if args.dropFirst().first == "--endpoint", args.count > 2 {
                 // Replay a WAV through the endpointer in 50 ms steps and print what it would have done.
                 let file = try AVAudioFile(forReading: URL(fileURLWithPath: args[2]))

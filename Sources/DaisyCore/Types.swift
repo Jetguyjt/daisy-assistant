@@ -29,6 +29,8 @@ public struct Configuration: Codable, Sendable {
     /// Set after the first successful Hermes connection. Until then Daisy waits for a click,
     /// so it never starts Hermes (and a provider token refresh) on its own.
     public var hermesConnected: Bool?
+    /// How Daisy hears: Apple's recognizer or Whisper, Silero, the wake word model. Nil means defaults.
+    public var speechInput: SpeechInputSettings?
     public init() {}
 
     public static var dataDirectory: URL { resolvedDataDirectory }

@@ -690,6 +690,10 @@ private struct SettingsView: View {
                                   speed: Binding(get: { model.config.speechRate ?? 1 }, set: { model.config.speechRate = $0 }),
                                   busy: model.busy, preview: { model.previewVoice() }, stop: { model.interrupt() })
                 note("\(model.audio.microphoneStatus) · Input: \(model.audio.inputDeviceName)")
+                if !model.speechInStatus.isEmpty { note(model.speechInStatus) }
+                note(model.audio.voiceActivityStatus)
+                note(OpenWakeWordDetector.installed ? "Wake word: the trained model (hey_daisy.onnx)."
+                                                    : "Wake word: listening for the words \"Hey Daisy\". A trained model can take over; see docs/wake-word.md.")
                 Button("Sound input settings") {
                     NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.sound?input")!)
                 }

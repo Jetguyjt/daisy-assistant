@@ -112,6 +112,22 @@ struct ConversationItem: Identifiable {
     private var endpointer = SpeechEndpointer()
     private var bargeEndpointer = SpeechEndpointer(settings: .bargeIn)
     private var standbyWork: Task<Void, Never>?
+    /// Standby: hears "Hey Daisy" (in Apple's partial transcripts, or with the trained wake word
+    /// model) and then the request, and hands over the finished text.
+    private lazy var wake: WakeListener = {
+        let listener = WakeListener { [weak self] onUpdate in
+            guard let self else { throw CancellationError() }
+            return try await self.speech.stream(configuration: self.config, onUpdate: onUpdate)
+        }
+        listener.onEvent = { [weak self] event in self?.wakeEvent(event) }
+        return listener
+    }()
+    /// "Hey Daisy" was heard and the wake listener is taking down the request.
+    private var wakeTurn = false
+    /// What Daisy was doing when the wake phrase came in: idle, or waiting on a card.
+    private var wokeFrom: AssistantPhase = .idle
+    /// Which recognizer is hearing Daisy's user right now, for Settings.
+    @Published var speechInStatus = ""
     var busy: Bool { phase != .idle }
     var listeningMode: ListeningMode { ListeningMode(rawValue: config.listeningMode ?? "") ?? .wakeWord }
     var alwaysListening: Bool { listeningMode == .wakeWord }
@@ -193,8 +209,11 @@ struct ConversationItem: Identifiable {
         }
         if listeningMode != .wakeWord { quietMode = listeningMode }
         audio.speechWorker = speechWorker
-        audio.onChunk = { [weak self] power, duration in self?.observe(power: power, duration: duration) }
+        audio.onAudio = { [weak self] chunk in self?.observe(chunk) }
         audio.onEngineLost = { [weak self] in self?.engineLost() }
+        // Helpers a crashed or force-quit Daisy left running (whisper-server, ollama serve, workers).
+        Task.detached { ChildProcesses.shared.sweepOnce() }
+        applySpeechInput()
         Task {
             await reloadMemories(); await reloadTasks()
             if config.speakResponses { await speechWorker.warmUp() }
@@ -612,59 +631,90 @@ struct ConversationItem: Identifiable {
             }
             guard !Task.isCancelled, self.listeningMode == .wakeWord, self.canStandBy else { return }
             do { try self.audio.startEngine() } catch { self.notice = error.localizedDescription; return }
-            self.endpointer = SpeechEndpointer(settings: .standby)
+            self.wake.reset()
+            self.startWakeWordModel()
             self.standby = true
             self.warmTranscriber()
         }
     }
-    /// Start whisper-server ahead of the first utterance so the wake gate answers at once.
+    /// Get the recognizer ready ahead of the first utterance (Apple's model loaded, or
+    /// whisper-server started), then show which one it is.
     private func warmTranscriber() {
         let speech = self.speech, configuration = self.config
-        Task.detached { try? await speech.ensureRunning(configuration: configuration) }
+        Task { [weak self] in
+            await speech.prepare(configuration: configuration)
+            let status = await speech.status
+            self?.speechInStatus = status.summary
+        }
     }
     private func disarmStandby() {
         standbyWork?.cancel(); standbyWork = nil
         standby = false
+        wake.reset()
+        if wakeTurn { wakeTurn = false; if phase == .listening { phase = wokeFrom } }
         if audio.capturing && phase == .idle { audio.discardCapture() }
     }
-    /// One reading per audio chunk. Which endpointer it feeds depends on what Daisy is doing.
-    private func observe(power: Float, duration: TimeInterval) {
+    /// Speech-in settings go to the recognizer, the audio engine (Silero loads at its next start)
+    /// and the wake word model, which restarts with them.
+    private func applySpeechInput() {
+        let settings = config.speechInput ?? SpeechInputSettings()
+        audio.speechInput = settings
+        let speech = self.speech
+        Task { await speech.configure(settings) }
+        if let detector = wake.detector {
+            wake.detector = nil
+            Task { await detector.stop() }
+        }
+        if standby { startWakeWordModel() }
+    }
+    /// The trained "hey daisy" model as the first stage, when it's installed and turned on. Until
+    /// it has loaded, and if it ever stops, the recognizer gate listens instead.
+    private func startWakeWordModel() {
+        let settings = config.speechInput ?? SpeechInputSettings()
+        guard settings.usesWakeWordModel, OpenWakeWordDetector.installed,
+              (wake.detector as? OpenWakeWordDetector)?.isRunning != true else { return }
+        let detector = OpenWakeWordDetector(threshold: settings.wakeThreshold)
+        do { try detector.start(); wake.detector = detector } catch { wake.detector = nil }
+    }
+    /// One audio chunk. Which endpointer (or the wake listener) it feeds depends on what Daisy is doing.
+    private func observe(_ chunk: AudioController.Chunk) {
         switch phase {
         case .listening:
-            switch endpointer.observe(power: power, duration: duration) {
+            if wakeTurn { wake.feed(chunk); return }
+            switch endpointer.observe(power: chunk.power, duration: chunk.duration, speech: chunk.speech) {
             case .finished: endListening()
             case .timedOut: abandonListening()
             default: break
             }
         case .speaking:
             guard listeningMode != .manual, audio.echoCancellation else { return }
-            if bargeEndpointer.observe(power: power, duration: duration) == .speechStarted { bargeIn() }
+            if bargeEndpointer.observe(power: chunk.power, duration: chunk.duration, speech: chunk.speech) == .speechStarted { bargeIn() }
         case .idle, .awaitingApproval:
             guard standby else { return }
-            switch endpointer.observe(power: power, duration: duration) {
-            case .speechStarted: audio.beginCapture(preRoll: 1.0)
-            case .finished: gateStandbyUtterance()
-            default: break
-            }
+            wake.feed(chunk)
         default: break
         }
     }
-    /// Standby heard something. Transcribe it; only an utterance that starts with the wake phrase
-    /// becomes a turn, everything else is dropped without a trace.
-    private func gateStandbyUtterance() {
-        endpointer = SpeechEndpointer(settings: .standby)
-        guard let url = try? audio.endCapture() else { return }
-        let token = generation
-        standbyWork = Task { [weak self] in
-            defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
-            guard let self else { return }
-            do {
-                let text = try await self.speech.transcribe(audio: url, configuration: self.config)
-                guard !Task.isCancelled, self.generation == token, self.standby, WakePhrase.matches(text) else { return }
-                let request = WakePhrase.stripping(text)
-                self.standby = false
-                if request.isEmpty { self.beginListening(purpose: .command) } else { self.run(request, spoken: true) }
-            } catch { }
+    /// What the wake listener heard in standby. Anything without the wake phrase never gets here.
+    private func wakeEvent(_ event: WakeListener.Event) {
+        switch event {
+        case .wake:
+            // Show it at once; the listener keeps taking down the request. A card left waiting
+            // (after `park`) stays up; a new request cancels its turn, which counts as no.
+            guard standby, phase == .idle || phase == .awaitingApproval else { return }
+            wokeFrom = phase
+            wakeTurn = true; phase = .listening; notice = nil
+            audio.beginCapture(preRoll: 0)   // only for the level meter
+        case .request(let text):
+            guard wakeTurn else { return }
+            wakeTurn = false
+            audio.discardCapture()
+            if !text.isEmpty { run(text, spoken: true); return }
+            // Nothing after the wake phrase: back to what Daisy was doing.
+            let cardsLeft = !approvalQueue.items(from: .conversation).isEmpty
+            phase = wokeFrom == .awaitingApproval ? (cardsLeft ? .awaitingApproval : .working) : .idle
+        case .ignored:
+            break
         }
     }
     func beginListening() { beginListening(purpose: .command) }
@@ -684,7 +734,7 @@ struct ConversationItem: Identifiable {
                 warmTranscriber()
                 endpointer = SpeechEndpointer(settings: purpose == .followUp ? .followUp : .standard)
                 for reading in audio.beginCapture(preRoll: purpose == .command ? 0.5 : 0) {
-                    _ = endpointer.observe(power: reading.power, duration: reading.duration)
+                    _ = endpointer.observe(power: reading.power, duration: reading.duration, speech: reading.speech)
                 }
                 phase = .listening
             } catch { notice = error.localizedDescription; phase = .idle; holdRequested = false; rest() }
@@ -746,6 +796,7 @@ struct ConversationItem: Identifiable {
     }
     private func engineLost() {
         standby = false
+        wakeTurn = false; wake.reset()
         if phase == .listening || phase == .preparing { holdRequested = false; phase = .idle; notice = "The audio device changed. Try again." }
         guard listeningMode == .wakeWord, !busy else { return }
         Task { [weak self] in
@@ -782,6 +833,7 @@ struct ConversationItem: Identifiable {
         }
         generation = UUID(); work?.cancel(); work = nil
         standbyWork?.cancel(); standbyWork = nil
+        wake.reset(); wakeTurn = false
         endVoice(); approvalQueue.withdraw(from: .conversation)
         // Whatever was already written stays in the transcript, marked as cut off.
         if !liveText.isEmpty {
@@ -943,6 +995,7 @@ struct ConversationItem: Identifiable {
             }
             connected = false; connectWhenAllowed()
             if config.speakResponses { Task { await speechWorker.warmUp() } }
+            applySpeechInput()
             applyListeningMode()
         } catch { notice = error.localizedDescription }
     }
@@ -952,6 +1005,7 @@ struct ConversationItem: Identifiable {
         selectedFolder?.stopAccessingSecurityScopedResource()
         browserWork?.cancel(); await chrome.disconnect()
         await speechWorker.stop()
+        await wake.detector?.stop()
         await speech.shutdown()
         // Jobs first, so their sessions lose the job mark before Hermes goes.
         await jobs.shutdown()
