@@ -389,7 +389,6 @@ struct ContentView: View {
                 readout("MEMORY", "\(model.memories.count) saved") { model.tab = "Memory" }
                 readout("TASKS", "\(model.tasks.filter { $0.status != "done" }.count) open") { model.tab = "Tasks" }
                 JobsReadout(jobs: model.jobs) { model.tab = "Jobs" }
-                readout("CHROME", model.chromeConnected ? "Connected" : "Not linked", color: model.chromeConnected ? HUD.ice : HUD.steel) { model.tab = "Connections" }
             }
             .padding(16)
             }

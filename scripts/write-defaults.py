@@ -17,6 +17,5 @@ config = {
     "voice": "Samantha",
     "naturalVoice": "af_heart",
     "speechRate": 1.0,
-    "browserNode": shutil.which("node") or str(pathlib.Path.home() / ".local/bin/node"),
 }
 pathlib.Path(sys.argv[2]).write_text(json.dumps(config, indent=2) + "\n")

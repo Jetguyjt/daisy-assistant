@@ -21,7 +21,6 @@ Only registered code runs. There is no model-generated shell, arbitrary path rea
 | Tasks | `list_tasks`, `prepare_task` | Local persistent projects, dates, status and notes; review to save. |
 | Drafts | `prepare_file` | New file in selected folder; exact-content review, no overwrite. |
 | Mac apps | `find_apps`, `prepare_open_app` | Discover installed apps and review launch; no app UI control. |
-| Chrome | `browser_tabs`, `browser_read`, `browser_open`, `web_search` | Explicit connection approval, accessible page text and new tabs only. |
 | Utilities | `calculate`, `current_time` | Arithmetic parser and system date/time; no shell or account data. |
 
 Search issues temporary opaque references. The text reader accepts references from that same request, rechecks folder containment, and reads a bounded UTF-8 excerpt. Files larger than 64 KB and unsupported formats are rejected. Results are data, not authorization. Saved explicit memory commands and UI edits remain separate deterministic user actions.
@@ -45,7 +44,7 @@ Voice uses explicit Record/Finish controls. A common-mode timer keeps the level 
 
 ## Version 0.3 expansion
 
-`MCPConnection` is a generic local stdio JSON-RPC transport with request IDs, bounded messages, cancellation notifications, timeouts, and owned-process shutdown. The Chrome adapter wraps the official Chrome DevTools MCP package with only tab discovery, accessible page text, and new-page navigation. It uses structured tab IDs, filters/pages long tab lists, and requires an observed ID before reading. No site-specific Gmail/Calendar branching exists in the engine. Connected sites share the same browser adapter.
+`MCPConnection` is a generic local stdio JSON-RPC transport with request IDs, bounded messages, cancellation notifications, timeouts, and owned-process shutdown. The Chrome adapter that used it was retired on 2026-09-28; Chrome now goes through Hermes (see [mac-control](research/mac-control.md)).
 
 `preparesChanges` capabilities produce a `ReviewedAction` with an exact display preview and trusted Swift commit closure. Model-facing receipts say prepared/unsaved and never include that closure. Only the UI Apply button calls it. Task revisions reject stale updates; exclusive file creation rejects overwrites. A new request, Stop or permission change expires unapplied cards. Existing `changesData` and `communicatesExternally` capabilities still fail closed; this is not general autonomous mutation.
 

@@ -43,43 +43,20 @@ struct ReviewCard: View {
 struct ConnectionsView: View {
     @ObservedObject var model: AppModel
     var body: some View {
-        HUDPage(kicker: "BROWSER LINK / " + (model.chromeConnected ? "CONNECTED" : "OFFLINE"), title: "Connections") {
+        HUDPage(kicker: "CHROME / THROUGH HERMES", title: "Connections") {
             HStack(spacing: 12) {
                 Image(systemName: "globe").font(.system(size: 18)).foregroundStyle(HUD.accent)
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Google Chrome").font(.system(size: 15, weight: .semibold)).foregroundStyle(HUD.ice)
-                    Text(model.chromeConnected ? "CONNECTED" : model.chromeConnecting ? "WAITING FOR CHROME" : "NOT CONNECTED")
-                        .font(HUD.label(9)).tracking(1.4).foregroundStyle(model.chromeConnected ? HUD.accent : HUD.amber)
-                }
-                Spacer()
-                if model.chromeConnected || model.chromeConnecting {
-                    Button(model.chromeConnecting ? "Cancel" : "Disconnect") { model.disconnectChrome() }
-                        .buttonStyle(HUDButtonStyle(kind: .danger, compact: true))
-                } else {
-                    Button("Connect") { model.connectChrome() }.buttonStyle(HUDButtonStyle(kind: .primary, compact: true))
+                    Text("YOUR OWN CHROME, NOTHING TO CONNECT").font(HUD.label(9)).tracking(1.4).foregroundStyle(HUD.accent)
                 }
             }
-            VStack(alignment: .leading, spacing: 8) {
-                step(1, "Open Chrome's remote debugging page.")
-                step(2, "Turn on remote debugging.")
-                step(3, "Click Connect, then allow Chrome's prompt.")
-                Button("Open Chrome setup") { model.openChromeSetup() }.buttonStyle(HUDButtonStyle(kind: .ghost, compact: true)).padding(.top, 4)
+            Text("Daisy uses your own Chrome through Hermes: it can list your tabs, switch to one and open pages, including your signed-in ones. It can't click, type or run anything inside a page. The first time, macOS asks whether Daisy can control Google Chrome.")
+                .font(.system(size: 12)).foregroundStyle(HUD.dim).lineSpacing(3)
+            Button("Open Automation settings") {
+                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")!)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, 12)
-            .overlay(alignment: .top) { Rectangle().fill(HUD.line.opacity(0.09)).frame(height: 1) }
-            Text("Daisy can list tabs, read page text and open new tabs. It can't type, click, run scripts or send anything. Pages without readable text are reported as such. Reconnect after relaunching.")
-                .font(.system(size: 11.5)).foregroundStyle(HUD.dim).lineSpacing(3)
-            if let status = model.connectionNotice {
-                Text(status).font(.system(size: 12)).foregroundStyle(HUD.accent).textSelection(.enabled)
-            }
-        }
-    }
-    private func step(_ number: Int, _ text: String) -> some View {
-        HStack(spacing: 10) {
-            Text("\(number)").font(HUD.readout(10)).foregroundStyle(HUD.accent)
-                .frame(width: 20, height: 20).overlay(Rectangle().strokeBorder(HUD.accent.opacity(0.4), lineWidth: 1))
-            Text(text).font(.system(size: 12.5)).foregroundStyle(HUD.ice.opacity(0.9))
+            .buttonStyle(HUDButtonStyle(kind: .ghost, compact: true))
         }
     }
 }

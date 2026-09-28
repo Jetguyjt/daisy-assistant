@@ -48,20 +48,6 @@ import DaisyCore
                 await hermes.shutdown()
                 return
             }
-            if args.dropFirst().first == "--browser-metadata" {
-                let connection = MCPConnection()
-                let script = Configuration.dataDirectory.appendingPathComponent("Runtime/browser/node_modules/chrome-devtools-mcp/build/src/bin/chrome-devtools-mcp.js")
-                let node = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/bin/node")
-                do {
-                    try await connection.start(executable: node, arguments: ChromeConnection.adapterArguments(script: script.path), environment: ChromeConnection.adapterEnvironment)
-                    let result = try await connection.request(method: "tools/list", parameters: .object([:]))
-                    guard case .object(let object) = result, case .array(let list) = object["tools"] else { throw DaisyError.message("Missing tool metadata") }
-                    let names = Set(list.compactMap { value -> String? in if case .object(let fields) = value { return fields["name"]?.stringValue }; return nil })
-                    guard Set(["list_pages", "new_page", "take_snapshot"]).isSubset(of: names), !names.contains("evaluate_script"), !names.contains("click"), !names.contains("fill") else { throw DaisyError.message("Unexpected browser adapter configuration") }
-                    print("PASS — real MCP initialize + tools/list; read/navigation metadata present; input/JavaScript disabled. No browser tool invoked or account accessed.")
-                    await connection.stop(); return
-                } catch { await connection.stop(); throw error }
-            }
             if args.dropFirst().first == "--spoken" {
                 // Print what the voice would say for a Markdown answer (file path or stdin).
                 let text = args.count > 2 ? try String(contentsOfFile: args[2], encoding: .utf8)
@@ -235,7 +221,7 @@ import DaisyCore
             ]
             for prompt in prompts {
                 let builtins = try BuiltInCapabilities.registry(root: fixtures, allowFiles: true, memories: try await store.all(), memoryStore: store, permissions: ["read_text_file": true])
-                let registry = try CapabilityRegistry(capabilities: builtins.entries + TaskCapabilityProvider(store: tasks).capabilities() + DraftCapabilityProvider(root: fixtures).capabilities() + BrowserCapabilityProvider(connection: ChromeConnection(), available: false).capabilities())
+                let registry = try CapabilityRegistry(capabilities: builtins.entries + TaskCapabilityProvider(store: tasks).capabilities() + DraftCapabilityProvider(root: fixtures).capabilities())
                 let response = try await engine.respond(text: prompt, history: [], memories: try await store.all(), model: model, registry: registry)
                 let files = response.search?.files.count ?? 0
                 let lower = response.text.lowercased()

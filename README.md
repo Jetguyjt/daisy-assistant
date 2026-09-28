@@ -30,7 +30,7 @@ bash scripts/setup.sh
 open ~/Applications/Daisy.app
 ```
 
-This installs Ollama, whisper.cpp and Python 3.11 through Homebrew, downloads Qwen 3.5 4B (~3.4 GB), Whisper base.en (~148 MB), Kokoro speech weights (~354 MB) and the speech-in models (Silero voice activity and openWakeWord features, ~3.7 MB from GitHub, via `scripts/setup-speech.sh`), compiles the app, applies a local ad-hoc signature, and installs it in your user Applications folder. Downloads require internet. Normal assistant inference does not. Optional browser access needs Node 22.12+ and npm; run `bash scripts/setup-browser.sh` to install its pinned local adapter. Website access still uses the internet. The setup script does not enable a login service. `dist/Daisy.zip` preserves the signed bundle when the repository is in an iCloud/File Provider folder.
+This installs Ollama, whisper.cpp and Python 3.11 through Homebrew, downloads Qwen 3.5 4B (~3.4 GB), Whisper base.en (~148 MB), Kokoro speech weights (~354 MB) and the speech-in models (Silero voice activity and openWakeWord features, ~3.7 MB from GitHub, via `scripts/setup-speech.sh`), compiles the app, applies a local ad-hoc signature, and installs it in your user Applications folder. Downloads require internet. Normal assistant inference does not. The setup script does not enable a login service. `dist/Daisy.zip` preserves the signed bundle when the repository is in an iCloud/File Provider folder.
 
 1. Click **Choose folder**. Daisy searches filenames only under that folder.
 2. Type “Find my latest resume”, or `/find resume` for a search without the language model.
@@ -53,7 +53,7 @@ This installs Ollama, whisper.cpp and Python 3.11 through Homebrew, downloads Qw
 | Tasks/projects | Persistent local title, project, due date, status and notes; UI editing and model-prepared review cards |
 | Document/code drafts | Prepare a new text file; review full content and Apply; no overwrites or code execution |
 | Mac apps | Find installed apps and review a launch; opening does not grant UI control |
-| Chrome | Optional user-approved connection; tab search, accessible text reading, new background pages and web searches |
+| Chrome | Your own Chrome through Hermes: list tabs, switch to one, open pages. macOS asks once whether Daisy can control Chrome |
 | Utilities | Validated arithmetic and date/time with timezone support |
 | Capability system | Dynamic schemas, per-capability permissions, multi-step execution, deduplication, cancellation, verified result cards |
 | Permissions | Folder selection/revocation, individual capability toggles, content reading off by default, microphone on first use |
@@ -65,7 +65,7 @@ Search does not inspect document contents, determine which resume is substantive
 
 The model chooses from the enabled capabilities and can combine them, such as finding a text file, reading it, and summarizing it. Enable **Read text files** in Capabilities first. This reader accepts only references obtained from that request's scoped search, limits files to 64 KB, and returns at most 1,200 characters. It does not parse PDF/Word files. `/find budget` remains a direct search without inference.
 
-General questions, writing, explanations, brainstorming, and planning do not require a special integration. Real data or actions in another app require an installed adapter and the appropriate access. Connected Chrome enables browsing and accessible page reading across sites, including signed-in pages. Full Gmail/Drive APIs, Google Docs canvas editing, arbitrary app control, form input, shell execution and sending messages are not implemented.
+General questions, writing, explanations, brainstorming, and planning do not require a special integration. Real data or actions in another app require an installed adapter and the appropriate access. Full Gmail/Drive APIs, Google Docs canvas editing, arbitrary app control, form input, shell execution and sending messages are not implemented.
 
 The agent is bounded to eight model rounds and ten tool calls, with strict schema validation and duplicate-call reuse. The current request is limited to 4,000 UTF-8 bytes. Complete memories/history are included only while they fit the context budget. Only result cards prove that an operation ran; model prose can still be inaccurate. Tools may read data or prepare exact changes. Task saves, new files and app launches require the user to Apply a review card. Other effectful adapters remain blocked. Old cards expire when another request starts, access changes, or Stop is pressed; task revisions and exclusive file creation also prevent stale overwrites. See [capability architecture](docs/CAPABILITIES.md).
 
@@ -77,9 +77,7 @@ In **Settings → Voice**, choose any American or British Kokoro voice (Heart is
 
 Use **Tasks → Add task** for homework, essay or coding projects. Or ask “Prepare a task to outline my essay in project College essays.” Daisy produces a review card; **Apply** saves it. Due dates are tracking fields, not scheduled reminders. Ask “What tasks do I have for College essays?” to retrieve saved work. Notes can contain prompts, source links and next steps. “Prepare a new file study-plan.md with …” creates a review card showing exact content and destination. No existing file is overwritten.
 
-Use **Connections → Open Chrome connection settings**, enable remote debugging in Chrome, click **Connect Chrome**, and approve Chrome’s prompt. This grants the local Chrome DevTools process access to your browser session; only the four restricted browser capabilities are exposed to Daisy. Telemetry, CrUX requests, JavaScript evaluation, input, network-inspection and emulation tools are disabled. Disconnect ends the process; quitting Daisy also disconnects. Connections are not restored automatically.
-
-After connecting, try “Research this topic and cite sources” or “Summarize my open Gmail tab.” Full Gmail and Drive APIs are not connected. Reading a Drive listing does not prove a document’s contents were read. Some sites and document canvases expose little accessible text; the assistant must report that limitation. No signed-in browser workflow is claimed as validated until tested with your permission.
+Chrome needs no setup. Ask “what tabs do I have open”, “switch to my Gmail tab” or “search Google for …”: Hermes lists your tabs, switches to one or opens a page in your own Chrome, signed-in tabs included. The first time, macOS asks whether Daisy can control Google Chrome; allow it (System Settings → Privacy & Security → Automation). Daisy never clicks, types or runs anything inside a page. The old **Connect Chrome** adapter (remote debugging for the on-device model) is gone.
 
 ## Memory and privacy
 
@@ -100,7 +98,7 @@ Memories, configuration, and the selected folder's bookmark live in:
 
 The app uses a private data directory and file permissions; the database is **not separately encrypted**. FileVault and system backups govern storage-at-rest protection. Deletion removes a memory from active storage and retrieval, and clears the current conversation. OS backups, snapshots, or model-server RAM are not forensic-erased. Temporary recordings and speech text are removed after success, cancellation, or ordinary failure; a force-kill/system crash can leave files named `daisy-…` in the OS temporary directory.
 
-Conversation history is session-only, bounded, and never written to a transcript log. Explicit memory is retrieved with lexical FTS and recent notes; there are no embedding or inference API calls to an external provider. Most recent/relevant memories fit a bounded prompt; this is not unlimited recall. Chrome keeps account credentials in its own profile; Daisy does not copy them into settings or request passwords. Browser page text is supplied to the local model only.
+Conversation history is session-only, bounded, and never written to a transcript log. Explicit memory is retrieved with lexical FTS and recent notes; there are no embedding or inference API calls to an external provider. Most recent/relevant memories fit a bounded prompt; this is not unlimited recall. Chrome keeps account credentials in its own profile; Daisy does not copy them into settings or request passwords.
 
 The dedicated Ollama process sets `OLLAMA_NO_CLOUD=1`. The client has a fixed loopback endpoint, disables proxies and redirects, and rejects cloud tags/remote-model metadata. It does not connect to your normal Ollama port 11434. If you manually supply an existing server on 11435, you are responsible for running the genuine Ollama binary with cloud disabled; a compromised local server is outside this trust boundary. Model downloads and Ollama's own startup/download metadata traffic may access the internet; this is not an OS-enforced network sandbox.
 
@@ -119,7 +117,6 @@ swift run daisy-check --runtime       # quit Daisy/external server first; owned 
 swift run daisy-check --hermes "What is 37 × 18?" "Find my resume."  # real Hermes over ACP; approvals always declined
 for t in hermes/test_*.py; do python3 "$t"; done  # approval guard rules and the typed-tool contract
 python3 scripts/gen-tests.py          # after adding a *Tests.swift file
-swift run daisy-check --browser-metadata # real MCP handshake only; no browser/account access
 swift run daisy-check --spoken answer.md  # print what the voice would say for a Markdown answer
 swift run daisy-check --endpoint clip.wav  # replay a WAV through the silence endpointer
 swift run daisy-check --wake-gate clip.wav # transcribe a WAV and show whether the wake phrase fires

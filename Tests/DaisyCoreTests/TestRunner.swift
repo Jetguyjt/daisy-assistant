@@ -1164,20 +1164,6 @@ import Foundation
         do {
             let before = TestLog.failures
             let suite = WorkspaceTests()
-            try await suite.testBrowserTabsParseTextPageListWithoutStructuredContent()
-            count += 1
-            print("\(TestLog.failures == before ? "PASS" : "FAIL") testBrowserTabsParseTextPageListWithoutStructuredContent")
-        } catch { fail("testBrowserTabsParseTextPageListWithoutStructuredContent: \(error)") }
-        do {
-            let before = TestLog.failures
-            let suite = WorkspaceTests()
-            try await suite.testBrowserPaginationNewTabAndIDValidation()
-            count += 1
-            print("\(TestLog.failures == before ? "PASS" : "FAIL") testBrowserPaginationNewTabAndIDValidation")
-        } catch { fail("testBrowserPaginationNewTabAndIDValidation: \(error)") }
-        do {
-            let before = TestLog.failures
-            let suite = WorkspaceTests()
             try await suite.testProjectSnapshotReadsGitStatusBranchAndNotes()
             count += 1
             print("\(TestLog.failures == before ? "PASS" : "FAIL") testProjectSnapshotReadsGitStatusBranchAndNotes")
@@ -1189,13 +1175,6 @@ import Foundation
             count += 1
             print("\(TestLog.failures == before ? "PASS" : "FAIL") testProjectSnapshotBlockedWithoutActiveProjectsMemory")
         } catch { fail("testProjectSnapshotBlockedWithoutActiveProjectsMemory: \(error)") }
-        do {
-            let before = TestLog.failures
-            let suite = WorkspaceTests()
-            try await suite.testChromeHealthKeepsSlowAdapterAndDropsDeadAdapter()
-            count += 1
-            print("\(TestLog.failures == before ? "PASS" : "FAIL") testChromeHealthKeepsSlowAdapterAndDropsDeadAdapter")
-        } catch { fail("testChromeHealthKeepsSlowAdapterAndDropsDeadAdapter: \(error)") }
         do {
             let before = TestLog.failures
             let suite = WorkspaceTests()

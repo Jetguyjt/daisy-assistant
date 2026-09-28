@@ -11,6 +11,5 @@
     "read_text_file": false
   },
   "naturalVoice": "af_heart",
-  "speechRate": 1.0,
-  "browserNode": "/Users/YOUR_NAME/.local/bin/node"
+  "speechRate": 1.0
 }

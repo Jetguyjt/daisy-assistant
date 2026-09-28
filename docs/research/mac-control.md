@@ -46,10 +46,9 @@ The goal: "search Google for…", "check my email" → go to Chrome, use the Gma
 
 ### "Check my email"
 
-1. `chrome_tabs` looks for `mail.google.com`.
-2. If there's a match, `chrome_focus` switches to it. If not, `chrome_open("https://mail.google.com/")`.
-3. The inbox itself comes from the Gmail API ([google.md](google.md)), not from scraping the page. Fallback: a `computer_use` accessibility capture.
-4. Daisy reads a short summary aloud. Replying, archiving or deleting goes through an approval card.
+1. `chrome_open("https://mail.google.com/", reuse=true)`, one call: it switches to an open Gmail tab or opens one. Listing tabs first would make that open stop at a card (the guard counts `chrome_tabs` as reading the web).
+2. The inbox itself comes from the Gmail API ([google.md](google.md)), not from scraping the page. Fallback: a `computer_use` accessibility capture.
+3. Daisy reads a short summary aloud. Replying, archiving or deleting goes through an approval card.
 
 ## Guard gaps
 

@@ -19,7 +19,6 @@ public struct Configuration: Codable, Sendable {
     public var voice = "Samantha"
     public var naturalVoice: String?
     public var speechRate: Double?
-    public var browserNode: String?
     /// manual, handsFree or wakeWord. Optional so settings saved before it existed still decode.
     public var listeningMode: String?
     /// "hermes" (default) or "local", the on-device fallback.

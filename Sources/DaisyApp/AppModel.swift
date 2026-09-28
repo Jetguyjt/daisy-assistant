@@ -58,9 +58,6 @@ struct ConversationItem: Identifiable {
     @Published var tab = "Assistant"
     @Published var recentSearch: SearchReport?
     @Published var currentStep: String?
-    @Published var chromeConnected = false
-    @Published var chromeConnecting = false
-    @Published var connectionNotice: String?
     @Published var tasks: [WorkItem] = []
     @Published var reviewResults: [UUID: String] = [:]
     @Published var applyingReviews = Set<UUID>()
@@ -101,9 +98,6 @@ struct ConversationItem: Identifiable {
     private var voicePlayback: Task<Void, Error>?
     private var expiredReviews = Set<UUID>()
     private var taskStore: TaskStore?
-    private let chrome = ChromeConnection()
-    private var browserWork: Task<Void, Never>?
-    private var chromeHealth: Task<Void, Never>?
     let audio = AudioController()
     private var store: MemoryStore?
     private var work: Task<Void, Never>?
@@ -144,7 +138,7 @@ struct ConversationItem: Identifiable {
     func capabilityRegistry() throws -> CapabilityRegistry {
         var entries = try BuiltInCapabilities.registry(root: selectedFolder, allowFiles: config.allowFileSearch,
             memories: memories, memoryStore: store, permissions: config.capabilityPermissions ?? [:]).entries
-        var additional = BrowserCapabilityProvider(connection: chrome, available: chromeConnected).capabilities()
+        var additional: [Capability] = []
         if let taskStore { additional += TaskCapabilityProvider(store: taskStore).capabilities() }
         additional += DraftCapabilityProvider(root: selectedFolder).capabilities()
         additional += MacCapabilityProvider().capabilities()
@@ -200,7 +194,7 @@ struct ConversationItem: Identifiable {
             }
         }
         if firstDaisyLaunch, notice == nil {
-            notice = "Jarvis is now Daisy. macOS treats it as a new app, so allow the microphone again when asked (and Automation for Chrome later)."
+            notice = "Jarvis is now Daisy. macOS treats it as a new app, so allow the microphone again when asked (and Chrome, the first time Daisy uses your tabs)."
                 + (folderLost ? " Choose your search folder again in Setup." : "")
         } else if folderLost, notice == nil {
             notice = "Choose your search folder again in Setup; macOS no longer recognizes the old one."
@@ -900,49 +894,6 @@ struct ConversationItem: Identifiable {
     }
     func discardReview(_ review: ReviewedAction) { reviewResults[review.id] = "Discarded. No change applied." }
 
-    // MARK: Chrome
-
-    func connectChrome() {
-        guard !chromeConnecting else { return }
-        stop(clearNotice: true); chromeConnecting = true; connectionNotice = "Waiting for Chrome to allow the local connection…"
-        browserWork = Task {
-            defer { chromeConnecting = false }
-            do {
-                try await chrome.connect(node: config.browserNode ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/bin/node").path)
-                chromeConnected = true; connectionNotice = "Connected. Daisy can find tabs, read accessible page text and open research pages when requested."
-                startChromeHealth()
-            } catch is CancellationError { chromeConnected = false; connectionNotice = "Connection cancelled." }
-            catch { chromeConnected = false; connectionNotice = error.localizedDescription }
-            rest()
-        }
-    }
-    func disconnectChrome() {
-        stop(clearNotice: true); browserWork?.cancel(); chromeHealth?.cancel(); chromeHealth = nil; chromeConnected = false
-        Task { await chrome.disconnect(); connectionNotice = "Disconnected from Chrome."; rest() }
-    }
-    /// Periodically probe the adapter so the badge stops lying when Chrome or the child dies.
-    /// A slow reply is left alone: the model may be generating and starving the adapter.
-    private func startChromeHealth() {
-        chromeHealth?.cancel()
-        chromeHealth = Task { [weak self] in
-            while !Task.isCancelled {
-                do { try await Task.sleep(nanoseconds: 10_000_000_000) } catch { return }
-                guard let self else { return }
-                if self.busy || self.chromeConnecting { continue }
-                guard await self.chrome.health() == .lost else { continue }
-                self.chromeConnected = false
-                if self.connectionNotice?.hasPrefix("Connected.") == true {
-                    self.connectionNotice = "The Chrome adapter stopped. Reconnect in Connections."
-                }
-                return
-            }
-        }
-    }
-    func openChromeSetup() {
-        let application = URL(fileURLWithPath: "/Applications/Google Chrome.app")
-        NSWorkspace.shared.open([URL(string: "chrome://inspect/#remote-debugging")!], withApplicationAt: application, configuration: NSWorkspace.OpenConfiguration())
-    }
-
     // MARK: Tasks, folder, memory, settings
 
     func reloadTasks() async { tasks = await taskStore?.all() ?? [] }
@@ -1026,10 +977,9 @@ struct ConversationItem: Identifiable {
         } catch { notice = error.localizedDescription }
     }
     func shutdown() async {
-        startup?.cancel(); healthMonitor?.cancel(); chromeHealth?.cancel(); stop()
+        startup?.cancel(); healthMonitor?.cancel(); stop()
         audio.stopEngine()
         selectedFolder?.stopAccessingSecurityScopedResource()
-        browserWork?.cancel(); await chrome.disconnect()
         await speechWorker.stop()
         await wake.detector?.stop()
         await speech.shutdown()

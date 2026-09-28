@@ -249,7 +249,7 @@ final class VoiceTests {
         {"model":"qwen3.5:4b","whisperExecutable":"/opt/homebrew/bin/whisper-cli","whisperModel":"","ollamaExecutable":"/opt/homebrew/bin/ollama","ollamaModels":"","speakResponses":true,"allowFileSearch":true,"voice":"Samantha"}
         """
         let config = try JSONDecoder().decode(Configuration.self, from: Data(older.utf8))
-        expectEqual(config.listeningMode, nil); expectEqual(config.naturalVoice, nil); expectEqual(config.browserNode, nil)
+        expectEqual(config.listeningMode, nil); expectEqual(config.naturalVoice, nil)
         expectTrue(config.speakResponses)
         let roundTrip = try JSONDecoder().decode(Configuration.self, from: try JSONEncoder().encode(config))
         expectEqual(roundTrip.model, "qwen3.5:4b")
