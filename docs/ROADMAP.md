@@ -77,13 +77,13 @@ Notes: [persona.md](research/persona.md)
 
 ## Voice out
 
-- [ ] Kokoro quick fixes:
-  - try `af_heart` if the name changes, `bf_emma` / a george-fable blend if it stays Daisy
-  - A/B test playback with echo cancellation on and off
-  - merge short fragments
-  - expand numbers and abbreviations
-- [ ] ElevenLabs: design an original British voice, stream v3 Conversational into the sentence feed, cancel on barge-in
-- [ ] Local option: Qwen3-TTS 0.6B from ModelScope, measured on this Mac; Pocket TTS if it's too heavy
+- [x] `af_heart` by default, plus an optional Heart + Bella blend (`af_heart:0.7,af_bella:0.3`); every English Kokoro voice stays selectable
+  - 2026-09-27: Heart and the blend render with the real model (`daisy-check --voice-ab --render-only`); a saved George switches to Heart once
+- [ ] Kokoro quick fixes (built and tested, waiting on a listen):
+  - A/B playback with echo cancellation on and off: `swift run daisy-check --voice-ab` (`--blind` shuffles it)
+  - merge short fragments, even 200 ms joins, trimmed lead-in
+  - numbers, money, times, dates and abbreviations read as words; no splits inside "3.5" or "e.g."
+- Dropped: ElevenLabs and Qwen3-TTS. Daisy stays on local Kokoro
 
 ## Speech in
 
