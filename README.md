@@ -17,6 +17,8 @@ open ~/Applications/Daisy.app    # first launch: press Connect
 
 After the first connection Daisy starts Hermes on launch and resumes the last conversation. If Hermes is missing, signed out, or has no provider, the HUD says so and shows the command that fixes it. **Setup → Agent** switches between Hermes and the on-device model, and **New conversation** (⌘N) starts a fresh Hermes session; Hermes's memory carries over.
 
+Type `/job <what you want done>` (or use the **JOBS** tab) to run something in the background while you keep talking. Two jobs run at once, each in its own Hermes session that can only read; Daisy says the result when one finishes. Anything that needs a yes shows up as a card with a countdown, and no answer counts as no.
+
 ### On-device fallback
 
 Daisy checks and starts its dedicated local Ollama server before each model request. It monitors connectivity while open and stops a server it owns on exit. The first answer after the model unloads may take longer. The installer copies downloaded model assets into `~/Library/Application Support/Daisy/Runtime` (APFS clones when available). Startup does not depend on Documents access. Homebrew binaries are still required; this is not a self-contained distributable yet.
