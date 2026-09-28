@@ -1013,6 +1013,32 @@ if parse is not None:
         check(f"the real google_api.py reads {argv[:2]} the way Daisy means it", lambda argv=argv, expected=expected: all(
             parse(argv).get(key) == value for key, value in expected.items()))
 
+# The installed skill itself (a copy of its two scripts), run for real in a fresh HERMES_HOME with no token: it
+# stops at its own sign-in check, before any network, and both routes turn that into the setup message.
+if REAL_SKILL.is_file():
+    signed_out = Path(os.path.realpath(tempfile.mkdtemp(prefix="daisy-google-signed-out-")))
+    copy = signed_out / "skills" / "productivity" / "google-workspace" / "scripts"
+    copy.mkdir(parents=True)
+    for name in ("google_api.py", "_hermes_home.py"):
+        shutil.copy(REAL_SKILL.parent / name, copy / name)
+    os.environ["HERMES_HOME"] = str(signed_out)
+    google.runner = google.run_process
+    # The skill imports Google's client library before it looks for a token, so a Python that can't see it in
+    # isolated mode (a plain python3; -I hides user site-packages) gets the missing-libraries message instead.
+    # Hermes's venv has it. Both are plain setup messages.
+    visible = subprocess.run([sys.executable, "-I", "-c", "import importlib.util, sys; sys.exit(0 if "
+                              "importlib.util.find_spec('googleapiclient') else 1)"], capture_output=True).returncode
+    expected = google.NOT_CONNECTED if visible == 0 else google.NO_LIBRARIES
+    check("the real skill, before sign-in: checking email says what to set up",
+          lambda: use("gmail_search", {})["error"] == expected)
+    check("the real skill, before sign-in: sending says the same",
+          lambda: use("gmail_send", send_args)["error"] == expected)
+    check("the real skill ran without leaving .pyc files next to it",
+          lambda: sorted(path.name for path in copy.iterdir()) == ["_hermes_home.py", "google_api.py"])
+    google.runner = fake
+    os.environ["HERMES_HOME"] = str(HOME)
+    shutil.rmtree(signed_out, ignore_errors=True)
+
 check("the decoy token never shows up in a result or a card", lambda: not any(DECOY in text for text in outputs))
 shutil.rmtree(HOME, ignore_errors=True)
 shutil.rmtree(FILES, ignore_errors=True)
