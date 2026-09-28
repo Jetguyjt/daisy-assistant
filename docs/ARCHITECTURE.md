@@ -55,8 +55,18 @@ The alternative, Hermes's OpenAI-compatible API server, lives inside the gateway
 - resumes the saved session and rebuilds the transcript from Hermes's replay. An unknown id comes back as an empty success, so it checks for `models`/`modes` before trusting it.
 - turns tool titles into plain phrases ("Searching your files", "Reading resume.pdf") and never shows raw commands or payloads.
 - on Stop, sends `session/cancel`. If the prompt hasn't ended six seconds later, it abandons that session and opens a fresh one, because a stop can leave a Hermes session stuck.
+- runs the conversation and up to two background jobs on the one `hermes-acp`, each job in a session of its own. Every update and approval request is routed by `sessionId`; anything for a session with no turn running is dropped, and its approval requests are declined.
+- passes Hermes's plan (its `todo` list) through `stream(_:)`, which the HUD shows under Activity.
 
 The UI only sees `AgentBackend`. `LocalBackend` wraps the original Ollama engine behind the same interface.
+
+## Background jobs
+
+`/job <goal>` or the JOBS tab starts a job. `JobsModel` runs two at a time and queues the rest, keeps them in `jobs.json` in the data folder (the last 50 finished ones), and says the result out loud when one finishes ("Your repo digest is ready: …"), after the current answer if Daisy is talking.
+
+Each job gets its own Hermes session. Before its first prompt, the session is listed in `~/.hermes/daisy/roles.json` as a `worker`, so the guard lets it read and nothing else; the entry comes off once Hermes has ended the turn. If the file can't be written, the job doesn't run.
+
+Hermes's own `delegate_task` isn't used in Daisy sessions: over ACP its background results never come back (`daisy-check --delegation`, checked 2026-09-27), so the persona tells Hermes not to call it.
 
 ## Sign-in
 
@@ -67,7 +77,9 @@ Daisy never handles OpenAI credentials. `hermes auth add openai-codex` (or `herm
 Hermes asks before dangerous shell commands and before file edits in its default mode. It doesn't ask before a skill sends a message or email or changes a calendar. `hermes/daisy` is a small Hermes plugin that closes that gap for Daisy sessions only (`DAISY_SESSION=1`):
 
 - a `pre_tool_call` hook escalates sends (iMessage, Mail, email CLIs), calendar writes, GitHub posts and deletes to Hermes's own approval gate. Denied, timed out or unanswered means blocked.
-- Daisy shows each request as an amber card with the exact content and **Cancel / Send**. It only ever answers "once". Nothing is remembered as always-allowed.
+- Daisy shows each request as an amber card with the exact content and **Cancel / Send**. It only ever answers "once"; an "always" answer is sent back as "once". Nothing is remembered as always-allowed.
+- no answer is no. Hermes gives up after 60 seconds, so the card counts down, and at 54 seconds it's declined and taken down (the bridge declines at 57 as a backstop). Cards go as soon as their turn or job ends, and job cards say which job asked.
+- in a voice turn, a card left waiting for 3 seconds frees the voice: Daisy says "I've left that for you to approve." and, in wake-word mode, goes back to listening while the card stays up.
 - it also adds the Daisy persona as a system-prompt section. `$HERMES_HOME/daisy-persona.md` replaces it without touching code.
 
 The guard pattern-matches commands; it is not a sandbox. `python3 hermes/test_daisy_guard.py` lists what it stops and what it lets through. Install with `bash scripts/setup-hermes.sh`.
@@ -117,4 +129,7 @@ What the HUD says while a tool runs comes from `Sources/DaisyCore/ToolPhrases.sw
   - cancel and recover
   - missing sign-in and missing provider
   - session resume
+  - two sessions at once, job approvals, cards timing out, the two-job limit, roles.json and plan updates
 - `swift run daisy-check --hermes "What is 37 × 18?" "Find my resume."` runs the same bridge against the real Hermes. It declines every approval, so a check can't send or delete anything.
+- `swift run daisy-check --delegation` asks the real Hermes for one tiny background `delegate_task` and watches whether its result ever comes back.
+- `swift run daisy-check --voice-ab` plays the same sentence plain, through the voice-processing engine and without it, for comparing by ear (`--render-only` just writes the WAVs to `.build/voice-ab`).
