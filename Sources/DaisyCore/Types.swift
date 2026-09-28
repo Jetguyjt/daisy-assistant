@@ -33,6 +33,10 @@ public struct Configuration: Codable, Sendable {
 
     public static var dataDirectory: URL { resolvedDataDirectory }
     private static let resolvedDataDirectory: URL = {
+        // Tests and one-off tools point this somewhere else so they never touch real data.
+        if let override = ProcessInfo.processInfo.environment["DAISY_DATA_DIR"], !override.isEmpty {
+            return URL(fileURLWithPath: override, isDirectory: true)
+        }
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         return adoptLegacyFolder(from: support.appendingPathComponent("Jarvis", isDirectory: true),
                                  to: support.appendingPathComponent("Daisy", isDirectory: true))

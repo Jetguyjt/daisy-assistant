@@ -2,6 +2,11 @@ import Foundation
 
 @main struct TestRunner {
     static func main() async {
+        // Keep every test away from the real ~/Library/Application Support/Daisy.
+        let sandbox = FileManager.default.temporaryDirectory.appendingPathComponent("daisy-tests-\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(at: sandbox, withIntermediateDirectories: true)
+        setenv("DAISY_DATA_DIR", sandbox.path, 1)
+        defer { try? FileManager.default.removeItem(at: sandbox) }
         let started = Date()
         var count = 0
         do {
