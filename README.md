@@ -1,6 +1,6 @@
 # Jarvis for Mac
 
-A native Mac assistant. Version 0.4 splits the work: Jarvis is the face and the voice (a HUD, an audio-reactive core, the "Hey Jarvis" wake word, local speech in and out), [Hermes Agent](https://github.com/NousResearch/hermes-agent) is the agent runtime (tool loop, sessions, memory, skills, MCP, approvals), and OpenAI is the reasoning model through Hermes's ChatGPT/Codex subscription sign-in. Jarvis talks to Hermes over ACP and never sees the model or its credentials. The original on-device engine (Ollama plus a Swift tool loop) is still there as an optional fallback. See [architecture](docs/ARCHITECTURE.md).
+A native Mac assistant. Version 0.4 splits the work: Jarvis is the face and the voice (a HUD, an audio-reactive core, the "Hey Jarvis" wake word, local speech in and out), [Hermes Agent](https://github.com/NousResearch/hermes-agent) is the agent runtime (tool loop, sessions, memory, skills, MCP, approvals), and OpenAI is the reasoning model through Hermes's ChatGPT/Codex subscription sign-in. Jarvis talks to Hermes over ACP and never sees the model or its credentials. The original on-device engine (Ollama plus a Swift tool loop) is still there as an optional fallback. See [architecture](docs/ARCHITECTURE.md). What's left to build is in the [roadmap](docs/ROADMAP.md).
 
 Built and tested on an **M3 MacBook Air, 24 GB, macOS 26.5.1**. Minimum deployment target is macOS 14, but older systems have not been tested. Uses the installed Swift Command Line Tools; full Xcode is not required.
 
