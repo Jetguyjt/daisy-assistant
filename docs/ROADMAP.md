@@ -75,9 +75,8 @@ Notes: [persona.md](research/persona.md)
 
 - [x] Pick the name: DAISY, "Definitely An Intelligent System, Yeah" (decided 2026-09-27)
 - [x] Rename what I see and hear: wake phrase + misspellings, display name, mic permission text, Hermes persona, UI strings, README (verified 2026-09-27: wake-phrase tests incl. misspellings pass, Daisy.app launched showing "Hey Daisy" standby; saying it live is still Josh's to try)
-- [ ] Switch Kokoro to `af_heart` (or a heart/bella 70/30 blend) today
-- [ ] Hosted American female voice: Cartesia "Jacqueline" (Pro $5), or OpenAI "marin"; needs its own API key in the Keychain
-- [ ] Local: design the voice with Qwen3-TTS 1.7B VoiceDesign, then clone from a reference clip
+- [x] Switch Kokoro to `af_heart` (or a heart/bella 70/30 blend) today (see Voice out below)
+- Not now: a hosted voice (Cartesia "Jacqueline", OpenAI "marin") or Qwen3-TTS VoiceDesign. Kokoro stays until I say otherwise
 - [ ] Later: train an openWakeWord model for the new name on Colab
 - [x] Internal rename: bundle ID, targets, `hermes/daisy`, Application Support folder, repo (verified 2026-09-27: clean build and 74 tests, Daisy.app installed as `com.local.daisy.desktop` and launched with its memories, settings and Hermes session carried over, live `daisy-check --hermes` answered, GitHub repo renamed to daisy-assistant)
 
