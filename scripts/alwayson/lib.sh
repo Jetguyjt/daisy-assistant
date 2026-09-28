@@ -18,7 +18,11 @@ daisy_hermes_python() {
 # Sets DAISY_MODEL (empty when nothing cheaper is listed), DAISY_PROVIDER and DAISY_MODEL_WHY, once per
 # setup run. The rule is scripts/alwayson/models.py; the list is what `hermes model` offers.
 daisy_pick_model() {
-  if [ -n "${DAISY_MODEL_WHY:-}" ]; then return 0; fi
+  if [ -n "${DAISY_MODEL_WHY:-}" ]; then
+    DAISY_MODEL="${DAISY_MODEL:-}"
+    DAISY_PROVIDER="${DAISY_PROVIDER:-}"
+    return 0
+  fi
   DAISY_MODEL=""
   DAISY_PROVIDER=""
   local python listing

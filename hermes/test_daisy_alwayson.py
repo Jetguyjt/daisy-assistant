@@ -272,10 +272,15 @@ CHECKER = r"""
 import importlib.util, json, sys
 from pathlib import Path
 source = Path(sys.argv[1])
-spec = importlib.util.spec_from_file_location("daisy_lifecycle_check", source / "cron" / "lifecycle_guard.py")
-lifecycle = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(lifecycle)
-from tools.cronjob_prompt_scan import _scan_cron_prompt, _scan_cron_skill_assembled
+try:
+    spec = importlib.util.spec_from_file_location("daisy_lifecycle_check", source / "cron" / "lifecycle_guard.py")
+    lifecycle = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(lifecycle)
+    from tools.cronjob_prompt_scan import _scan_cron_prompt, _scan_cron_skill_assembled
+    lifecycle.check_gateway_lifecycle
+except Exception as error:
+    print(json.dumps({"missing": type(error).__name__ + ": " + str(error)}))
+    sys.exit(0)
 data = json.loads(sys.stdin.read())
 result = {"scan": {}, "lifecycle": {}}
 for name, prompt in data["prompts"].items():
@@ -307,7 +312,10 @@ if HERMES_PYTHON.is_file() and (HERMES_SOURCE / "tools" / "cronjob_prompt_scan.p
     except ValueError:
         checked = None
         check(f"Hermes's cron checks ran ({done.stderr.strip()[-300:]})", False)
-    if checked:
+    if checked and "missing" in checked:
+        # A Hermes update moved its private scanner; the templates may be fine, so say so and go on.
+        print(f"skipped: Hermes's own cron prompt checks ({checked['missing']})")
+    elif checked:
         for name in templates:
             check(f"{name}: passes Hermes's cron prompt scan ({checked['scan'][name]})", checked["scan"][name] == "")
             check(f"{name}: passes Hermes's gateway lifecycle check ({checked['lifecycle'][name]})",
@@ -616,6 +624,10 @@ unpinned.listing(["gpt-5.6-sol", "gpt-5.5"])
 done = unpinned.run(DAISY_CRON="1")
 check("nothing cheaper: the jobs follow the default model", len(unpinned.jobs()) == 2 and all(not job["model"] for job in unpinned.jobs()))
 check("nothing cheaper: setup says so", "jobs follow the default model" in done.stdout)
+
+stray = Setup("stray-variable")
+done = stray.run(DAISY_CRON="1", DAISY_MODEL_WHY="left in the shell")
+check("a stray DAISY_MODEL_WHY doesn't trip set -u", done.returncode == 0 and len(stray.jobs()) == 2)
 
 with_gateway = Setup("both")
 done = with_gateway.run(DAISY_GATEWAY="1", DAISY_CRON="1")
