@@ -89,8 +89,6 @@ struct ConversationItem: Identifiable {
     @Published var plan: AgentPlan?
     /// Job news that came in mid-turn, said once Daisy is free.
     private var pendingAnnouncements: [String] = []
-    /// The listening mode to return to when always-listening is switched off.
-    private var quietMode: ListeningMode = .handsFree
     private lazy var backend: AgentBackend = makeBackend()
     private var backendSignature = ""
     private var turnHistory: [ChatMessage] = []
@@ -201,7 +199,6 @@ struct ConversationItem: Identifiable {
         } else if folderLost, notice == nil {
             notice = "Choose your search folder again in Setup; macOS no longer recognizes the old one."
         }
-        if listeningMode != .wakeWord { quietMode = listeningMode }
         audio.speechWorker = speechWorker
         audio.onAudio = { [weak self] chunk in self?.observe(chunk) }
         audio.onEngineLost = { [weak self] in self?.engineLost() }
@@ -624,24 +621,31 @@ struct ConversationItem: Identifiable {
 
     // MARK: Listening
 
-    /// The main-screen switch. On is wake-word standby; off goes back to the last non-wake mode.
-    /// Saved right away, without the engine restart that saving settings does.
+    /// The main-screen switch. On is wake-word standby. Off is click to talk: the mic closes and
+    /// stays closed between turns, with no standby and no listening for a follow-up. Saved right
+    /// away, without the engine restart that saving settings does.
     func setAlwaysListening(_ on: Bool) {
         guard on != alwaysListening else { return }
-        if on { quietMode = listeningMode }
-        config.listeningMode = (on ? ListeningMode.wakeWord : quietMode).rawValue
+        config.listeningMode = (on ? ListeningMode.wakeWord : ListeningMode.manual).rawValue
         do { try config.save() } catch { notice = error.localizedDescription }
+        if !on {
+            // Off means off now: a request still being heard is dropped, and a turn already underway
+            // finishes without listening again.
+            voiceTurn = false
+            if phase == .listening || phase == .preparing { stop(clearNotice: true) }
+        }
         applyListeningMode()
     }
     /// Called after settings change and at launch. Wake-word mode keeps the mic open; the others
     /// open it only while a conversation is going.
     func applyListeningMode() {
-        if listeningMode != .wakeWord { quietMode = listeningMode }
         switch listeningMode {
         case .wakeWord: armStandby()
         case .manual, .handsFree:
             disarmStandby()
-            if !busy { audio.stopEngine() }
+            // The mic closes unless it's recording or a reply is playing through it; those close it
+            // when they finish.
+            if !audio.capturing, voicePlayback == nil, phase != .speaking, phase != .synthesizing { audio.stopEngine() }
         }
     }
     /// Standby can be armed while idle, or while a turn waits on a card after `park`.
@@ -773,6 +777,9 @@ struct ConversationItem: Identifiable {
         let quietly = purpose == .followUp
         do {
             let url = try audio.endCapture()
+            // Click to talk: the mic's job is done, so it closes before the reply plays (there's no
+            // talking over Daisy in this mode, so nothing needs it open).
+            if listeningMode == .manual { audio.stopEngine() }
             phase = .transcribing
             work = Task {
                 defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
