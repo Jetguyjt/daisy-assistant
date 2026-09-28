@@ -57,6 +57,10 @@ final class LearnedTests {
         expectEqual(read(notes), "Josh's repos live in ~/projects")
         try write("\u{FEFF}First\n§\nSecond", to: user)
         try expectEqual(files.entries(.user), ["First", "Second"])
+        // The Memory tab's read-only view is more forgiving: Windows line endings, a stray "§", repeats.
+        try write("One\r\n§\r\nTwo\r\n§\r\n§\r\n§\r\nOne", to: user)
+        expectEqual(HermesMemory.profile(in: memories), ["One", "Two"])
+        expectEqual(HermesMemory.notes(in: memories), ["Josh's repos live in ~/projects"])
     }
 
     func testASymlinkedFileStaysASymlink() throws {
