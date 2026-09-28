@@ -157,14 +157,18 @@ public enum CronOutput {
         let ranAt = field("Run Time", in: lines).flatMap(HermesDates.localStamp) ?? HermesDates.fileStamp(file.deletingPathExtension().lastPathComponent)
         let status = field("Status", in: lines)?.lowercased() ?? ""
         var detail = ""
-        if let response = section("Response", in: text) {
-            detail = response
-            let bare = response.trimmingCharacters(in: .whitespacesAndNewlines)
-            if bare == "[SILENT]" || bare.hasSuffix("\n[SILENT]") { outcome = .skipped; detail = "Nothing new to report." }
-            else if bare == "(No response generated)" { outcome = .skipped; detail = "The job ran but had nothing to say." }
-        } else if let error = section("Error", in: text) {
+        // Whichever of "## Response" and "## Error" Hermes wrote last is this run's; an earlier one can be
+        // an old run quoted in the prompt.
+        let answer = text.range(of: "\n## Response\n", options: .backwards)
+        let error = text.range(of: "\n## Error\n", options: .backwards)
+        if let answer, error.map({ $0.lowerBound < answer.lowerBound }) ?? true {
+            detail = String(text[answer.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            if detail == "[SILENT]" || detail.hasSuffix("\n[SILENT]") { outcome = .skipped; detail = "Nothing new to report." }
+            else if detail == "(No response generated)" { outcome = .skipped; detail = "The job ran but had nothing to say." }
+        } else if let error {
             outcome = .failed
-            detail = error.replacingOccurrences(of: "```", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+            detail = String(text[error.upperBound...]).replacingOccurrences(of: "```", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
         } else if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             outcome = .skipped; detail = "Skipped: there was nothing to do."
         } else if text.contains("wakeAgent=false") || status.hasPrefix("silent") || status.hasPrefix("no_change") {
@@ -207,13 +211,6 @@ public enum CronOutput {
     static func field(_ name: String, heading: Bool = false, in lines: [String]) -> String? {
         let prefix = heading ? "# \(name): " : "**\(name):** "
         return lines.first { $0.hasPrefix(prefix) }.map { String($0.dropFirst(prefix.count)).trimmingCharacters(in: .whitespaces) }
-    }
-
-    /// Everything after the last "## <name>" line Hermes wrote. The last one, because an earlier run's
-    /// output can be quoted inside the prompt.
-    static func section(_ name: String, in text: String) -> String? {
-        guard let heading = text.range(of: "\n## \(name)\n", options: .backwards) else { return nil }
-        return String(text[heading.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// What follows the header lines when there's no named section.

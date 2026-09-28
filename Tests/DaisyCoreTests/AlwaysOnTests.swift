@@ -225,6 +225,13 @@ final class AlwaysOnTests {
         today's digest
         """
         expectEqual(CronOutput.parse(quoting, jobID: "0f0f0f0f0f0f", file: file).detail, "today's digest")
+        // A failed run after a quoted good one: the error is what counts.
+        let failedAfterQuote = quoting
+            .replacingOccurrences(of: "# Cron Job: Daisy repo digest\n\n**Job ID:** 0f0f0f0f0f0f", with: "# Cron Job: Daisy repo digest (FAILED)\n\n**Job ID:** 0f0f0f0f0f0f")
+            .replacingOccurrences(of: "## Response\n\ntoday's digest", with: "## Error\n\n```\nTimeoutError: no reply\n```")
+        let failed = CronOutput.parse(failedAfterQuote, jobID: "0f0f0f0f0f0f", file: file)
+        expectEqual(failed.outcome, .failed)
+        expectEqual(failed.detail, "TimeoutError: no reply")
     }
 
     func testSummaryIsShortAndPlain() {
