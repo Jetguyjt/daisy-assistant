@@ -10,8 +10,11 @@ public struct SpeechFeed: Sendable {
     private var total = 0
     private var started = false
     private let limit: Int
-    /// Fragments shorter than this ("1.", "Mr.") wait for the next sentence unless the answer is done.
+    /// Fragments shorter than this ("1.", "Ok.") wait for the next sentence unless the answer is done.
     static let minimumChunk = 12
+    /// Once the voice is talking, a short sentence ("Found it.") waits to go out with the next one,
+    /// since it sounds clipped on its own. `flush` sends it anyway when the agent stops to work.
+    static let minimumFollowUp = SpeechText.shortFragment
 
     public init(limit: Int = 2200) { self.limit = limit }
 
@@ -23,6 +26,15 @@ public struct SpeechFeed: Sendable {
         guard ready > boundary else { return [] }
         boundary = ready
         return take(SpeechText.spoken(from: String(text.prefix(ready)), limit: .max), final: false)
+    }
+
+    /// Call when the agent pauses mid-answer (a tool starts). Returns every finished sentence
+    /// still waiting, however short, so "Let me check." is said before the tool runs.
+    public mutating func flush(_ text: String) -> [String] {
+        restartIfNeeded(text)
+        source = text
+        boundary = max(boundary, Self.readyLength(of: text))
+        return take(SpeechText.spoken(from: String(text.prefix(boundary)), limit: .max), final: true)
     }
 
     /// Call once with the final answer. Returns whatever is left to say.
@@ -42,7 +54,7 @@ public struct SpeechFeed: Sendable {
     private mutating func take(_ cleaned: String, final: Bool) -> [String] {
         guard total < limit, cleaned.count > handedOut else { return [] }
         var pending = String(cleaned.dropFirst(handedOut)).trimmingCharacters(in: .whitespaces)
-        guard final || pending.count >= Self.minimumChunk else { return [] }
+        guard final || pending.count >= (started ? Self.minimumFollowUp : Self.minimumChunk) else { return [] }
         handedOut = cleaned.count
         if total + pending.count > limit { pending = SpeechText.truncated(pending, limit: limit - total) }
         guard !pending.isEmpty else { return [] }
@@ -53,19 +65,13 @@ public struct SpeechFeed: Sendable {
     }
 
     /// Length of the prefix that ends at a line break, or at a sentence end followed by a space.
-    /// A period after a digit ("1. ", "3. ") is a list marker, not a sentence end.
+    /// Sentence ends are `SpeechText`'s: a period after a number ("1. " in a list) or after an
+    /// abbreviation ("Dr. ", "e.g. ") doesn't count, since what follows changes how it's read.
     static func readyLength(of text: String) -> Int {
         let characters = Array(text)
-        var ready = 0
-        for index in characters.indices {
-            let character = characters[index]
-            if character == "\n" { ready = index + 1; continue }
-            guard character == " " || character == "\t", index > 0 else { continue }
-            var end = index - 1
-            if "\"'”’)".contains(characters[end]), end > 0 { end -= 1 }
-            guard ".!?".contains(characters[end]) else { continue }
-            if characters[end] == ".", end > 0, characters[end - 1].isNumber { continue }
-            ready = index + 1
+        var ready = (characters.lastIndex(of: "\n") ?? -1) + 1
+        for end in SpeechText.sentenceBreaks(in: characters) where end < characters.count {
+            ready = max(ready, end + 1)
         }
         return ready
     }
