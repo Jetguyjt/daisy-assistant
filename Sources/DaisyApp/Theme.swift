@@ -46,7 +46,7 @@ extension Color {
 }
 
 /// Palette and type for the HUD. Near-black ground tinted by the accent, the accent itself, gold
-/// only for decisions, pink only for stop and delete (both move if the accent sits too close).
+/// only for decisions (it moves if the accent sits too close), a hotter accent for stop and delete.
 enum HUD {
     private static var palette: ThemePalette { ThemeStore.shared.palette }
     static var void: Color { Color(palette.void) }
@@ -157,7 +157,7 @@ extension View {
     }
 }
 
-/// Buttons: primary is lit red, critical is amber (approve, send), danger is pink (stop,
+/// Buttons: primary is the lit accent, critical is amber (approve, send), danger is the hot accent (stop,
 /// delete), ghost is an outline for everything else. Square, monospace caps.
 struct HUDButtonStyle: ButtonStyle {
     enum Kind { case primary, critical, danger, ghost }
