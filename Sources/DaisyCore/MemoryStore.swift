@@ -2,9 +2,16 @@ import Foundation
 import CSQLite
 
 /// Actor confinement serializes all SQLite use. Only explicit user actions call put/delete.
+///
+/// This is the on-device engine's memory. With Hermes as the brain, memories live in Hermes's own
+/// files instead (`HermesMemory`); `LearnedMigration` moves these over once, and the app turns
+/// writes off here with `refuseWrites` so the two stores can't drift apart. Reading still works.
 public actor MemoryStore {
+    /// Why `put` is refused while Hermes keeps the memories.
+    public static let keptByHermes = "Daisy's memory lives in Hermes now. Say “Remember that …” in a chat and Hermes keeps it."
     private var db: OpaquePointer?
     private let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+    private var refusal: String?
 
     public init(url: URL) throws {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true,
@@ -38,7 +45,13 @@ public actor MemoryStore {
     }
     deinit { sqlite3_close(db) }
 
+    /// Stops new memories from being saved here, with the reason `put` gives; nil allows them again
+    /// (the on-device fallback). Deleting still works either way.
+    public func refuseWrites(_ reason: String?) { refusal = reason }
+    public var acceptsWrites: Bool { refusal == nil }
+
     @discardableResult public func put(key: String, value: String, source: String) throws -> Memory {
+        if let refusal { throw DaisyError.message(refusal) }
         let key = key.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let value = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !key.isEmpty, key.count <= 80, !value.isEmpty, value.count <= 2000, source.count <= 4000 else {

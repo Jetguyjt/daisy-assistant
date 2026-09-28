@@ -100,6 +100,34 @@ import Foundation
         } catch { fail("testLexicalMissKeepsSavedPreferenceAvailable: \(error)") }
         do {
             let before = TestLog.failures
+            let suite = ContactsTests()
+            suite.testQueriesAreNamesNumbersOrEmails()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testQueriesAreNamesNumbersOrEmails")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = ContactsTests()
+            suite.testNicknameThenWholeNameThenFirstNameThenPartial()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testNicknameThenWholeNameThenFirstNameThenPartial")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = ContactsTests()
+            suite.testNumbersAndEmailsFindTheirOwner()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testNumbersAndEmailsFindTheirOwner")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = ContactsTests()
+            try suite.testOutputIsNamesNumbersAndEmailsOnly()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testOutputIsNamesNumbersAndEmailsOnly")
+        } catch { fail("testOutputIsNamesNumbersAndEmailsOnly: \(error)") }
+        do {
+            let before = TestLog.failures
             let suite = CoreTests()
             try suite.setUpWithError(); defer { try? suite.tearDownWithError() }
             try await suite.testMemoryPersistsAndCorrectionReplacesFact()
@@ -436,6 +464,142 @@ import Foundation
         } catch { fail("testDelegationPromptCarriesTheWordButNotItsAnswer: \(error)") }
         do {
             let before = TestLog.failures
+            let suite = LearnedMigrationTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            suite.testEntriesReadLikeHermesEntries()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testEntriesReadLikeHermesEntries")
+        } catch { fail("testEntriesReadLikeHermesEntries: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = LearnedMigrationTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testOldMemoriesMoveOnceInHermesFormat()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testOldMemoriesMoveOnceInHermesFormat")
+        } catch { fail("testOldMemoriesMoveOnceInHermesFormat: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = LearnedMigrationTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testWhatDoesNotFitIsReportedNeverCut()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testWhatDoesNotFitIsReportedNeverCut")
+        } catch { fail("testWhatDoesNotFitIsReportedNeverCut: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = LearnedMigrationTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testAnUntidyFileStopsTheMoveWithoutAMarker()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testAnUntidyFileStopsTheMoveWithoutAMarker")
+        } catch { fail("testAnUntidyFileStopsTheMoveWithoutAMarker: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = LearnedMigrationTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testMovedMemoriesArentNewsInTheFeed()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testMovedMemoriesArentNewsInTheFeed")
+        } catch { fail("testMovedMemoriesArentNewsInTheFeed: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = LearnedMigrationTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testOldStoreRefusesNewMemoriesWhileHermesKeepsThem()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testOldStoreRefusesNewMemoriesWhileHermesKeepsThem")
+        } catch { fail("testOldStoreRefusesNewMemoriesWhileHermesKeepsThem: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = LearnedTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            suite.testParseMatchesHermesSplit()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testParseMatchesHermesSplit")
+        } catch { fail("testParseMatchesHermesSplit: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = LearnedTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testEditWritesTheCleanFormHermesExpects()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testEditWritesTheCleanFormHermesExpects")
+        } catch { fail("testEditWritesTheCleanFormHermesExpects: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = LearnedTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testEditLeavesUntidyAndUnreadableFilesAlone()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testEditLeavesUntidyAndUnreadableFilesAlone")
+        } catch { fail("testEditLeavesUntidyAndUnreadableFilesAlone: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = LearnedTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testEditKeepsToTheLimits()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testEditKeepsToTheLimits")
+        } catch { fail("testEditKeepsToTheLimits: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = LearnedTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testEditWaitsForHermesLockAndReadsInsideIt()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testEditWaitsForHermesLockAndReadsInsideIt")
+        } catch { fail("testEditWaitsForHermesLockAndReadsInsideIt: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = LearnedTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testHermesDriftCheckAcceptsWhatDaisyWrites()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testHermesDriftCheckAcceptsWhatDaisyWrites")
+        } catch { fail("testHermesDriftCheckAcceptsWhatDaisyWrites: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = LearnedTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testLimitsComeFromHermesConfig()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testLimitsComeFromHermesConfig")
+        } catch { fail("testLimitsComeFromHermesConfig: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = LearnedTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            suite.testFeedShowsWhatHermesDidOnItsOwn()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testFeedShowsWhatHermesDidOnItsOwn")
+        } catch { fail("testFeedShowsWhatHermesDidOnItsOwn: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = LearnedTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            suite.testFeedRecoversAWholeEntryFromWhatItSawBefore()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testFeedRecoversAWholeEntryFromWhatItSawBefore")
+        } catch { fail("testFeedRecoversAWholeEntryFromWhatItSawBefore: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = LearnedTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testUndoEditAndKeepThroughTheModel()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testUndoEditAndKeepThroughTheModel")
+        } catch { fail("testUndoEditAndKeepThroughTheModel: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = LearnedTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testLogLinesDecodeAndBadOnesAreSkipped()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testLogLinesDecodeAndBadOnesAreSkipped")
+        } catch { fail("testLogLinesDecodeAndBadOnesAreSkipped: \(error)") }
+        do {
+            let before = TestLog.failures
             let suite = MarkdownTests()
             suite.testBlocksCoverTheCommonShapes()
             count += 1
@@ -503,6 +667,54 @@ import Foundation
             count += 1
             print("\(TestLog.failures == before ? "PASS" : "FAIL") testUnsupportedModelToolCannotExecute")
         } catch { fail("testUnsupportedModelToolCannotExecute: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = RecallTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            suite.testVerdicts()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testVerdicts")
+        } catch { fail("testVerdicts: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = RecallTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            suite.testPlanUsesFreshMadeUpWords()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testPlanUsesFreshMadeUpWords")
+        } catch { fail("testPlanUsesFreshMadeUpWords: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = RecallTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testEveryCasePassesWhenItRemembersAndTheTestComesBackOut()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testEveryCasePassesWhenItRemembersAndTheTestComesBackOut")
+        } catch { fail("testEveryCasePassesWhenItRemembersAndTheTestComesBackOut: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = RecallTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            await suite.testEveryCaseFailsAgainstAStandInThatRemembersNothing()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testEveryCaseFailsAgainstAStandInThatRemembersNothing")
+        } catch { fail("testEveryCaseFailsAgainstAStandInThatRemembersNothing: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = RecallTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testCleanupLeavesAFileAloneWhenTheTestWasFoldedIntoAnOlderEntry()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testCleanupLeavesAFileAloneWhenTheTestWasFoldedIntoAnOlderEntry")
+        } catch { fail("testCleanupLeavesAFileAloneWhenTheTestWasFoldedIntoAnOlderEntry: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = RecallTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            await suite.testNoHermesMeansItCantRun()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testNoHermesMeansItCantRun")
+        } catch { fail("testNoHermesMeansItCantRun: \(error)") }
         do {
             let before = TestLog.failures
             let suite = RenameTests()
