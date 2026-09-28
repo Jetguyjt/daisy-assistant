@@ -1,0 +1,1 @@
+AppleScript failed: Attachment not found at /private/tmp/daisy-files/photo.jpg

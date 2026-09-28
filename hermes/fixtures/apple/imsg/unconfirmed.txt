@@ -1,0 +1,1 @@
+applescript send failed (may_have_completed): Messages automation returned success, but no matching outgoing text row was observed within 8 seconds. The operation may execute or may already have executed; retry is not safe.

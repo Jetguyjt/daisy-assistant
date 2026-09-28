@@ -1,0 +1,20 @@
+[
+  {
+    "id" : "7A12B3C4-0000-4000-8000-000000000001",
+    "overdueCount" : 0,
+    "reminderCount" : 2,
+    "title" : "Reminders"
+  },
+  {
+    "id" : "7A12B3C4-0000-4000-8000-000000000002",
+    "overdueCount" : 1,
+    "reminderCount" : 2,
+    "title" : "School"
+  },
+  {
+    "id" : "7A12B3C4-0000-4000-8000-000000000003",
+    "overdueCount" : 0,
+    "reminderCount" : 0,
+    "title" : "Groceries 🛒"
+  }
+]
