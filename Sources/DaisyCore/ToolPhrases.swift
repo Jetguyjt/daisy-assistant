@@ -28,6 +28,8 @@ public enum ToolPhrases {
         case "execute_code": return ("Running code", nil)
         case "todo", "todo_list": return ("Planning", nil)
         case "vision_analyze": return ("Looking at an image", nil)
+        // Hermes keeps some tools folded away until the model asks for one.
+        case "tool_describe", "tool describe", "tool_search", "tool search": return ("Getting a tool ready", nil)
         case "chrome_tabs": return ("Checking your tabs", nil)
         case "chrome_focus": return (site(input).map { "Switching to \($0)" } ?? "Switching tabs", nil)
         case "chrome_open":

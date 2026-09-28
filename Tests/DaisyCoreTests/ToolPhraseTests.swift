@@ -22,5 +22,6 @@ final class ToolPhraseTests {
         expectEqual(ToolPhrases.describe(title: "gmail_send", kind: "other", input: ["to": "dad@example.com"]).title, "Sending an email")
         expectEqual(ToolPhrases.describe(title: "calendar_write", kind: "other").title, "Updating your calendar")
         expectEqual(ToolPhrases.describe(title: "drive_share", kind: "other").title, "Sharing a Drive file")
+        expectEqual(ToolPhrases.describe(title: "tool_describe", kind: "other").title, "Getting a tool ready")
     }
 }

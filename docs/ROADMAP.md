@@ -16,7 +16,8 @@ Research notes:
 
 These gaps have to close before the tools below go live. Stress test in [orchestrator.md](research/orchestrator.md#guard-stress-test).
 
-- [ ] Card must show exactly what runs: refuse chained commands (`;` `&&` `|` `$(`), and show every recipient, Bcc and attachment untruncated
+- [x] Card must show exactly what runs: refuse chained commands (`;` `&&` `|` `$(`), and show every recipient, Bcc and attachment untruncated
+  - live 2026-09-28: a `gmail_send` card listed To, Cc, Bcc, attachments, subject and the whole message; declined, nothing sent
   - guard side done: tests, and live on 2026-09-28 a chained `echo …; rm -f …` was refused (Hermes log: the terminal call returned the guard's message in 0.01s). The app's card scrolls instead of cutting off, not seen live yet
 - [ ] Typed plugin tools for risky actions (`gmail_send`, `drive_share`, `drive_delete`, `imsg_send`, `calendar_write`); block the same actions from `terminal` / `execute_code`
   - guard side done (tests): the shell route is refused and points at the typed tool once it exists, and gets a card until then
@@ -72,12 +73,12 @@ Notes: [orchestrator.md](research/orchestrator.md)
 
 ## Google
 
-- [ ] My part: Cloud project, APIs on, consent screen published to "In production", Desktop OAuth client
-- [ ] `google-workspace` skill setup: `setup.py --client-secret`, `--auth-url`, `--auth-code`, `--check` (steps in [google.md](research/google.md); this `setup.py` has no `--services`)
-- [ ] "Check my email": unread headers + snippets, bodies only on request
-  - built: 16 typed tools in `hermes/daisy/tools/google.py`, tested against stand-ins and the real skill signed out; not run against Google yet
-- [ ] Keep `~/.hermes/google_token.json` out of every script and sweep
-  - the tools never open it (tested); sign-in goes through the skill's own scripts
+- [x] My part: Cloud project, APIs on, consent screen published to "In production", Desktop OAuth client (done 2026-09-28)
+- [x] `google-workspace` skill setup: `setup.py --client-secret`, `--auth-url`, `--auth-code`, `--check` (steps in [google.md](research/google.md); this `setup.py` has no `--services`)
+- [x] "Check my email": unread headers + snippets, bodies only on request
+  - 16 typed tools in `hermes/daisy/tools/google.py`; live 2026-09-28 (`daisy-check --hermes`): "how many unread emails from the last two days" went through `gmail_search` and answered
+- [x] Keep `~/.hermes/google_token.json` out of every script and sweep
+  - the tools never open it (tested); sign-in goes through the skill's own scripts; the pre-push sweep flags any credential file
 
 ## New voice and name
 
