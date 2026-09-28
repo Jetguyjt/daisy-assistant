@@ -9,18 +9,39 @@ Research notes:
 - [voice.md](research/voice.md): a better voice
 - [speech-in.md](research/speech-in.md): speech in, and Willow Voice
 - [lukebuildsai.md](research/lukebuildsai.md): what his Jarvis does and how it compares
+- [orchestrator.md](research/orchestrator.md): orchestrator design, always-on, guard stress test
 
 ## Guard first
 
-These gaps have to close before the tools below go live.
+These gaps have to close before the tools below go live. Stress test in [orchestrator.md](research/orchestrator.md#guard-stress-test).
 
-- [ ] Guard rules plus test lines for:
+- [ ] Card must show exactly what runs: refuse chained commands (`;` `&&` `|` `$(`), and show every recipient, Bcc and attachment untruncated
+- [ ] Typed plugin tools for risky actions (`gmail_send`, `drive_share`, `drive_delete`, `imsg_send`, `calendar_write`); block the same actions from `terminal` / `execute_code`
+- [ ] Guard loads in every Hermes process (cron, gateway), not just `JARVIS_SESSION`; fails closed if it throws
+- [ ] Allowlists per role, enforced by the plugin (chat, worker read-only, cron pre-approved)
+- [ ] Taint: after reading mail/web/files, new recipients, URLs or memory writes need a card
+- [ ] Approval queue: no answer = no, card removed on timeout, voice loop freed
+- [ ] Rules plus test lines for:
   - Drive `delete` / `share` / `upload`
   - `gmail modify`
   - Docs/Sheets writes
   - chrome-devtools `click` / `fill` / `press_key` / `evaluate_script`
   - `computer_use` `type` and `key(return)`
   - `javascript:` URLs
+  - camelCase MCP names
+
+## Orchestrator
+
+Notes: [orchestrator.md](research/orchestrator.md)
+
+- [ ] Test live: does a background `delegate_task` over ACP ever return its result? Until it does, tell Hermes not to use it in Jarvis sessions
+- [ ] Worker sessions: `session/new` per background job (max 2–3), route updates by session ID, job ledger + jobs panel, speak results when done
+- [ ] Fix or patch ACP so delegation results come back (read `completion_queue`, or run delegations synchronously)
+- [ ] `hermes gateway` as a LaunchAgent: cron, Kanban, Telegram/iMessage from my phone
+- [ ] Jarvis shows cron output (`~/.hermes/cron/output/`) and the Kanban board
+- [ ] Budget: cheaper `delegation.model`, poll usage windows, pause background work around 80%, add a fallback provider
+- [ ] Launch at login (`SMAppService.mainApp`); push-to-talk on battery
+- [ ] Later, if 24/7 matters: gateway on a home box or VPS with its own device-code login (never copy `auth.json`)
 
 ## Chrome and Mac control
 
