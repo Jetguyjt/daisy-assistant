@@ -31,7 +31,19 @@ public struct Configuration: Codable, Sendable {
     public var hermesConnected: Bool?
     /// How Daisy hears: Apple's recognizer or Whisper, Silero, the wake word model. Nil means defaults.
     public var speechInput: SpeechInputSettings?
+    /// Set once the Daisy voice default has been applied, so choosing George later on purpose sticks.
+    public var daisyVoiceApplied: Bool?
     public init() {}
+
+    /// Jarvis spoke as George; Daisy's voice is Heart. Settings carried over from Jarvis (or with no
+    /// voice saved) switch to Heart once. After that the saved choice is left alone.
+    public func withDaisyVoice() -> Configuration {
+        guard daisyVoiceApplied != true else { return self }
+        var config = self
+        if config.naturalVoice == nil || config.naturalVoice == "bm_george" { config.naturalVoice = NaturalSpeech.defaultVoice }
+        config.daisyVoiceApplied = true
+        return config
+    }
 
     public static var dataDirectory: URL { resolvedDataDirectory }
     private static let resolvedDataDirectory: URL = {
@@ -65,7 +77,10 @@ public struct Configuration: Codable, Sendable {
     public static func load() throws -> Configuration {
         let saved = dataDirectory.appendingPathComponent("config.json")
         if FileManager.default.fileExists(atPath: saved.path) {
-            return try JSONDecoder().decode(Self.self, from: Data(contentsOf: saved))
+            let config = try JSONDecoder().decode(Self.self, from: Data(contentsOf: saved))
+            let updated = config.withDaisyVoice()
+            if updated.daisyVoiceApplied != config.daisyVoiceApplied { try? updated.save() }
+            return updated
         }
         if let bundled = Bundle.main.url(forResource: "RuntimeDefaults", withExtension: "json") {
             return try JSONDecoder().decode(Self.self, from: Data(contentsOf: bundled))

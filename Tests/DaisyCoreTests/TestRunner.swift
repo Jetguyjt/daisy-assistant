@@ -946,6 +946,27 @@ import Foundation
         } catch { fail("testWorkerPassesTheVoiceSettingAndArgumentsThrough: \(error)") }
         do {
             let before = TestLog.failures
+            let suite = VoiceDefaultTests()
+            suite.testJarvisGeorgeAndMissingVoiceBecomeHeart()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testJarvisGeorgeAndMissingVoiceBecomeHeart")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = VoiceDefaultTests()
+            suite.testOtherChoicesAreKept()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testOtherChoicesAreKept")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = VoiceDefaultTests()
+            suite.testGeorgeChosenAfterTheSwitchSticks()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testGeorgeChosenAfterTheSwitchSticks")
+        }
+        do {
+            let before = TestLog.failures
             let suite = VoiceSyncTests()
             suite.testEachStreamedChunkRevealsItsOwnSentence()
             count += 1

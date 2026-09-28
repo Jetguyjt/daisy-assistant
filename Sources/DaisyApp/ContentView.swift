@@ -5,6 +5,8 @@ struct ContentView: View {
     @ObservedObject var model: AppModel
     @Namespace private var orbSpace
     @AppStorage("telemetryCollapsed") private var telemetryCollapsed = false
+    /// Off: the core stays in the middle and replies show as a caption under it. On: the full transcript.
+    @AppStorage("chatMode") private var chatMode = false
     @State private var showingChats = false
     @State private var atBottom = true
 
@@ -133,7 +135,7 @@ struct ContentView: View {
         ZStack {
         HStack(alignment: .top, spacing: 14) {
             VStack(spacing: 12) {
-                if conversationEmpty { hero } else { transcript }
+                if chatMode { transcript } else { hero }
                 composer
             }
             if telemetryCollapsed {
@@ -156,7 +158,7 @@ struct ContentView: View {
             }
         }
         .padding(.horizontal, 16).padding(.bottom, 16)
-        .animation(.spring(response: 0.55, dampingFraction: 0.86), value: conversationEmpty)
+        .animation(.spring(response: 0.55, dampingFraction: 0.86), value: chatMode)
         .animation(.easeOut(duration: 0.18), value: model.composerExpanded)
     }
 
@@ -220,16 +222,42 @@ struct ContentView: View {
             phaseReadout(large: true)
             if setupShowing {
                 SetupPanel(model: model)
-            } else {
+            } else if let caption {
+                Text(rich(caption))
+                    .font(.system(size: 14)).lineSpacing(4).foregroundStyle(HUD.ice.opacity(0.9))
+                    .multilineTextAlignment(.center).lineLimit(4).truncationMode(.head)
+                    .frame(maxWidth: 560)
+                    .textSelection(.enabled)
+                    .onTapGesture(count: 2) { chatMode = true }
+                    .help("Double-click for the full conversation")
+            } else if conversationEmpty {
                 HStack(spacing: 10) {
                     Button { model.composer.set("/find ") } label: { Label("Find a file", systemImage: "doc.text.magnifyingglass") }
                     Button { model.composer.set("Remember that ") } label: { Label("Remember something", systemImage: "brain") }
                 }
                 .buttonStyle(HUDButtonStyle(kind: .ghost, compact: true))
             }
+            // Anything waiting on a yes shows here too, so it's never hidden behind chat mode.
+            ApprovalQueueList(queue: model.approvalQueue).frame(maxWidth: 560)
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// What Daisy is saying right now, or the last thing she said, under the core.
+    private var caption: String? {
+        if !model.liveText.isEmpty { return model.liveText }
+        guard let last = model.messages.last, last.role == "assistant", !last.text.isEmpty else { return nil }
+        return last.text
+    }
+
+    private var chatModeButton: some View {
+        Button { chatMode.toggle() } label: {
+            Label(chatMode ? "Core" : "Chat", systemImage: chatMode ? "circle.hexagongrid" : "text.bubble")
+        }
+        .buttonStyle(HUDButtonStyle(kind: chatMode ? .primary : .ghost, compact: true))
+        .help(chatMode ? "Back to the core view" : "Show the full conversation")
+        .accessibilityLabel(chatMode ? "Show the core" : "Show the conversation")
     }
 
     private var transcript: some View {
@@ -295,6 +323,7 @@ struct ContentView: View {
             }
             HStack(alignment: .bottom, spacing: 14) {
                 ComposerBar(model: model, composer: model.composer)
+                chatModeButton
                 HUDSwitch(title: "ALWAYS LISTENING", isOn: model.alwaysListening,
                           detail: model.alwaysListening ? (model.standby ? "Say “Hey Daisy”" : "Arming mic…") : "Mic off between turns") {
                     model.setAlwaysListening(!model.alwaysListening)
@@ -311,7 +340,7 @@ struct ContentView: View {
 
     private var corePanel: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if !conversationEmpty {
+            if chatMode {
                 VStack(spacing: 10) {
                     orb(150)
                     phaseReadout(large: false)
@@ -347,7 +376,6 @@ struct ContentView: View {
                 readout("LINK", model.agentLink.isReady ? (model.agentDetail ?? model.linkLabel) : linkText.capitalized, color: model.agentLink.isReady ? HUD.ice : linkColor)
                 readout("REPLY", replyText)
                 MicReadout(audio: model.audio)
-                readout("VOICE", model.config.speakResponses ? voiceName : "Muted")
                 readout("FOLDER", model.selectedFolder?.lastPathComponent ?? "None") { model.chooseFolder() }
                 readout("MEMORY", "\(model.memories.count) saved") { model.tab = "Memory" }
                 readout("TASKS", "\(model.tasks.filter { $0.status != "done" }.count) open") { model.tab = "Tasks" }
@@ -371,7 +399,6 @@ struct ContentView: View {
         if let first = reply.firstText { return String(format: "%.1fs · first word %.1fs", reply.total, first) }
         return String(format: "%.1fs", reply.total)
     }
-    private var voiceName: String { NaturalSpeech.shortName(for: model.config.naturalVoice ?? NaturalSpeech.defaultVoice) }
 
     private func readout(_ label: String, _ value: String, color: Color = HUD.ice, action: (() -> Void)? = nil) -> some View {
         HStack(alignment: .bottom, spacing: 8) {
@@ -686,8 +713,10 @@ private struct SettingsView: View {
                     }
                     .labelsHidden().fixedSize()
                 }
-                VoiceSettingsView(voice: Binding(get: { model.config.naturalVoice ?? NaturalSpeech.defaultVoice }, set: { model.config.naturalVoice = $0 }),
-                                  speed: Binding(get: { model.config.speechRate ?? 1 }, set: { model.config.speechRate = $0 }),
+                // Voice and speed save as soon as they change, so a pick survives a relaunch without
+                // pressing Save (which also restarts the agent).
+                VoiceSettingsView(voice: Binding(get: { model.config.naturalVoice ?? NaturalSpeech.defaultVoice }, set: { model.config.naturalVoice = $0; persist() }),
+                                  speed: Binding(get: { model.config.speechRate ?? 1 }, set: { model.config.speechRate = $0; persist() }),
                                   busy: model.busy, preview: { model.previewVoice() }, stop: { model.interrupt() })
                 note("\(model.audio.microphoneStatus) · Input: \(model.audio.inputDeviceName)")
                 if !model.speechInStatus.isEmpty { note(model.speechInStatus) }
@@ -718,6 +747,9 @@ private struct SettingsView: View {
             }
             if let notice = model.notice { Text(notice).font(.system(size: 11)).foregroundStyle(HUD.amber).textSelection(.enabled) }
         }
+    }
+    private func persist() {
+        do { try model.config.save() } catch { model.notice = "Couldn't save the voice setting: \(error.localizedDescription)" }
     }
     private var status: String {
         switch model.agentLink {
