@@ -15,15 +15,15 @@ The willowvoice.com dictation app, not the HeyWillow ESP32 project.
 - **Terms.** They forbid reverse engineering, and a developer API is Enterprise-only ([pricing](https://willowvoice.com/pricing)).
 - **Privacy.** Their policy says audio isn't kept on their servers and history stays on the device ([privacy](https://willowvoice.com/privacy-policy)).
 
-### What works with Jarvis
+### What works with Daisy
 
-- **Willow as a typing aid:** hold Fn with the Jarvis composer focused, and Willow pastes the text. Works today with no code.
+- **Willow as a typing aid:** hold Fn with the Daisy composer focused, and Willow pastes the text. Works today with no code.
   - Still push-to-talk only, and it goes through Willow's cloud.
   - It can reword what I said.
-- **Mic conflicts.** Both apps can share the mic. Jarvis's wake gate ignores anything that doesn't start with "Hey Jarvis". Willow's `autoMuteAudio` setting would mute Jarvis's voice, so leave it off.
+- **Mic conflicts.** Both apps can share the mic. Daisy's wake gate ignores anything that doesn't start with "Hey Daisy". Willow's `autoMuteAudio` setting would mute Daisy's voice, so leave it off.
 - **Watching Willow's transcript files, or calling its backend:** fragile or against its terms. No.
 
-## Better speech-in for Jarvis
+## Better speech-in for Daisy
 
 The current `base.en` Whisper model came from huggingface.co, which the school filter now blocks. Anything new from Hugging Face has to be downloaded at home.
 
@@ -37,7 +37,7 @@ The current `base.en` Whisper model came from huggingface.co, which the school f
 
 **Wake word:**
 - openWakeWord has a pretrained `hey_jarvis` model on GitHub releases (not HF), ONNX format.
-- Porcupine has a built-in "Jarvis" keyword but needs a free access key.
+- Porcupine has a built-in "Daisy" keyword but needs a free access key.
 - Either one means Whisper doesn't have to run on every pause.
 
 **Plan:**

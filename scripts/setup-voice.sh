@@ -1,10 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-VOICE_DIR="$HOME/Library/Application Support/Jarvis/Runtime/voice"
-PYTHON_BIN="${JARVIS_PYTHON:-/opt/homebrew/bin/python3.11}"
+VOICE_DIR="$HOME/Library/Application Support/Daisy/Runtime/voice"
+PYTHON_BIN="${DAISY_PYTHON:-/opt/homebrew/bin/python3.11}"
 if [ ! -x "$PYTHON_BIN" ]; then
-  echo "Install Python 3.11 (brew install python@3.11), or set JARVIS_PYTHON to a Python 3.10–3.13 executable."
+  echo "Install Python 3.11 (brew install python@3.11), or set DAISY_PYTHON to a Python 3.10–3.13 executable."
   exit 1
 fi
 mkdir -p "$VOICE_DIR"

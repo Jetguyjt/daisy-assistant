@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-BROWSER_DIR="$HOME/Library/Application Support/Jarvis/Runtime/browser"
+BROWSER_DIR="$HOME/Library/Application Support/Daisy/Runtime/browser"
 mkdir -p "$BROWSER_DIR"
 cp "$REPO_DIR/scripts/browser/package.json" "$BROWSER_DIR/package.json"
 cp "$REPO_DIR/scripts/browser/package-lock.json" "$BROWSER_DIR/package-lock.json"

@@ -5,7 +5,7 @@ import shutil
 import sys
 
 repo = pathlib.Path(sys.argv[1]).resolve()
-runtime = pathlib.Path.home() / "Library/Application Support/Jarvis/Runtime"
+runtime = pathlib.Path.home() / "Library/Application Support/Daisy/Runtime"
 config = {
     "model": "qwen3.5:4b",
     "whisperExecutable": shutil.which("whisper-cli") or "/opt/homebrew/bin/whisper-cli",

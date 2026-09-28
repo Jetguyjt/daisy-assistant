@@ -2,7 +2,7 @@
 
 ## With Hermes (0.4)
 
-Integrations now belong to Hermes, not Jarvis code: skills for procedures, MCP servers or Hermes plugins for code and credentials. Checked against the installed Hermes 0.21.0 on 2026-09-25:
+Integrations now belong to Hermes, not Daisy code: skills for procedures, MCP servers or Hermes plugins for code and credentials. Checked against the installed Hermes 0.21.0 on 2026-09-25:
 
 | Need | Hermes route | State on this Mac |
 | --- | --- | --- |
@@ -12,7 +12,7 @@ Integrations now belong to Hermes, not Jarvis code: skills for procedures, MCP s
 | Calendar | `google-workspace` skill (`gws` or its bundled Python, Google OAuth token) | No Google token yet; no Apple Calendar skill exists |
 | Reminders, Notes | `apple-reminders` (`remindctl`), `apple-notes` (`memo`) | CLIs not installed |
 
-Hermes only asks before dangerous commands and file edits; skills send with no prompt. In Jarvis sessions the `hermes/jarvis` plugin stops sends, email, calendar writes, posts and deletes at an approval card first ([architecture](ARCHITECTURE.md#approvals)). The rest of this document is the original investigation for the on-device engine, kept for the Contacts, EventKit and Messages details that still apply.
+Hermes only asks before dangerous commands and file edits; skills send with no prompt. In Daisy sessions the `hermes/daisy` plugin stops sends, email, calendar writes, posts and deletes at an approval card first ([architecture](ARCHITECTURE.md#approvals)). The rest of this document is the original investigation for the on-device engine, kept for the Contacts, EventKit and Messages details that still apply.
 
 These are adapter examples, not a fixed feature roadmap. New services plug into the common [capability system](CAPABILITIES.md).
 

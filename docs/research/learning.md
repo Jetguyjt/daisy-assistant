@@ -1,12 +1,12 @@
 # Learning without /remember
 
-Checked 2026-09-25 against Hermes 0.21.0 at `~/.hermes/hermes-agent` and Jarvis at the Hermes/ACP commit.
+Checked 2026-09-25 against Hermes 0.21.0 at `~/.hermes/hermes-agent` and Daisy at the Hermes/ACP commit.
 
-The goal: Jarvis picks things up while I use it. A nickname for someone turns into the right contact when I say "text them." "Email" means Gmail. It reads my files, does research, and splits big jobs across several agents at once.
+The goal: Daisy picks things up while I use it. A nickname for someone turns into the right contact when I say "text them." "Email" means Gmail. It reads my files, does research, and splits big jobs across several agents at once.
 
 ## What Hermes already does
 
-Most of this ships in Hermes and is already turned on in `~/.hermes/config.yaml`. All of it is in the `hermes-acp` toolset Jarvis talks to.
+Most of this ships in Hermes and is already turned on in `~/.hermes/config.yaml`. All of it is in the `hermes-acp` toolset Daisy talks to.
 
 | Feature | What it does | Setting |
 | --- | --- | --- |
@@ -22,7 +22,7 @@ At the time of checking, Hermes had seen 9 user messages across 5 sessions, so t
 
 The hard one, because nothing can read Contacts yet.
 
-1. "Text Bubba." No alias is known, so Jarvis searches Contacts and asks "Robert Lukose?"
+1. "Text Bubba." No alias is known, so Daisy searches Contacts and asks "Robert Lukose?"
 2. I say yes. The alias `bubba → Robert Lukose, +1…` gets saved then and there.
 3. Next time it resolves the name directly. It still shows the approval card before sending, because a wrong guess texts the wrong person.
 
@@ -43,7 +43,7 @@ Two rules:
 
 ## Parallel agents
 
-`delegate_task` already runs 3 at a time. The model is hosted, so each subagent costs almost no RAM on this Mac, unlike the local model that fought Chrome for memory. What's missing is Jarvis showing each one in the HUD. I haven't checked yet how ACP reports child agents.
+`delegate_task` already runs 3 at a time. The model is hosted, so each subagent costs almost no RAM on this Mac, unlike the local model that fought Chrome for memory. What's missing is Daisy showing each one in the HUD. I haven't checked yet how ACP reports child agents.
 
 ## Risks
 

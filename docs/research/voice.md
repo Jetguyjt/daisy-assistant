@@ -2,7 +2,7 @@
 
 Checked 2026-09-27. Prices and latencies come from vendor pages unless marked. Nothing was installed.
 
-Right now Jarvis speaks with Kokoro-82M (`bm_george`) through a Python worker, one sentence at a time. It sounds flat.
+Right now Daisy speaks with Kokoro-82M (`bm_george`) through a Python worker, one sentence at a time. It sounds flat.
 
 ## Why it sounds bad (cheap fixes first)
 

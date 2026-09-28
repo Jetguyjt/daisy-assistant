@@ -8,7 +8,7 @@ Research notes:
 - [google.md](research/google.md): Gmail, Drive and Calendar
 - [voice.md](research/voice.md): a better voice
 - [speech-in.md](research/speech-in.md): speech in, and Willow Voice
-- [lukebuildsai.md](research/lukebuildsai.md): what his Jarvis does and how it compares
+- [lukebuildsai.md](research/lukebuildsai.md): what his Daisy does and how it compares
 - [orchestrator.md](research/orchestrator.md): orchestrator design, always-on, guard stress test
 - [persona.md](research/persona.md): American female voice and a new name
 
@@ -18,7 +18,7 @@ These gaps have to close before the tools below go live. Stress test in [orchest
 
 - [ ] Card must show exactly what runs: refuse chained commands (`;` `&&` `|` `$(`), and show every recipient, Bcc and attachment untruncated
 - [ ] Typed plugin tools for risky actions (`gmail_send`, `drive_share`, `drive_delete`, `imsg_send`, `calendar_write`); block the same actions from `terminal` / `execute_code`
-- [ ] Guard loads in every Hermes process (cron, gateway), not just `JARVIS_SESSION`; fails closed if it throws
+- [ ] Guard loads in every Hermes process (cron, gateway), not just `DAISY_SESSION`; fails closed if it throws
 - [ ] Allowlists per role, enforced by the plugin (chat, worker read-only, cron pre-approved)
 - [ ] Taint: after reading mail/web/files, new recipients, URLs or memory writes need a card
 - [ ] Approval queue: no answer = no, card removed on timeout, voice loop freed
@@ -35,11 +35,11 @@ These gaps have to close before the tools below go live. Stress test in [orchest
 
 Notes: [orchestrator.md](research/orchestrator.md)
 
-- [ ] Test live: does a background `delegate_task` over ACP ever return its result? Until it does, tell Hermes not to use it in Jarvis sessions
+- [ ] Test live: does a background `delegate_task` over ACP ever return its result? Until it does, tell Hermes not to use it in Daisy sessions
 - [ ] Worker sessions: `session/new` per background job (max 2–3), route updates by session ID, job ledger + jobs panel, speak results when done
 - [ ] Fix or patch ACP so delegation results come back (read `completion_queue`, or run delegations synchronously)
 - [ ] `hermes gateway` as a LaunchAgent: cron, Kanban, Telegram/iMessage from my phone
-- [ ] Jarvis shows cron output (`~/.hermes/cron/output/`) and the Kanban board
+- [ ] Daisy shows cron output (`~/.hermes/cron/output/`) and the Kanban board
 - [ ] Budget: cheaper `delegation.model`, poll usage windows, pause background work around 80%, add a fallback provider
 - [ ] Launch at login (`SMAppService.mainApp`); push-to-talk on battery
 - [ ] Later, if 24/7 matters: gateway on a home box or VPS with its own device-code login (never copy `auth.json`)
@@ -47,7 +47,7 @@ Notes: [orchestrator.md](research/orchestrator.md)
 ## Chrome and Mac control
 
 - [ ] Plugin tools `chrome_tabs` / `chrome_focus` / `chrome_open` over AppleScript, registered into `hermes-acp`
-- [ ] `jarvis-chrome` skill: reuse an open tab before opening a new one ("check my email" → Gmail tab)
+- [ ] `daisy-chrome` skill: reuse an open tab before opening a new one ("check my email" → Gmail tab)
 - [ ] `computer_use` into ACP sessions through a plugin tool (keeps Hermes's hard-blocks); check how its approvals behave over ACP
 - [ ] Try `chrome-devtools-mcp --autoConnect` in `mcp_servers` and count the Chrome consent prompts
 - [ ] Auto-connect the old Chrome adapter at launch for the local fallback, or retire it
@@ -71,12 +71,12 @@ Notes: [persona.md](research/persona.md)
 - [ ] Hosted American female voice: Cartesia "Jacqueline" (Pro $5), or OpenAI "marin"; needs its own API key in the Keychain
 - [ ] Local: design the voice with Qwen3-TTS 1.7B VoiceDesign, then clone from a reference clip
 - [ ] Later: train an openWakeWord model for the new name on Colab
-- [ ] Later: internal rename (bundle ID, targets, `hermes/jarvis`, Application Support folder, repo)
+- [ ] Later: internal rename (bundle ID, targets, `hermes/daisy`, Application Support folder, repo)
 
 ## Voice out
 
 - [ ] Kokoro quick fixes:
-  - try `af_heart` if the name changes, `bf_emma` / a george-fable blend if it stays Jarvis
+  - try `af_heart` if the name changes, `bf_emma` / a george-fable blend if it stays Daisy
   - A/B test playback with echo cancellation on and off
   - merge short fragments
   - expand numbers and abbreviations
@@ -87,7 +87,7 @@ Notes: [persona.md](research/persona.md)
 
 - [ ] SpeechTranscriber (macOS 26) as the main recognizer, with whisper-server kept as the fallback
 - [ ] Silero VAD in place of the energy endpointer
-- [ ] openWakeWord `hey_jarvis` so Whisper doesn't run on every pause
+- [ ] openWakeWord `hey_daisy` (trained on Colab) so Whisper doesn't run on every pause
 - [ ] Willow stays a push-to-talk typing aid; keep its `autoMuteAudio` off
 
 ## Learning without /remember
@@ -99,11 +99,11 @@ Notes: [persona.md](research/persona.md)
 - [ ] Try the `holographic` memory plugin for aliases and facts that won't fit in `USER.md`
 - [ ] Opt-in folder indexing: a Hermes cron job that writes a "where I left off" note per repo in folders I pick
 - [ ] Show running subagents (`delegate_task`) in the HUD
-- [ ] Recall check in `jarvis-check`: teach facts on day one, ask on day seven, plus a correction case and a "you don't know that" case
+- [ ] Recall check in `daisy-check`: teach facts on day one, ask on day seven, plus a correction case and a "you don't know that" case
 
 ## Integrations still open
 
-- [x] Install the `hermes/jarvis` approval plugin
+- [x] Install the `hermes/daisy` approval plugin
 - [ ] iMessage: `imsg` CLI, permissions, contact mapping (overlaps with the Contacts item)
 - [ ] Reminders and Notes CLIs (`remindctl`, `memo`)
 - [ ] Specialist agents on cron (inbox triage overnight, repo digests), in the spirit of lukebuildsai's setup

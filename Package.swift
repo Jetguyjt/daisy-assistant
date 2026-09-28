@@ -2,19 +2,19 @@
 import PackageDescription
 
 let package = Package(
-    name: "Jarvis",
+    name: "Daisy",
     platforms: [.macOS(.v14)],
     products: [
-        .executable(name: "Jarvis", targets: ["JarvisApp"]),
-        .executable(name: "jarvis-check", targets: ["JarvisCheck"]),
-        .executable(name: "jarvis-tests", targets: ["JarvisTests"])
+        .executable(name: "Daisy", targets: ["DaisyApp"]),
+        .executable(name: "daisy-check", targets: ["DaisyCheck"]),
+        .executable(name: "daisy-tests", targets: ["DaisyTests"])
     ],
     targets: [
         .systemLibrary(name: "CSQLite"),
-        .target(name: "JarvisCore", dependencies: ["CSQLite"]),
-        .executableTarget(name: "JarvisApp", dependencies: ["JarvisCore"]),
-        .executableTarget(name: "JarvisCheck", dependencies: ["JarvisCore"]),
+        .target(name: "DaisyCore", dependencies: ["CSQLite"]),
+        .executableTarget(name: "DaisyApp", dependencies: ["DaisyCore"]),
+        .executableTarget(name: "DaisyCheck", dependencies: ["DaisyCore"]),
         // The standalone test runner works with Apple's Command Line Tools (no full Xcode/XCTest required).
-        .executableTarget(name: "JarvisTests", dependencies: ["JarvisCore"], path: "Tests/JarvisCoreTests")
+        .executableTarget(name: "DaisyTests", dependencies: ["DaisyCore"], path: "Tests/DaisyCoreTests")
     ]
 )

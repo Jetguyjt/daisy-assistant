@@ -38,7 +38,7 @@ Account setup and native permissions belong in the adapter's UI/service layer. C
 
 `LocalRuntime` owns only the server it creates, coalesces startup attempts, and checks readiness before user work. It never retries a dispatched action to recover a lost response. A health monitor clears stale readiness. Normal termination waits for owned-server cleanup.
 
-The installed model assets live under `~/Library/Application Support/Jarvis/Runtime`, avoiding a Documents access prompt during engine/decoder startup. Homebrew still supplies the model and speech binaries; this is a development installation, not a portable bundle.
+The installed model assets live under `~/Library/Application Support/Daisy/Runtime`, avoiding a Documents access prompt during engine/decoder startup. Homebrew still supplies the model and speech binaries; this is a development installation, not a portable bundle.
 
 Voice uses explicit Record/Finish controls. A common-mode timer keeps the level meter and recording limit running during mouse tracking. Recordings are no longer rejected based on a stale cached meter peak. Audio input, permission state, and a link to macOS input settings are visible. Whisper transcription and Kokoro neural speech remain local.
 
