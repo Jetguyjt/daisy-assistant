@@ -236,7 +236,10 @@ public struct HermesMemoryFiles: Sendable {
     }
 
     private func write(_ text: String, to url: URL) throws {
-        let temporary = directory.appendingPathComponent(".mem_daisy_\(UUID().uuidString).tmp")
+        // A memory file that's a symlink stays one: the file it points to is replaced, as Hermes does.
+        let isLink = (try? FileManager.default.destinationOfSymbolicLink(atPath: url.path)) != nil
+        let url = isLink ? url.resolvingSymlinksInPath() : url
+        let temporary = url.deletingLastPathComponent().appendingPathComponent(".mem_daisy_\(UUID().uuidString).tmp")
         let fd = open(temporary.path, O_WRONLY | O_CREAT | O_EXCL, 0o600)
         guard fd >= 0 else { throw DaisyError.message("Couldn't write \(url.lastPathComponent).") }
         var written = true

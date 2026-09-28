@@ -530,6 +530,14 @@ import Foundation
             let before = TestLog.failures
             let suite = LearnedTests()
             try suite.setUp(); defer { suite.tearDown() }
+            try suite.testASymlinkedFileStaysASymlink()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testASymlinkedFileStaysASymlink")
+        } catch { fail("testASymlinkedFileStaysASymlink: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = LearnedTests()
+            try suite.setUp(); defer { suite.tearDown() }
             try suite.testEditLeavesUntidyAndUnreadableFilesAlone()
             count += 1
             print("\(TestLog.failures == before ? "PASS" : "FAIL") testEditLeavesUntidyAndUnreadableFilesAlone")

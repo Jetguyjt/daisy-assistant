@@ -59,6 +59,18 @@ final class LearnedTests {
         try expectEqual(files.entries(.user), ["First", "Second"])
     }
 
+    func testASymlinkedFileStaysASymlink() throws {
+        let elsewhere = root.appendingPathComponent("synced")
+        try FileManager.default.createDirectory(at: elsewhere, withIntermediateDirectories: true)
+        let real = elsewhere.appendingPathComponent("USER.md")
+        try write("Likes tea\n§\nPlays tennis", to: real)
+        try FileManager.default.createSymbolicLink(at: user, withDestinationURL: real)
+        try files.edit(.user) { $0.removeLast() }
+        try expectEqual(FileManager.default.destinationOfSymbolicLink(atPath: user.path), real.path)
+        expectEqual(read(real), "Likes tea")
+        try expectEqual(FileManager.default.contentsOfDirectory(atPath: elsewhere.path), ["USER.md"])
+    }
+
     func testEditLeavesUntidyAndUnreadableFilesAlone() throws {
         for untidy in ["Likes tea  \n§\n\n§\nPlays tennis", "Likes tea\n§\n" + String(repeating: "x", count: 1400)] {
             try write(untidy, to: user)
