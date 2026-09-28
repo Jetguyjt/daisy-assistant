@@ -210,6 +210,7 @@ public enum LearnedFeed {
     public let logURL: URL
     public let stateURL: URL
     private var state = LearnedState()
+    private var written: LearnedState?
     private var loaded = false
     private var unreadable = false
 
@@ -336,10 +337,13 @@ public enum LearnedFeed {
         decoder.dateDecodingStrategy = .secondsSince1970
         if let data = try? Data(contentsOf: stateURL), let saved = try? decoder.decode(LearnedState.self, from: data) {
             state = saved
+            written = saved
         }
     }
 
+    /// Writes the state when it changed (the feed refreshes every few seconds while it's on screen).
     private func save() {
+        guard state != written else { return }
         do {
             try FileManager.default.createDirectory(at: stateURL.deletingLastPathComponent(), withIntermediateDirectories: true,
                                                     attributes: [.posixPermissions: 0o700])
@@ -347,6 +351,7 @@ public enum LearnedFeed {
             encoder.dateEncodingStrategy = .secondsSince1970
             try encoder.encode(state).write(to: stateURL, options: .atomic)
             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: stateURL.path)
+            written = state
         } catch {
             problem = "Couldn't save the Learned feed's notes: \(error.localizedDescription)"
         }

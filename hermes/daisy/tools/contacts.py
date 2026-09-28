@@ -77,8 +77,9 @@ def aliases_file() -> Path:
 
 
 def nickname_key(text: str) -> str:
-    """"Bubba", " bubba ", "“Bubba”" and "my Bubba" are one nickname."""
-    words = re.sub(r"[\"'“”‘’`.,!?:;]+", " ", str(text or "")).casefold().split()
+    """"Bubba", " bubba ", "“Bubba”", "Bubba's" and "my Bubba" are one nickname."""
+    text = re.sub(r"['’]s\b", "", str(text or ""))
+    words = re.sub(r"[\"'“”‘’`.,!?:;]+", " ", text).casefold().split()
     if len(words) > 1 and words[0] == "my":
         words = words[1:]
     return " ".join(words)

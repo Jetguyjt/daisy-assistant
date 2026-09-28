@@ -103,7 +103,7 @@ check("no temporary files are left", not [p for p in aliases.parent.iterdir() if
 
 # Next time it resolves directly, whatever the spelling, without asking Contacts.
 asked = len(calls)
-for spelling in ("Bubba", "bubba", "“Bubba”", "my Bubba", "  BUBBA "):
+for spelling in ("Bubba", "bubba", "“Bubba”", "my Bubba", "  BUBBA ", "Bubba's", "bubba’s"):
     again = run(search, {"query": spelling})
     check(f"{spelling!r} resolves from the saved nickname", again["source"] == "saved nickname"
           and again["contacts"][0]["name"] == "Robert Lukose" and again["contacts"][0]["phones"][0]["number"] == "+1 555 010 4477")
