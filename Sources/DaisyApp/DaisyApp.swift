@@ -5,6 +5,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var occlusion: NSObjectProtocol?
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular); NSApp.activate(ignoringOtherApps: true)
+        // The Dock shows the icon in the chosen accent, not whatever it cached from the bundle.
+        ThemeStore.shared.scheduleDockIcon(delay: .zero)
         // Pause the core animation while no Daisy window can be seen.
         occlusion = NotificationCenter.default.addObserver(forName: NSApplication.didChangeOcclusionStateNotification, object: nil, queue: .main) { [weak self] _ in
             let visible = NSApp.occlusionState.contains(.visible)
