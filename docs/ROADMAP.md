@@ -65,13 +65,13 @@ Notes: [orchestrator.md](research/orchestrator.md)
 
 Notes: [persona.md](research/persona.md)
 
-- [ ] Pick the name (top 3: DAISY, JANET, DORIS)
-- [ ] Rename what I see and hear: wake phrase + misspellings, display name, mic permission text, Hermes persona, UI strings, README
+- [x] Pick the name: DAISY, "Definitely An Intelligent System, Yeah" (decided 2026-09-27)
+- [x] Rename what I see and hear: wake phrase + misspellings, display name, mic permission text, Hermes persona, UI strings, README (verified 2026-09-27: wake-phrase tests incl. misspellings pass, Daisy.app launched showing "Hey Daisy" standby; saying it live is still Josh's to try)
 - [ ] Switch Kokoro to `af_heart` (or a heart/bella 70/30 blend) today
 - [ ] Hosted American female voice: Cartesia "Jacqueline" (Pro $5), or OpenAI "marin"; needs its own API key in the Keychain
 - [ ] Local: design the voice with Qwen3-TTS 1.7B VoiceDesign, then clone from a reference clip
 - [ ] Later: train an openWakeWord model for the new name on Colab
-- [ ] Later: internal rename (bundle ID, targets, `hermes/daisy`, Application Support folder, repo)
+- [x] Internal rename: bundle ID, targets, `hermes/daisy`, Application Support folder, repo (verified 2026-09-27: clean build and 74 tests, Daisy.app installed as `com.local.daisy.desktop` and launched with its memories, settings and Hermes session carried over, live `daisy-check --hermes` answered, GitHub repo renamed to daisy-assistant)
 
 ## Voice out
 
@@ -103,7 +103,7 @@ Notes: [persona.md](research/persona.md)
 
 ## Integrations still open
 
-- [x] Install the `hermes/daisy` approval plugin
+- [x] Install the `hermes/daisy` approval plugin (reinstalled under the new name 2026-09-27; `hermes plugins list` shows daisy enabled, jarvis gone)
 - [ ] iMessage: `imsg` CLI, permissions, contact mapping (overlaps with the Contacts item)
 - [ ] Reminders and Notes CLIs (`remindctl`, `memo`)
 - [ ] Specialist agents on cron (inbox triage overnight, repo digests), in the spirit of lukebuildsai's setup
