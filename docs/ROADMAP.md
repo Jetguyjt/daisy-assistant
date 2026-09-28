@@ -19,7 +19,8 @@ These gaps have to close before the tools below go live. Stress test in [orchest
 - [ ] Card must show exactly what runs: refuse chained commands (`;` `&&` `|` `$(`), and show every recipient, Bcc and attachment untruncated
   - guard side done: tests, and live on 2026-09-28 a chained `echo …; rm -f …` was refused (Hermes log: the terminal call returned the guard's message in 0.01s). The app's card scrolls instead of cutting off, not seen live yet
 - [ ] Typed plugin tools for risky actions (`gmail_send`, `drive_share`, `drive_delete`, `imsg_send`, `calendar_write`); block the same actions from `terminal` / `execute_code`
-  - guard side done (tests): the shell route is refused and points at the typed tool once it exists, and gets a card until then. The tools come with the Google and iMessage work
+  - guard side done (tests): the shell route is refused and points at the typed tool once it exists, and gets a card until then
+  - Google side built (`gmail_send`, `drive_share`, `drive_delete`, `calendar_write` and the rest), tests only; `imsg_send` comes with the iMessage work
 - [x] Guard loads in every Hermes process (cron, gateway), not just `DAISY_SESSION`; fails closed if it throws
   - tests, and `hermes plugins doctor --ci` registers the hook with and without `DAISY_SESSION=1`
 - [x] Allowlists per role, enforced by the plugin (chat, worker read-only, cron pre-approved)
@@ -72,9 +73,11 @@ Notes: [orchestrator.md](research/orchestrator.md)
 ## Google
 
 - [ ] My part: Cloud project, APIs on, consent screen published to "In production", Desktop OAuth client
-- [ ] `google-workspace` skill setup (`setup.py --services email,calendar,drive,docs,sheets`)
+- [ ] `google-workspace` skill setup: `setup.py --client-secret`, `--auth-url`, `--auth-code`, `--check` (steps in [google.md](research/google.md); this `setup.py` has no `--services`)
 - [ ] "Check my email": unread headers + snippets, bodies only on request
+  - built: 16 typed tools in `hermes/daisy/tools/google.py`, tested against stand-ins and the real skill signed out; not run against Google yet
 - [ ] Keep `~/.hermes/google_token.json` out of every script and sweep
+  - the tools never open it (tested); sign-in goes through the skill's own scripts
 
 ## New voice and name
 

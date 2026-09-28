@@ -580,6 +580,7 @@ for command, tool in {
     f"{GAPI} drive delete 1BudgetSheet00000000000000": "drive_delete",
     f"{GAPI} docs append 1EssayDoc0000000000000000 --text hi": "docs_write",
     f"{GAPI} sheets update 1BudgetSheet00000000000000 'Sheet1!A1' --values '[[1]]'": "sheets_write",
+    f"{GAPI} calendar delete evt0001": "calendar_delete",
 }.items():
     blocked = decide("terminal", {"command": command})
     check(f"from the shell, {command.split('google_api.py ')[1][:28]}... points at {tool}", lambda b=blocked, tool=tool:

@@ -266,7 +266,11 @@ check("ROADMAP a chain of reads still runs", lambda: passes(run(daisy, "ls ~/Dow
 check("ROADMAP each untyped card has its own rule key", lambda: len({
     run(daisy, "rm ~/Desktop/a.png")["rule_key"], run(daisy, "rm ~/Desktop/a.png")["rule_key"]}) == 2)
 
-# ROADMAP: the shell route to an action that has a typed tool is blocked, and points at the tool.
+# ROADMAP: the shell route to an action that has a typed tool is blocked, and points at the tool. The Google
+# tools (hermes/daisy/tools/google.py) only count once the google-workspace skill is installed.
+skill = HOME / "skills" / "productivity" / "google-workspace" / "scripts"
+skill.mkdir(parents=True, exist_ok=True)
+(skill / "google_api.py").write_text("")
 typed("drive_delete", "delete", "Delete a Drive file")
 redirect = attempt(lambda: run(daisy, f"{GAPI} drive delete FILE123"))
 check("ROADMAP drive delete from the shell points at drive_delete", lambda: block(redirect) and "drive_delete" in redirect["message"])

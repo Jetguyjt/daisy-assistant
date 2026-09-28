@@ -1504,11 +1504,11 @@ GOOGLE_RISK = {
               "forward": ("send-email", "Forward an email", ("gmail_forward", "gmail_send")),
               "draft": ("write", "Save an email draft", ("gmail_draft",)),
               "modify": ("write", "Change your email (labels, archive or trash)", ("gmail_modify",)),
-              "trash": ("delete", "Move email to the trash", ("gmail_modify", "gmail_delete")),
+              "trash": ("delete", "Move email to the trash", ("gmail_delete", "gmail_modify")),
               "delete": ("delete", "Delete email", ("gmail_delete", "gmail_modify")),
               "archive": ("write", "Archive email", ("gmail_modify",))},
     "calendar": {"*": ("calendar", "Change your calendar", ("calendar_write",)),
-                 "delete": ("calendar", "Delete a calendar event", ("calendar_write", "calendar_delete"))},
+                 "delete": ("calendar", "Delete a calendar event", ("calendar_delete", "calendar_write"))},
     "drive": {"upload": ("upload", "Upload a file to Google Drive", ("drive_upload",)),
               "share": ("share", "Share a Google Drive file", ("drive_share",)),
               "delete": ("delete", "Delete a Google Drive file", ("drive_delete",)),
@@ -1567,7 +1567,8 @@ def _gws(command: Cmd) -> Verdict:
     if service == "drive" and "permissions" in resources:
         return _risky(command, "share", "Share a Google Drive file", ("drive_share",), network=True)
     if method in ("delete", "emptytrash", "trash", "batchdelete"):
-        typed = {"drive": ("drive_delete",), "calendar": ("calendar_write",)}.get(service, ())
+        typed = {"drive": ("drive_delete",), "calendar": ("calendar_delete", "calendar_write"),
+             "gmail": ("gmail_delete",)}.get(service, ())
         rule_name = "calendar" if service == "calendar" else "delete"
         return _risky(command, rule_name, f"Delete in Google {service.capitalize()}", typed, network=True)
     if service == "calendar":

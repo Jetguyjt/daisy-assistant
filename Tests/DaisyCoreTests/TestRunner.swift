@@ -932,6 +932,13 @@ import Foundation
         }
         do {
             let before = TestLog.failures
+            let suite = ToolPhraseTests()
+            suite.testGoogleToolsReadAsPlainWords()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testGoogleToolsReadAsPlainWords")
+        }
+        do {
+            let before = TestLog.failures
             let suite = VoiceBlendTests()
             suite.testDefaultVoiceAndTheCatalog()
             count += 1

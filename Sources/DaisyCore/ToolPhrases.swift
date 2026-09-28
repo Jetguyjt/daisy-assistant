@@ -34,6 +34,22 @@ public enum ToolPhrases {
             guard let site = site(input) else { return ("Opening a page", nil) }
             return (input?["reuse"]?.boolValue == true ? "Switching to \(site)" : "Opening \(site)", nil)
         case "computer_look", "computer_act": return (computer(head, input: input), nil)
+        case "gmail_search": return ("Checking your email", nil)
+        case "gmail_read": return ("Reading an email", nil)
+        case "gmail_send": return ("Sending an email", nil)
+        case "gmail_reply": return ("Replying to an email", nil)
+        case "gmail_modify": return ("Tidying your inbox", nil)
+        case "gmail_delete": return ("Moving email to the trash", nil)
+        case "calendar_list": return ("Checking your calendar", nil)
+        case "calendar_write": return ("Updating your calendar", nil)
+        case "calendar_delete": return ("Removing a calendar event", nil)
+        case "drive_search": return ("Searching your Drive", nil)
+        case "drive_read": return ("Reading a Drive file", nil)
+        case "drive_upload": return ("Uploading to Drive", nil)
+        case "drive_share": return ("Sharing a Drive file", nil)
+        case "drive_delete": return ("Deleting a Drive file", nil)
+        case "docs_write": return ("Editing a Google Doc", nil)
+        case "sheets_write": return ("Editing a Google Sheet", nil)
         default:
             if head.hasPrefix("patch") { return ("Editing a file", file) }
             if head.hasPrefix("memory") { return ("Updating memory", nil) }

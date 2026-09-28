@@ -287,19 +287,23 @@ for command in ["i\"m\"sg send --to x --text y", "'im'sg send --to x --text y", 
     check(f"sees through {command!r} -> {verdict.decision}/{verdict.rule}", verdict.decision == "card" and verdict.rule == "send-message")
 check("/bin/../tmp is not a system folder", shell("/bin/../tmp/ls").decision == "card")
 
-# Where a typed tool does the job, the shell route points at it (Daisy only).
+# Where a typed tool does the job, the shell route points at it (Daisy only). The Google tools
+# (hermes/daisy/tools/google.py) are only available once the google-workspace skill is installed.
+unavailable = plugin.registry.get("calendar_write") or plugin.registry.add(plugin.registry.TypedTool(
+    name="calendar_write", description="", parameters={"type": "object", "properties": {}}, risk="write",
+    card=lambda a: "Change", run=lambda a: None, check=lambda: False))
+check("a typed tool that isn't available doesn't count", not unavailable.check() and
+      shell(f"{GAPI} calendar create --summary x").decision == "card")
+skill = HOME / "skills" / "productivity" / "google-workspace" / "scripts"
+skill.mkdir(parents=True, exist_ok=True)
+(skill / "google_api.py").write_text("")
 typed(plugin, "gmail_send", "send", "Send an email")
 pointed = shell(f"{GAPI} gmail send --to x@example.com --subject s --body b")
 check("gmail send from the shell points at gmail_send", pointed.decision == "block" and "gmail_send" in pointed.message)
 typed(plugin, "imsg_send", "send", "Send an iMessage")
 check("imsg send from the shell points at imsg_send", "imsg_send" in shell("imsg send --to Dad --text hi").message)
-typed(plugin, "drive_share", "share", "Share")
-check("a typed read tool doesn't count", typed(plugin, "drive_lookup", "read") and
-      shell(f"{GAPI} drive delete F").decision == "card")
-unavailable = plugin.registry.add(plugin.registry.TypedTool(
-    name="calendar_write", description="", parameters={"type": "object", "properties": {}}, risk="write",
-    card=lambda a: "Change", run=lambda a: None, check=lambda: False))
-check("a typed tool that isn't available doesn't count", shell(f"{GAPI} calendar create --summary x").decision == "card")
+check("a typed read tool doesn't count", typed(plugin, "drive_write", "read") and
+      shell(f"{GAPI} drive create-folder F").decision == "card")
 
 # execute_code.
 def code(source):

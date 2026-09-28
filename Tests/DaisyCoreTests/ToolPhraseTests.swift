@@ -16,4 +16,11 @@ final class ToolPhraseTests {
         expectEqual(ToolPhrases.describe(title: "computer_act", kind: "other", input: ["action": "focus_app", "app": "Finder"]).title, "Switching to Finder")
         expectEqual(ToolPhrases.describe(title: "computer_act", kind: "other").title, "Using an app")
     }
+
+    func testGoogleToolsReadAsPlainWords() {
+        expectEqual(ToolPhrases.describe(title: "gmail_search", kind: "other").title, "Checking your email")
+        expectEqual(ToolPhrases.describe(title: "gmail_send", kind: "other", input: ["to": "dad@example.com"]).title, "Sending an email")
+        expectEqual(ToolPhrases.describe(title: "calendar_write", kind: "other").title, "Updating your calendar")
+        expectEqual(ToolPhrases.describe(title: "drive_share", kind: "other").title, "Sharing a Drive file")
+    }
 }
