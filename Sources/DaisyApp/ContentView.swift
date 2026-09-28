@@ -10,6 +10,7 @@ struct ContentView: View {
 
     private static let tabs: [(id: String, label: String, symbol: String)] = [
         ("Assistant", "DAISY", "circle.hexagongrid"), ("Tasks", "TASKS", "checklist"),
+        ("Jobs", "JOBS", "square.stack.3d.forward.dottedline"),
         ("Memory", "MEMORY", "square.stack.3d.up"), ("Connections", "LINKS", "point.3.connected.trianglepath.dotted"),
         ("Capabilities", "TOOLS", "square.grid.2x2"), ("Settings", "SETUP", "slider.horizontal.3")
     ]
@@ -26,6 +27,7 @@ struct ContentView: View {
                         switch model.tab {
                         case "Memory": MemoryView(model: model)
                         case "Tasks": TasksView(model: model)
+                        case "Jobs": JobsView(jobs: model.jobs, approvals: model.approvalQueue)
                         case "Connections": ConnectionsView(model: model)
                         case "Settings": SettingsView(model: model)
                         case "Capabilities": CapabilitiesView(model: model)
@@ -241,7 +243,7 @@ struct ContentView: View {
                     if !model.liveText.isEmpty || [.thinking, .searching, .working, .responding, .awaitingApproval].contains(model.phase) {
                         LiveReply(text: model.liveText, step: model.currentStep ?? model.phase.rawValue).id("live")
                     }
-                    ForEach(model.approvals) { request in ApprovalCard(model: model, request: request).id(request.id) }
+                    ApprovalQueueList(queue: model.approvalQueue)
                     if setupShowing { SetupPanel(model: model) }
                     Color.clear.frame(height: 1).id("bottom")
                 }
@@ -252,7 +254,10 @@ struct ContentView: View {
             // Follow new text only while already at the bottom, so reading back isn't yanked away.
             .onChange(of: model.messages.count) { if atBottom { withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo("bottom", anchor: .bottom) } } }
             .onChange(of: model.liveText) { if atBottom { proxy.scrollTo("bottom", anchor: .bottom) } }
-            .onChange(of: model.approvals.count) { withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo("bottom", anchor: .bottom) } }
+            // A new card always comes into view: it's waiting on an answer.
+            .onReceive(model.approvalQueue.$items.map(\.count).removeDuplicates()) { _ in
+                withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo("bottom", anchor: .bottom) }
+            }
             .overlay(alignment: .bottomTrailing) {
                 if !atBottom {
                     Button { withAnimation(.easeOut(duration: 0.3)) { proxy.scrollTo("bottom", anchor: .bottom) } } label: {
@@ -334,6 +339,10 @@ struct ContentView: View {
             }
             .padding(16)
             rule
+            if let plan = model.plan, !plan.entries.isEmpty {
+                PlanView(plan: plan).padding(16)
+                rule
+            }
             VStack(alignment: .leading, spacing: 12) {
                 readout("LINK", model.agentLink.isReady ? (model.agentDetail ?? model.linkLabel) : linkText.capitalized, color: model.agentLink.isReady ? HUD.ice : linkColor)
                 readout("REPLY", replyText)
@@ -342,6 +351,7 @@ struct ContentView: View {
                 readout("FOLDER", model.selectedFolder?.lastPathComponent ?? "None") { model.chooseFolder() }
                 readout("MEMORY", "\(model.memories.count) saved") { model.tab = "Memory" }
                 readout("TASKS", "\(model.tasks.filter { $0.status != "done" }.count) open") { model.tab = "Tasks" }
+                JobsReadout(jobs: model.jobs) { model.tab = "Jobs" }
                 readout("CHROME", model.chromeConnected ? "Connected" : "Not linked", color: model.chromeConnected ? HUD.ice : HUD.steel) { model.tab = "Connections" }
             }
             .padding(16)

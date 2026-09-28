@@ -207,39 +207,3 @@ struct SetupPanel: View {
     }
 }
 
-/// A step the agent won't take without a yes: sending, deleting, running something risky.
-struct ApprovalCard: View {
-    @ObservedObject var model: AppModel
-    let request: AgentApproval
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: "hand.raised.fill").foregroundStyle(HUD.amber)
-                Text("NEEDS YOUR OK").font(HUD.label(9)).tracking(1.6).foregroundStyle(HUD.amber)
-            }
-            Text(request.title).font(.system(size: 15, weight: .semibold)).foregroundStyle(HUD.ice)
-            if let detail = request.detail, !detail.isEmpty {
-                Text(detail).font(looksLikeCode ? .system(size: 12, design: .monospaced) : .system(size: 14))
-                    .foregroundStyle(HUD.ice.opacity(0.92)).textSelection(.enabled).lineLimit(14)
-                    .padding(12).frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Rectangle().fill(HUD.void.opacity(0.6)))
-            }
-            HStack(spacing: 10) {
-                Button("Cancel") { model.answer(request, allow: false) }.buttonStyle(HUDButtonStyle(kind: .ghost))
-                Button(verb) { model.answer(request, allow: true) }.buttonStyle(HUDButtonStyle(kind: .critical))
-            }
-        }
-        .padding(16)
-        .frame(maxWidth: 560, alignment: .leading)
-        .hudPanel(tint: HUD.amber)
-    }
-    /// The button says what will happen: Send, Delete, Run… or Allow.
-    private var verb: String {
-        let first = request.title.split(separator: " ").first.map(String.init) ?? ""
-        return ["Send", "Delete", "Create", "Change", "Run", "Move", "Post", "Update", "Open", "Edit"].contains(first) ? first : "Allow"
-    }
-    private var looksLikeCode: Bool {
-        guard let detail = request.detail else { return false }
-        return detail.hasPrefix("/") || detail.contains("$ ") || detail.contains(" --") || detail.contains("\n\n")
-    }
-}

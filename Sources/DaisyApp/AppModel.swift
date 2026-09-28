@@ -75,8 +75,14 @@ struct ConversationItem: Identifiable {
     @Published var appVisible = true
     /// Where the agent stands: starting, ready, waiting on setup, or offline.
     @Published var agentLink: AgentLink = .starting
-    /// Decisions the agent is waiting on during this turn.
-    @Published var approvals: [AgentApproval] = []
+    /// Approval cards waiting on the user, from the conversation and from background jobs.
+    lazy var approvalQueue: ApprovalQueue = makeApprovalQueue()
+    /// Background jobs, each in a Hermes session of its own.
+    lazy var jobs: JobsModel = makeJobs()
+    /// The agent's plan for the current (or last) turn, when it keeps one.
+    @Published var plan: AgentPlan?
+    /// Job news that came in mid-turn, said once Daisy is free.
+    private var pendingAnnouncements: [String] = []
     /// The listening mode to return to when always-listening is switched off.
     private var quietMode: ListeningMode = .handsFree
     private lazy var backend: AgentBackend = makeBackend()
@@ -270,10 +276,53 @@ struct ConversationItem: Identifiable {
 
     /// Answers a pending approval from its card. Sends and deletes only ever get "once".
     func answer(_ request: AgentApproval, allow: Bool) {
-        let option = allow ? (request.options.first { $0.kind == .allowOnce } ?? request.options.first { $0.allows })
-                           : request.options.first { $0.kind == .rejectOnce }
-        let backend = self.backend
-        Task { await backend.resolve(approval: request.id, optionID: option?.id) }
+        approvalQueue.answer(request.id, allow: allow)
+    }
+
+    private func makeApprovalQueue() -> ApprovalQueue {
+        let queue = ApprovalQueue { [weak self] id, option in
+            guard let self else { return }
+            await self.backend.resolve(approval: id, optionID: option)
+        }
+        queue.onDecision = { [weak self] item, outcome in
+            guard let self, item.source == .conversation else { return }
+            switch outcome {
+            case .allowed: self.decisions.append("Approved: " + item.approval.title)
+            case .declined, .overflow: self.decisions.append("Declined: " + item.approval.title)
+            case .expired: self.decisions.append("No answer, so declined: " + item.approval.title)
+            case .withdrawn: break
+            }
+        }
+        queue.onPark = { [weak self] line in self?.park(line) }
+        return queue
+    }
+
+    private func makeJobs() -> JobsModel {
+        let jobs = JobsModel(backend: backend as? JobBackend, approvals: approvalQueue)
+        jobs.onAnnouncement = { [weak self] note in self?.announce(note) }
+        return jobs
+    }
+
+    /// Job news goes in the transcript, and is said out loud once Daisy isn't busy.
+    private func announce(_ note: JobAnnouncement) {
+        messages.append(ConversationItem(role: "assistant", text: note.text, detail: "Background job · " + note.job.name))
+        guard config.speakResponses else { return }
+        if phase == .idle { readAloud(note.text) } else { pendingAnnouncements.append(note.text) }
+    }
+
+    /// A card from a voice turn has waited a few seconds: say so, and stop holding the voice for
+    /// it. The turn keeps waiting until the card is answered or times out; a new request cancels
+    /// it, which counts as no.
+    private func park(_ line: String) {
+        guard voiceTurn else { return }
+        voiceTurn = false
+        endVoice()
+        let token = generation
+        Task {
+            try? await audio.speak(line, voice: config.naturalVoice ?? "bm_george", speed: config.speechRate ?? 1) { }
+            guard generation == token, phase == .awaitingApproval else { return }
+            if listeningMode == .wakeWord { armStandby() }
+        }
     }
 
     var linkLabel: String {
@@ -285,6 +334,17 @@ struct ConversationItem: Identifiable {
         let text = composer.text.trimmingCharacters(in: .whitespacesAndNewlines)
         let files = composer.attachments
         guard !text.isEmpty || !files.isEmpty else { return }
+        if text.hasPrefix("/job ") {
+            // Runs in the background, in a session of its own; the conversation carries on.
+            guard files.isEmpty else { notice = "Background jobs don't take attachments yet."; return }
+            guard let job = jobs.start(String(text.dropFirst(5))) else {
+                notice = usesHermes ? "That job couldn't start." : "Background jobs need Hermes. Switch the brain in Setup."
+                return
+            }
+            composer.text = ""; composerExpanded = false
+            messages.append(ConversationItem(role: "assistant", text: "Started in the background: " + job.goal, detail: "Background job"))
+            return
+        }
         // Hermes gets up to 100 KB; the on-device model's small context keeps it at 4,000 bytes.
         if usesHermes {
             guard text.utf8.count <= HermesBackend.maxRequestBytes else { notice = "Please keep each message under 100 KB."; return }
@@ -356,7 +416,7 @@ struct ConversationItem: Identifiable {
         messages.append(ConversationItem(role: "user", text: text, attachments: attachments.map(\.name)))
         if messages.count > 100 { messages.removeFirst(messages.count - 100) }
         phase = .thinking
-        activity = []; liveText = ""; approvals = []; decisions = []; feed = SpeechFeed()
+        activity = []; liveText = ""; approvalQueue.withdraw(from: .conversation); decisions = []; plan = nil; feed = SpeechFeed()
         let started = Date()
         let backend = self.backend
         let direct = text.hasPrefix("/find ")
@@ -372,9 +432,13 @@ struct ConversationItem: Identifiable {
                     let receipt = try await session.execute(.init(name: "search_files", arguments: ["query": .string(String(text.dropFirst(6)))]))
                     receipts = [receipt]; liveText = receipt.output.summary
                 } else {
-                    for try await event in backend.send(AgentPrompt(text: text, attachments: attachments)) {
+                    for try await update in backend.stream(AgentPrompt(text: text, attachments: attachments)) {
                         try Task.checkCancellation()
                         guard generation == token else { return }
+                        guard case .event(let event) = update else {
+                            if case .plan(let next) = update { plan = next }
+                            continue
+                        }
                         switch event {
                         case .text(let delta):
                             if firstText == nil { firstText = Date().timeIntervalSince(started) }
@@ -384,13 +448,10 @@ struct ConversationItem: Identifiable {
                         case .tool(let tool):
                             track(tool)
                         case .approval(let request):
-                            approvals.append(request); phase = .awaitingApproval
+                            approvalQueue.add(request, from: .conversation, voice: voiceTurn); phase = .awaitingApproval
                         case .approvalResolved(let id, let allowed):
-                            if let request = approvals.first(where: { $0.id == id }) {
-                                decisions.append((allowed ? "Approved: " : "Declined: ") + request.title)
-                            }
-                            approvals.removeAll { $0.id == id }
-                            if phase == .awaitingApproval { phase = approvals.isEmpty ? .working : .awaitingApproval }
+                            approvalQueue.settled(id, allowed: allowed)
+                            if phase == .awaitingApproval { phase = approvalQueue.items(from: .conversation).isEmpty ? .working : .awaitingApproval }
                         case .receipts(let more):
                             receipts += more
                         case .finished:
@@ -402,7 +463,7 @@ struct ConversationItem: Identifiable {
                 guard generation == token else { return }
                 let report = receipts.compactMap(\.output.files).last
                 if let report { recentSearch = report }
-                currentStep = nil; settleActivity(.done); approvals = []
+                currentStep = nil; settleActivity(.done); approvalQueue.withdraw(from: .conversation)
                 let answer = liveText.trimmingCharacters(in: .whitespacesAndNewlines)
                 let total = Date().timeIntervalSince(started)
                 lastReply = ReplyTiming(firstText: firstText, total: total)
@@ -425,7 +486,7 @@ struct ConversationItem: Identifiable {
                 case .offline(let reason): agentLink = .offline(reason); connected = false
                 default: if error is URLError { connected = false }
                 }
-                currentStep = nil; settleActivity(.failed); approvals = []
+                currentStep = nil; settleActivity(.failed); approvalQueue.withdraw(from: .conversation)
                 if !liveText.isEmpty {
                     messages.append(ConversationItem(role: "assistant", text: liveText, detail: "Cut off", decisions: decisions))
                     liveText = ""
@@ -527,15 +588,17 @@ struct ConversationItem: Identifiable {
             if !busy { audio.stopEngine() }
         }
     }
+    /// Standby can be armed while idle, or while a turn waits on a card after `park`.
+    private var canStandBy: Bool { !busy || phase == .awaitingApproval }
     private func armStandby() {
-        guard listeningMode == .wakeWord, !busy, !standby else { return }
+        guard listeningMode == .wakeWord, canStandBy, !standby else { return }
         standbyWork?.cancel()
         standbyWork = Task { [weak self] in
             guard let self else { return }
             guard await self.audio.requestMicrophone() else {
                 self.notice = "Allow Daisy in System Settings → Privacy & Security → Microphone to use the wake word."; return
             }
-            guard !Task.isCancelled, self.listeningMode == .wakeWord, !self.busy else { return }
+            guard !Task.isCancelled, self.listeningMode == .wakeWord, self.canStandBy else { return }
             do { try self.audio.startEngine() } catch { self.notice = error.localizedDescription; return }
             self.endpointer = SpeechEndpointer(settings: .standby)
             self.standby = true
@@ -564,7 +627,7 @@ struct ConversationItem: Identifiable {
         case .speaking:
             guard listeningMode != .manual, audio.echoCancellation else { return }
             if bargeEndpointer.observe(power: power, duration: duration) == .speechStarted { bargeIn() }
-        case .idle:
+        case .idle, .awaitingApproval:
             guard standby else { return }
             switch endpointer.observe(power: power, duration: duration) {
             case .speechStarted: audio.beginCapture(preRoll: 1.0)
@@ -657,6 +720,8 @@ struct ConversationItem: Identifiable {
         phase = .idle; currentStep = nil
         let again = voiceTurn && listeningMode != .manual
         voiceTurn = false
+        // Job news that came in during the turn goes first; the follow-up can wait.
+        if !pendingAnnouncements.isEmpty { readAloud(pendingAnnouncements.joined(separator: " ")); pendingAnnouncements = []; return }
         if again { beginListening(purpose: .followUp) } else { rest() }
     }
     /// Back to whatever idle means for the current mode: standby with the mic open, or mic off.
@@ -705,7 +770,7 @@ struct ConversationItem: Identifiable {
         }
         generation = UUID(); work?.cancel(); work = nil
         standbyWork?.cancel(); standbyWork = nil
-        endVoice(); approvals = []
+        endVoice(); approvalQueue.withdraw(from: .conversation)
         // Whatever was already written stays in the transcript, marked as cut off.
         if !liveText.isEmpty {
             messages.append(ConversationItem(role: "assistant", text: liveText, detail: "Stopped", decisions: decisions))
@@ -722,7 +787,7 @@ struct ConversationItem: Identifiable {
         rest()
     }
     func clearConversation() {
-        stop(clearNotice: true); messages = []; recentSearch = nil; reviewResults = [:]; expiredReviews = []; activity = []
+        stop(clearNotice: true); messages = []; recentSearch = nil; reviewResults = [:]; expiredReviews = []; activity = []; plan = nil
         let backend = self.backend
         Task { await backend.newSession() }
         rest()
@@ -860,7 +925,9 @@ struct ConversationItem: Identifiable {
                 let old = backend
                 Task { await old.shutdown() }
                 backend = makeBackend(); backendSignature = signature
-                messages = []; activity = []
+                messages = []; activity = []; plan = nil
+                approvalQueue.withdrawAll()
+                jobs.use(backend as? JobBackend)
             }
             connected = false; connectWhenAllowed()
             if config.speakResponses { Task { await speechWorker.warmUp() } }
@@ -874,6 +941,9 @@ struct ConversationItem: Identifiable {
         browserWork?.cancel(); await chrome.disconnect()
         await speechWorker.stop()
         await speech.shutdown()
+        // Jobs first, so their sessions lose the job mark before Hermes goes.
+        await jobs.shutdown()
+        approvalQueue.withdrawAll()
         await backend.shutdown()
     }
 }

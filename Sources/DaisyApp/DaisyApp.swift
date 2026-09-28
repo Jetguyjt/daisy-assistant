@@ -35,7 +35,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 Button("Choose search folder…") { model.chooseFolder() }.keyboardShortcut("o", modifiers: [.command, .shift])
             }
             CommandGroup(before: .sidebar) {
-                ForEach(Array(["Assistant", "Tasks", "Memory", "Connections", "Capabilities", "Settings"].enumerated()), id: \.offset) { index, tab in
+                ForEach(Array(["Assistant", "Tasks", "Jobs", "Memory", "Connections", "Capabilities", "Settings"].enumerated()), id: \.offset) { index, tab in
                     Button(tab == "Connections" ? "Links" : tab == "Capabilities" ? "Tools" : tab) { model.tab = tab }
                         .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: .command)
                 }

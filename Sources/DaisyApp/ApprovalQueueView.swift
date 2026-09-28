@@ -35,10 +35,19 @@ struct QueuedApprovalCard: View {
             }
             Text(item.approval.title).font(.system(size: 15, weight: .semibold)).foregroundStyle(HUD.ice)
             if let detail = item.approval.detail, !detail.isEmpty {
-                Text(detail).font(looksLikeCode(detail) ? .system(size: 12, design: .monospaced) : .system(size: 14))
-                    .foregroundStyle(HUD.ice.opacity(0.92)).textSelection(.enabled).lineLimit(14)
+                // Never cut short: the card is the only place the user sees everything that will run.
+                // Long ones scroll instead.
+                let text = Text(detail).font(looksLikeCode(detail) ? .system(size: 12, design: .monospaced) : .system(size: 14))
+                    .foregroundStyle(HUD.ice.opacity(0.92)).textSelection(.enabled)
                     .padding(12).frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Rectangle().fill(HUD.void.opacity(0.6)))
+                Group {
+                    if detail.count > 1_200 || detail.split(separator: "\n", omittingEmptySubsequences: false).count > 14 {
+                        ScrollView { text }.frame(height: 280)
+                    } else {
+                        text
+                    }
+                }
+                .background(Rectangle().fill(HUD.void.opacity(0.6)))
             }
             HStack(spacing: 10) {
                 Button("Cancel") { queue.answer(item.id, allow: false) }.buttonStyle(HUDButtonStyle(kind: .ghost))
