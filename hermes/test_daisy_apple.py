@@ -642,6 +642,8 @@ if os.access(REAL_OSASCRIPT, os.X_OK):
     added = result("notes_append", {"id": key("p101"), "title": "college  essays", "folder": "SCHOOL", "text": "Draft 2"})
     check("stand-in: append adds to the end of the body, title matched the way a person reads it",
           lambda: added["status"] == "added" and STATE["notes"][key("p101")]["body"] == before_body + "<div>Draft 2</div>")
+    check("stand-in: invisible characters in the title don't count either", lambda: result("notes_append", {
+        "id": key("p101"), "title": "College" + chr(0x200B) + " Ess" + chr(0xAD) + "ays", "text": "Draft 3"})["status"] == "added")
     for args, expected in [
         ({"id": key("p101"), "title": "Physics", "text": "x"}, "is called “College Essays” now"),
         ({"id": key("p101"), "title": "College Essays", "folder": "Family", "text": "x"}, "is in “School”, not “Family”"),

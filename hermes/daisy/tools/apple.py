@@ -20,8 +20,9 @@ Notes go straight to Notes' own scripting (JavaScript for Automation through osa
   the body would drop the attachments.
 
 check() hides Reminders until remindctl is installed, and Notes wherever osascript or Notes.app is missing.
-A write only does what its card showed: run() refuses a call that no card showed in the last few minutes,
-or one whose plan changed after the card (a list, file or contact that changed in between).
+A write only does what its card showed: run() refuses a call that no card showed in the last few minutes, or
+one that would now do something else ("tomorrow" after midnight; for texts, a nickname, contact or file that
+changed after the card).
 """
 
 from __future__ import annotations
@@ -588,9 +589,13 @@ def complete_run(args: Dict[str, Any]) -> Dict[str, Any]:
 NOTES_SCRIPT = r"""function run(argv) {
   var Notes = Application('Notes');
   var DELETED = 'recently deleted';
+  // Invisible and direction-changing characters, the same ones apple.py's _HIDDEN ignores in names.
+  var HIDDEN = new RegExp('[' + [0xAD, 0x200B, 0x200E, 0x200F, 0x202A, 0x202B, 0x202C, 0x202D, 0x202E, 0x2060, 0x2061,
+    0x2062, 0x2063, 0x2064, 0x2066, 0x2067, 0x2068, 0x2069, 0xFEFF].map(function (code) {
+      return String.fromCharCode(code); }).join('') + ']', 'g');
   function norm(value) {
     return String(value === undefined || value === null ? '' : value).normalize('NFKC')
-      .replace(/[­​‎‏‪-‮⁠-⁤⁦-⁩﻿]/g, '')
+      .replace(HIDDEN, '')
       .replace(/\s+/g, ' ').trim().toLowerCase();
   }
   function safe(get, fallback) { try { return get(); } catch (error) { return fallback; } }

@@ -64,8 +64,9 @@ COUNTS = {2: "Two", 3: "Three", 4: "Four", 5: "Five", 6: "Six", 7: "Seven", 8: "
 MOBILE = ("mobile", "iphone", "cell", "cell phone")
 
 _PHONE = re.compile(r"^\+?[0-9(][0-9 ().\-]{3,38}$")  # what imsg itself takes as a number, not a name
-_DASHES = re.compile("[‐-―−﹣－]")
-_SPACES = re.compile("[   ]")
+# Typographic dashes and spaces that turn up in numbers copied into Contacts.
+_DASHES = re.compile("[%s]" % "".join(map(chr, (*range(0x2010, 0x2016), 0x2212, 0xFE63, 0xFF0D))))
+_SPACES = re.compile("[%s]" % "".join(map(chr, (0xA0, 0x2007, 0x202F))))
 
 runner: Callable[..., Any] = apple.run_process  # the tests swap in a stand-in
 

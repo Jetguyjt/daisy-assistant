@@ -99,6 +99,6 @@ What macOS will ask for, and what it will say. Daisy.app starts hermes-acp and t
 | Reminders, full access | the first Reminders call | “Daisy” would like full access to your Reminders. | Privacy & Security → Reminders → Daisy |
 | Contacts | the first name that isn't a saved nickname | “Daisy” would like to access your contacts. | Privacy & Security → Contacts → Daisy |
 | Files and Folders | sending a file from Desktop, Documents or Downloads | “Daisy” would like to access files in your Documents folder. | Privacy & Security → Files and Folders → Daisy |
-| Full Disk Access | never asked; only attachments need it | — | Privacy & Security → Full Disk Access. Not recommended: it opens every file on the Mac to Daisy's agent |
+| Full Disk Access | never asked; only attachments need it | none | Privacy & Security → Full Disk Access. Not recommended: it opens every file on the Mac to Daisy's agent |
 
 Messages also has to be signed in to iMessage on the Mac, and SMS needs an iPhone with Text Message Forwarding turned on for this Mac. The first text can wait up to two and a half minutes (imsg's own limit) while the Automation prompt is up; after a denial, each tool says which setting to turn on.

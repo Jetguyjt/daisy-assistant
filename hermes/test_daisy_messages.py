@@ -95,7 +95,7 @@ GRANDMA = {"name": "Grandma Doe", "match": "exact", "phones": [{"label": "mobile
 COACH = {"name": "Coach Example", "match": "exact", "phones": [], "emails": [{"label": "work", "address": "coach@example.com"}]}
 SAM = {"name": "Sam Example", "match": "exact", "phones": [], "emails": []}
 PAT = {"name": "Pat Sample", "match": "exact", "phones": [{"label": "work", "number": "+1 555 0170 ext. 2"}], "emails": []}
-DASHES = {"name": "Dana Sample", "match": "exact", "phones": [{"label": "mobile", "number": "+1 555‑0180"}], "emails": []}
+DASHES = {"name": "Dana Sample", "match": "exact", "phones": [{"label": "mobile", "number": "+1" + chr(0xA0) + "555" + chr(0x2011) + "0180"}], "emails": []}
 TWINS = [dict(ROBERT, name="Alex Doe"), dict(ROBERT, name="Alex Doe", phones=[{"label": "mobile", "number": "+1 555 0190"}])]
 PEOPLE = {"robert doe": [ROBERT], "rob": [ROBERT_PARTIAL, ROBIN], "robin": [ROBIN], "mom": [JANE], "grandma": [GRANDMA],
           "coach": [COACH], "sam": [SAM], "pat": [PAT], "dana": [DASHES], "alex doe": TWINS,
@@ -300,17 +300,18 @@ check("an unknown service is refused", lambda: refused({"to": "Dad", "text": "hi
       "service has to be one of: auto, imessage, sms")
 
 # The message, never shortened, line breaks and all.
-long_text = "Line one\n\nLine three says “hi” & 'bye' 😀 👨‍👩‍👧\n" + "x" * 5000 + " END"
+FAMILY = chr(0x200D).join((chr(0x1F468), chr(0x1F469), chr(0x1F467)))  # one emoji, held together by zero-width joiners
+long_text = "Line one\n\nLine three says “hi” & 'bye' 😀 " + FAMILY + "\n" + "x" * 5000 + " END"
 check("the whole message is on the card, every line", lambda: card({"to": "Dad", "text": long_text}).endswith(
     "Message (4 lines):\n" + long_text))
 check("leading and trailing blank lines are trimmed off what's sent and shown",
       lambda: card({"to": "Dad", "text": "\n\n  hi there \n\n"}).endswith("Message:\nhi there"))
 check("Windows line breaks count as line breaks", lambda: card({"to": "Dad", "text": "a\r\nb"}).endswith("Message (2 lines):\na\nb"))
 check("invisible or reordering characters are shown, not hidden",
-      lambda: card({"to": "Dad", "text": "pay ‮me​ back"}).endswith("Message:\npay [U+202E]me[U+200B] back"))
+      lambda: card({"to": "Dad", "text": "pay " + chr(0x202E) + "me" + chr(0x200B) + " back"}).endswith("Message:\npay [U+202E]me[U+200B] back"))
 check("control characters are refused", lambda: refused({"to": "Dad", "text": "ring \x07"}) == "text can't contain control characters")
 check("a line break in to is refused", lambda: "control characters" in refused({"to": "Dad\n+1 555 0199", "text": "hi"}))
-check("an invisible character in to is refused", lambda: "invisible" in refused({"to": "D​ad", "text": "hi"}))
+check("an invisible character in to is refused", lambda: "invisible" in refused({"to": "D" + chr(0x200B) + "ad", "text": "hi"}))
 check("nothing to send is refused", lambda: refused({"to": "Dad", "text": "  "}) ==
       "There's nothing to send: give text, an attachment, or both.")
 check("an argument the tool doesn't take is refused, not ignored", lambda: refused({"to": "Dad", "text": "hi", "file": "/x"}) ==
