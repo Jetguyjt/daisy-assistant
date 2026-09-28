@@ -141,6 +141,29 @@ Reuse Hermes and fix the joins, rather than rebuilding the Google layers.
 5. Budget and usage polling.
 6. Server move, only if 24/7 matters.
 
+## What's built
+
+The always-on layer, 2026-09-28. Tests only; none of it has run live yet.
+
+- **Gateway as a LaunchAgent.** `scripts/hermes.d/60-gateway.sh`, off unless `DAISY_GATEWAY=1`. It runs Hermes's own `hermes gateway install`, which writes `~/Library/LaunchAgents/ai.hermes.gateway.plist` (RunAtLoad, KeepAlive, `HERMES_HOME` set, logs in `~/.hermes/logs/gateway.log`) and loads it. `DAISY_GATEWAY=0` runs `hermes gateway uninstall`. With no messaging platform set up, the gateway stays up just for cron.
+- **The guard is in it.** Gateway startup and every agent Hermes builds call `discover_plugins()`, which loads `$HERMES_HOME/plugins/daisy`, and each cron run's tool calls carry `task_id` `cron:<job>:<run>` with `HERMES_CRON_SESSION` set, so the guard's cron role applies: reads only, plus `cron-allow.json`. `hermes/test_daisy_alwayson.py` runs the templates' commands through it. Two catches:
+  - `HERMES_SAFE_MODE=1` skips all plugins, the guard included.
+  - Kanban workers run as `hermes -p <profile>` with that profile's own plugins. My three profiles don't have the Daisy plugin, so a task assigned to one runs unguarded until it's installed there.
+- **Two cron jobs**, from `hermes/cron/*.md`, added by `scripts/hermes.d/62-cron.sh` only with `DAISY_CRON=1`. Output goes to `~/.hermes/cron/output/` and nowhere else.
+  - Inbox triage, 5:30: one `google_api.py gmail search` for unread mail from the last day, sorted into needs a reply / FYI / can wait, one line per email, no bodies. Signed out of Google, it's one line.
+  - Repo digest, 7:00: for the folders in `~/.hermes/daisy/repo-digest.txt` (empty to start). A pre-run script lists them and hands the agent one read-only git command, so it's two model calls however many repos there are, and none with an empty list. Commit messages stay out of the prompt on purpose: Hermes's injection scan blocks a whole run if one says "ignore all previous instructions".
+- **JOBS tab** shows the latest runs (summary, whole answer when opened), the jobs with their next run, and the Kanban board, read straight from the files and `kanban.db` opened read-only. `hermes kanban list` isn't used because it creates and updates the board.
+- **Open at login** with `SMAppService.mainApp`, a switch in Setup, off to start.
+- **Click to talk on battery**, on by default: on battery the wake word's open mic closes (that's what keeps the Mac awake), and it opens again on the charger. IOKit's power-source notification, no polling.
+- **Budget.**
+  - `61-budget.sh` (with the gateway) sets `delegation.model` to the newest "mini" model Hermes lists for the provider (`gpt-5.4-mini` in Hermes's built-in Codex list; the live list decides). It picks nothing if the default is already a mini or none is listed.
+  - The cron jobs are pinned to the same model with low reasoning effort, which also keeps Hermes's drift check from blocking them when I change the default model.
+  - Usage: Hermes has no CLI or ACP call for the windows, only `/usage` in its own chat and `agent/account_usage.py`. Daisy runs Hermes's Python with a few lines that call `fetch_account_usage` and print the 5-hour and weekly windows, every ten minutes once Hermes is connected. New background jobs wait at 80% of either window, with "Run them anyway".
+- **Fallback provider**, still my call, not set. `hermes fallback add` (picker), `hermes fallback list`, `hermes fallback remove`. Another model on the same ChatGPT plan doesn't help once its limit is hit. What would:
+  - an OpenRouter or other API key (pay per use)
+  - Nous Portal (`hermes auth add nous`)
+  - a local model as a `custom` provider (Daisy's Ollama at `http://127.0.0.1:11435/v1`, but only while Daisy's local backend has it running)
+
 ## Sources
 
 - **Hermes code** (`~/.hermes/hermes-agent`): `acp_adapter/{server,session,permissions,events}.py`, `run_agent.py:1297`, `tools/async_delegation.py`, `tools/delegate_tool*.py`, `tools/approval.py`, `tools/computer_use/tool.py`, `toolsets.py`
