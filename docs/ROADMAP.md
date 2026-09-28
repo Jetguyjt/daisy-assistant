@@ -56,10 +56,14 @@ Notes: [orchestrator.md](research/orchestrator.md)
 ## Chrome and Mac control
 
 - [ ] Plugin tools `chrome_tabs` / `chrome_focus` / `chrome_open` over AppleScript, registered into `hermes-acp`
+  - built and tested with fakes (`hermes/test_daisy_chrome.py`; the tab script runs in jsc against a pretend Chrome). Not run against Chrome yet; the Automation prompt hasn't been seen
 - [ ] `daisy-chrome` skill: reuse an open tab before opening a new one ("check my email" → Gmail tab)
+  - `hermes/skills/daisy-chrome`, installed by `scripts/hermes.d/30-chrome.sh`; "check my email" is one `chrome_open(..., reuse=true)` so it never stops at a card
 - [ ] `computer_use` into ACP sessions through a plugin tool (keeps Hermes's hard-blocks); check how its approvals behave over ACP
 - [ ] Try `chrome-devtools-mcp --autoConnect` in `mcp_servers` and count the Chrome consent prompts
-- [ ] Auto-connect the old Chrome adapter at launch for the local fallback, or retire it
+  - `scripts/hermes.d/31-chrome-devtools.sh` adds it only with `DAISY_CHROME_DEVTOOLS=1`; not tried
+- [x] Auto-connect the old Chrome adapter at launch for the local fallback, or retire it
+  - retired 2026-09-28 (mac-control.md, Decision): the Connections page now explains Chrome through Hermes; build and 160 tests pass without it
 - [ ] Brave Search key for `web_search` if the free endpoints rate-limit
 - [ ] Only if AppleScript falls short: MV3 extension + native messaging
 
