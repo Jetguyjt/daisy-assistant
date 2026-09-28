@@ -100,6 +100,48 @@ import Foundation
         } catch { fail("testLexicalMissKeepsSavedPreferenceAvailable: \(error)") }
         do {
             let before = TestLog.failures
+            let suite = ChildProcessTests()
+            try await suite.testWatchdogStopsTheWholeGroupWhenTheLifelineCloses()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testWatchdogStopsTheWholeGroupWhenTheLifelineCloses")
+        } catch { fail("testWatchdogStopsTheWholeGroupWhenTheLifelineCloses: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = ChildProcessTests()
+            try await suite.testWatchdogStopsTheChildWhenItsOwnerIsKilled()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testWatchdogStopsTheChildWhenItsOwnerIsKilled")
+        } catch { fail("testWatchdogStopsTheChildWhenItsOwnerIsKilled: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = ChildProcessTests()
+            try await suite.testLaunchRecordsTheChildAndForgetsItWhenItExits()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testLaunchRecordsTheChildAndForgetsItWhenItExits")
+        } catch { fail("testLaunchRecordsTheChildAndForgetsItWhenItExits: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = ChildProcessTests()
+            try await suite.testSweepStopsRecordedChildrenOfAGoneOwnerOnly()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testSweepStopsRecordedChildrenOfAGoneOwnerOnly")
+        } catch { fail("testSweepStopsRecordedChildrenOfAGoneOwnerOnly: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = ChildProcessTests()
+            try await suite.testSweepStopsOrphansThatMatchASignatureOnly()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testSweepStopsOrphansThatMatchASignatureOnly")
+        } catch { fail("testSweepStopsOrphansThatMatchASignatureOnly: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = ChildProcessTests()
+            suite.testDaisySignaturesMatchWhatDaisyStartsAndNothingElse()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testDaisySignaturesMatchWhatDaisyStartsAndNothingElse")
+        }
+        do {
+            let before = TestLog.failures
             let suite = CoreTests()
             try suite.setUpWithError(); defer { try? suite.tearDownWithError() }
             try await suite.testMemoryPersistsAndCorrectionReplacesFact()
@@ -519,6 +561,125 @@ import Foundation
         } catch { fail("testFailedMoveKeepsUsingTheOldFolder: \(error)") }
         do {
             let before = TestLog.failures
+            let suite = SileroTests()
+            try suite.testONNXTensorsReadsRawAndPackedFloatInitializers()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testONNXTensorsReadsRawAndPackedFloatInitializers")
+        } catch { fail("testONNXTensorsReadsRawAndPackedFloatInitializers: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = SileroTests()
+            try suite.testSileroGivesTheSameAnswerForAnyChunking()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testSileroGivesTheSameAnswerForAnyChunking")
+        } catch { fail("testSileroGivesTheSameAnswerForAnyChunking: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = SileroTests()
+            try suite.testSileroMatchesOnnxRuntimeWhenTheModelIsInstalled()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testSileroMatchesOnnxRuntimeWhenTheModelIsInstalled")
+        } catch { fail("testSileroMatchesOnnxRuntimeWhenTheModelIsInstalled: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = SpeechInTests()
+            await suite.testWakeListenerWakesOnAPartialBeforeTheUtteranceEnds()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testWakeListenerWakesOnAPartialBeforeTheUtteranceEnds")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = SpeechInTests()
+            await suite.testWakeListenerIgnoresSpeechWithoutTheWakePhrase()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testWakeListenerIgnoresSpeechWithoutTheWakePhrase")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = SpeechInTests()
+            await suite.testWakeListenerWaitsForTheRequestAfterABareWakePhrase()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testWakeListenerWaitsForTheRequestAfterABareWakePhrase")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = SpeechInTests()
+            await suite.testWakeListenerGivesUpWhenNothingFollowsTheWakePhrase()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testWakeListenerGivesUpWhenNothingFollowsTheWakePhrase")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = SpeechInTests()
+            await suite.testWakeListenerWithWhisperWakesWhenTheUtteranceEnds()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testWakeListenerWithWhisperWakesWhenTheUtteranceEnds")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = SpeechInTests()
+            await suite.testWakeWordModelStartsTheRecognizerOnlyAfterTheWakeWord()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testWakeWordModelStartsTheRecognizerOnlyAfterTheWakeWord")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = SpeechInTests()
+            await suite.testWakeListenerUsesTheRecognizerWhileTheModelIsDown()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testWakeListenerUsesTheRecognizerWhileTheModelIsDown")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = SpeechInTests()
+            await suite.testWakeListenerResetDropsTheUtteranceInProgress()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testWakeListenerResetDropsTheUtteranceInProgress")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = SpeechInTests()
+            try await suite.testFallbackStreamHandsTheAudioToWhisperWhenAppleFails()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testFallbackStreamHandsTheAudioToWhisperWhenAppleFails")
+        } catch { fail("testFallbackStreamHandsTheAudioToWhisperWhenAppleFails: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = SpeechInTests()
+            try suite.testSpeechSettingsDefaultsAndStatusWording()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testSpeechSettingsDefaultsAndStatusWording")
+        } catch { fail("testSpeechSettingsDefaultsAndStatusWording: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = SpeechInTests()
+            try await suite.testAppleRecognizerTranscribesASayClip()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testAppleRecognizerTranscribesASayClip")
+        } catch { fail("testAppleRecognizerTranscribesASayClip: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = SpeechInTests()
+            try await suite.testAppleStreamingHearsTheWakePhraseBeforeTheEnd()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testAppleStreamingHearsTheWakePhraseBeforeTheEnd")
+        } catch { fail("testAppleStreamingHearsTheWakePhraseBeforeTheEnd: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = SpeechInTests()
+            try await suite.testWakeListenerWithAppleWakesMidSentence()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testWakeListenerWithAppleWakesMidSentence")
+        } catch { fail("testWakeListenerWithAppleWakesMidSentence: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = SpeechInTests()
+            try await suite.testWakeWordModelFirstStageEndToEnd()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testWakeWordModelFirstStageEndToEnd")
+        } catch { fail("testWakeWordModelFirstStageEndToEnd: \(error)") }
+        do {
+            let before = TestLog.failures
             let suite = SpeechNumbersTests()
             suite.testDecimalsAndWholeNumbers()
             count += 1
@@ -859,6 +1020,34 @@ import Foundation
             suite.testWakePhraseMatchingAndStripping()
             count += 1
             print("\(TestLog.failures == before ? "PASS" : "FAIL") testWakePhraseMatchingAndStripping")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = VoiceTests()
+            suite.testWakePhraseFindsTheRequestInPartialsAndNeedsWholeWords()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testWakePhraseFindsTheRequestInPartialsAndNeedsWholeWords")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = VoiceTests()
+            suite.testEndpointerFollowsVoiceActivityOverEnergy()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testEndpointerFollowsVoiceActivityOverEnergy")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = VoiceTests()
+            suite.testBargeInWithVoiceActivityStillNeedsToBeLouderThanTheEcho()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testBargeInWithVoiceActivityStillNeedsToBeLouderThanTheEcho")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = VoiceTests()
+            suite.testEndpointerCanContinueAnUtteranceUnderNewSettings()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testEndpointerCanContinueAnUtteranceUnderNewSettings")
         }
         do {
             let before = TestLog.failures

@@ -67,6 +67,65 @@ final class VoiceTests {
         expectEqual(WakePhrase.stripping("Hey Daisy"), "")
         expectEqual(WakePhrase.stripping("What time is it, Daisy?"), "What time is it, Daisy?")
     }
+    func testWakePhraseFindsTheRequestInPartialsAndNeedsWholeWords() {
+        // Apple's partials come punctuated and grow word by word.
+        expectEqual(WakePhrase.request(after: "Hey, Daisy"), "")
+        expectEqual(WakePhrase.request(after: "Hey, Daisy, what"), "what")
+        expectEqual(WakePhrase.request(after: "Hey, Daisy, what time is it?"), "what time is it?")
+        expectEqual(WakePhrase.request(after: "so, hey Daisy, turn it down"), "turn it down")
+        expectEqual(WakePhrase.request(after: "Okay Daisy’s timer"), "timer")
+        expectEqual(WakePhrase.request(after: "Hey, Dais"), nil)
+        expectEqual(WakePhrase.request(after: "What time is it, Daisy?"), nil)
+        // Substrings of other words used to count: "they, Daisy" and "hey days here".
+        expectFalse(WakePhrase.matches("they, Daisy, come here"))
+        expectFalse(WakePhrase.matches("hey days here we go"))
+        expectFalse(WakePhrase.matches("okay daisyfield"))
+        expectTrue(WakePhrase.phrases.contains("hey daisy"))
+    }
+    func testEndpointerFollowsVoiceActivityOverEnergy() {
+        // A loud clatter the detector doesn't call speech never starts an utterance...
+        var vad = SpeechEndpointer()
+        var events: [SpeechEndpointer.Event] = []
+        for _ in 0..<20 { events.append(vad.observe(power: -60, duration: 0.05, speech: 0.02)) }
+        for _ in 0..<20 { events.append(vad.observe(power: -20, duration: 0.05, speech: 0.05)) }
+        expectFalse(events.contains(.speechStarted))
+        // ...a quiet voice across the room does, below where energy would have fired.
+        for _ in 0..<6 { events.append(vad.observe(power: -54, duration: 0.05, speech: 0.9)) }
+        expectEqual(events.filter { $0 == .speechStarted }.count, 1)
+        // A dip between words (0.4, above the 0.35 release) keeps it going; real silence ends it.
+        expectFalse((0..<10).map { _ in vad.observe(power: -58, duration: 0.05, speech: 0.4) }.contains(.finished))
+        let tail = (0..<30).map { _ in vad.observe(power: -58, duration: 0.05, speech: 0.05) }
+        let finish = tail.firstIndex(of: .finished) ?? -1
+        expectTrue(finish >= 24 && finish <= 27)
+        // Without probabilities it's the energy endpointer, unchanged.
+        var energy = SpeechEndpointer()
+        expectTrue((0..<10).map { _ in energy.observe(power: -54, duration: 0.05) }.allSatisfy { $0 == .none })
+    }
+    func testBargeInWithVoiceActivityStillNeedsToBeLouderThanTheEcho() {
+        // Daisy's own echo is speech to the detector; only a voice over the echo level interrupts.
+        var barge = SpeechEndpointer(settings: .bargeIn)
+        var heard: [SpeechEndpointer.Event] = []
+        for _ in 0..<80 { heard.append(barge.observe(power: -30, duration: 0.05, speech: 0.95)) }
+        expectFalse(heard.contains(.speechStarted))
+        // Loud but not speech (a cough into the mic, a dropped cup) doesn't either.
+        expectFalse((0..<12).map { _ in barge.observe(power: -10, duration: 0.05, speech: 0.1) }.contains(.speechStarted))
+        expectTrue((0..<12).map { _ in barge.observe(power: -10, duration: 0.05, speech: 0.95) }.contains(.speechStarted))
+    }
+    func testEndpointerCanContinueAnUtteranceUnderNewSettings() {
+        var standby = SpeechEndpointer(settings: .standby)
+        for _ in 0..<20 { _ = standby.observe(power: -60, duration: 0.05) }
+        for _ in 0..<10 { _ = standby.observe(power: -25, duration: 0.05) }
+        expectTrue(standby.speaking)
+        // "Hey Daisy" was in it: the request keeps the utterance and floor but gets the longer pause.
+        var request = SpeechEndpointer(settings: .afterWake, continuing: standby)
+        expectTrue(request.spoke); expectEqual(request.noiseFloor, standby.noiseFloor)
+        expectFalse((0..<22).map { _ in request.observe(power: -60, duration: 0.05) }.contains(.finished))   // 1.1 s would end standby
+        expectTrue((0..<6).map { _ in request.observe(power: -60, duration: 0.05) }.contains(.finished))
+        // A finished utterance carries over only its floor.
+        var fresh = SpeechEndpointer(settings: .afterWake, continuing: request)
+        expectFalse(fresh.spoke)
+        expectTrue((0..<170).map { _ in fresh.observe(power: -60, duration: 0.05) }.contains(.timedOut))
+    }
     func testWAVFileWritesReadableSixteenKilohertzMono() async throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("daisy-\(UUID().uuidString).wav")
         defer { try? FileManager.default.removeItem(at: url) }

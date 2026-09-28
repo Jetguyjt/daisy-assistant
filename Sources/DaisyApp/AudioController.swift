@@ -7,7 +7,7 @@ import DaisyCore
 /// only cancels audio played through the same engine, so speech goes through a player node while
 /// the engine runs and falls back to AVAudioPlayer when it does not.
 @MainActor final class AudioController: ObservableObject {
-    struct Chunk: Sendable { let samples: [Int16]; let power: Float; let duration: TimeInterval }
+    typealias Chunk = AudioChunk
     @Published var level: Double = 0
     @Published var elapsed: TimeInterval = 0
     @Published private(set) var engineRunning = false
@@ -15,10 +15,23 @@ import DaisyCore
     private(set) var echoCancellation = false
     /// Power in dBFS and duration of each 16 kHz chunk, delivered on the main actor.
     var onChunk: ((Float, TimeInterval) -> Void)?
+    /// Each whole chunk (samples, power, Silero's speech probability), on the main actor. The wake
+    /// listener needs the samples; the endpointers need the probability.
+    var onAudio: ((Chunk) -> Void)?
     /// The engine stopped because a device changed; the owner decides whether to restart.
     var onEngineLost: (() -> Void)?
     /// Warm Kokoro process; nil means one process per sentence.
     var speechWorker: SpeechWorker?
+    /// Speech-in settings; Silero is loaded (or not) when the engine starts.
+    var speechInput = SpeechInputSettings()
+    /// True when Silero VAD runs on the input; false means the endpointers go by energy alone.
+    private(set) var voiceActivity = false
+    var voiceActivityStatus: String {
+        if voiceActivity { return "Silero voice activity detection" }
+        if !speechInput.usesVoiceActivity { return "Energy only (Silero turned off)" }
+        return FileManager.default.fileExists(atPath: SpeechAssets.sileroVAD.path)
+            ? "Energy only (the Silero model didn't load)" : "Energy only (run scripts/setup-speech.sh for Silero)"
+    }
 
     static let sampleRate = 16000.0
     private static let preRollSeconds: TimeInterval = 1.5
@@ -59,7 +72,10 @@ import DaisyCore
     func startEngine() throws {
         if let session, session.engine.isRunning { return }
         session?.stop(); session = nil
-        bridge.reset()
+        // A fresh detector per engine: its state follows one continuous stream of audio.
+        let vad = SileroVAD.installed(speechInput)
+        bridge.reset(vad: vad)
+        voiceActivity = vad != nil
         let bridge = self.bridge
         let started = try MicrophoneEngine.start(preferVoiceProcessing: true) { buffer in bridge.handle(buffer) }
         session = started
@@ -94,11 +110,13 @@ import DaisyCore
             level = Self.meter(chunk.power)
         }
         onChunk?(chunk.power, chunk.duration)
+        onAudio?(chunk)
     }
     /// Starts an utterance, seeded with up to `seconds` of audio already heard (the wake phrase
-    /// and whatever followed it). Returns those chunks' readings so the caller can feed its endpointer.
+    /// and whatever followed it). Returns those chunks so the caller can feed its endpointer their
+    /// power, duration and speech probability.
     @discardableResult
-    func beginCapture(preRoll seconds: TimeInterval) -> [(power: Float, duration: TimeInterval)] {
+    func beginCapture(preRoll seconds: TimeInterval) -> [Chunk] {
         var kept: [Chunk] = []
         var total = 0.0
         for chunk in preRoll.reversed() {
@@ -107,7 +125,7 @@ import DaisyCore
         }
         capture = kept.flatMap(\.samples)
         elapsed = Double(capture?.count ?? 0) / Self.sampleRate
-        return kept.map { ($0.power, $0.duration) }
+        return kept
     }
     /// Writes the utterance for whisper. The caller owns the returned folder.
     func endCapture() throws -> URL {
@@ -250,23 +268,27 @@ private final class PlaybackGate: @unchecked Sendable {
     }
 }
 
-/// Runs on the audio thread: hands each input buffer to a downsampler matched to its format and
-/// passes the 16 kHz chunk to the main actor.
+/// Runs on the audio thread: hands each input buffer to a downsampler matched to its format, runs
+/// Silero on the 16 kHz result when it's loaded (a fraction of a millisecond per chunk), and passes
+/// the chunk to the main actor.
 private final class TapBridge: @unchecked Sendable {
     private let lock = NSLock()
     private var downsampler: MicDownsampler?
     private var format: AVAudioFormat?
+    private var vad: SileroVAD?
     var deliver: (@Sendable (AudioController.Chunk) -> Void)?
     var levelSink: (@Sendable (Float) -> Void)?
-    func reset() { lock.lock(); downsampler = nil; format = nil; lock.unlock() }
+    /// Before each engine start. The detector is only ever used from the tap thread after this.
+    func reset(vad: SileroVAD?) { lock.lock(); downsampler = nil; format = nil; self.vad = vad; lock.unlock() }
     func handle(_ buffer: AVAudioPCMBuffer) {
         lock.lock()
         if format != buffer.format { downsampler = MicDownsampler(inputFormat: buffer.format); format = buffer.format }
-        let downsampler = self.downsampler
+        let downsampler = self.downsampler, vad = self.vad
         lock.unlock()
         guard let deliver, let converted = downsampler?.convert(buffer) else { return }
         deliver(AudioController.Chunk(samples: converted.samples, power: converted.power,
-                                      duration: Double(converted.samples.count) / MicDownsampler.sampleRate))
+                                      duration: Double(converted.samples.count) / MicDownsampler.sampleRate,
+                                      speech: vad?.probability(for: converted.samples)))
     }
     func meter(_ buffer: AVAudioPCMBuffer) {
         guard let channel = buffer.floatChannelData?[0], buffer.frameLength > 0 else { return }

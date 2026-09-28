@@ -4,11 +4,14 @@ import Foundation
 /// coalesce concurrent startup attempts and restart only before executing user work.
 public actor LocalRuntime {
     private let client: OllamaClient
+    private let children: ChildProcesses
     private var process: Process?
     private var startup: Task<Void, Error>?
-    public init(client: OllamaClient = OllamaClient()) { self.client = client }
+    public init(client: OllamaClient = OllamaClient(), children: ChildProcesses = .shared) { self.client = client; self.children = children }
     public func ensureRunning(configuration: Configuration) async throws {
         try Task.checkCancellation()
+        // An orphaned `ollama serve` from a Daisy that crashed would otherwise answer here, unowned.
+        children.sweepOnce()
         if await client.isReachable() { return }
         try Task.checkCancellation()
         if let startup { try await startup.value; return }
@@ -29,7 +32,8 @@ public actor LocalRuntime {
             env["OLLAMA_DEBUG_LOG_REQUESTS"] = "false"
             child.environment = env; child.standardInput = FileHandle.nullDevice
             child.standardOutput = FileHandle.nullDevice; child.standardError = FileHandle.nullDevice
-            try child.run(); process = child
+            // Watched, so it stops with the app even after a crash or force quit.
+            try children.launch(child, label: "ollama serve"); process = child
         }
         let client = self.client
         let task = Task {
