@@ -5,7 +5,9 @@ import Foundation
 /// add their phrases here.
 public enum ToolPhrases {
     /// Plain words for the HUD: "Searching the web", "Reading resume.pdf". Commands stay hidden.
-    public static func describe(title: String, kind: String?) -> (title: String, detail: String?) {
+    /// `input` is the tool call's arguments (ACP's rawInput), which plugin tools need: their title is
+    /// only the tool's name.
+    public static func describe(title: String, kind: String?, input: JSONValue? = nil) -> (title: String, detail: String?) {
         let parts = title.split(separator: ":", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
         // Hermes adds counts in brackets to some titles: "todo (3 items)", "delegate batch (2 tasks)".
         let head = (parts.first?.lowercased() ?? "").replacingOccurrences(of: "\\s*\\([^)]*\\)$", with: "", options: .regularExpression)
@@ -26,6 +28,11 @@ public enum ToolPhrases {
         case "execute_code": return ("Running code", nil)
         case "todo", "todo_list": return ("Planning", nil)
         case "vision_analyze": return ("Looking at an image", nil)
+        case "chrome_tabs": return ("Checking your tabs", nil)
+        case "chrome_focus": return (site(input).map { "Switching to \($0)" } ?? "Switching tabs", nil)
+        case "chrome_open":
+            guard let site = site(input) else { return ("Opening a page", nil) }
+            return (input?["reuse"]?.boolValue == true ? "Switching to \(site)" : "Opening \(site)", nil)
         default:
             if head.hasPrefix("patch") { return ("Editing a file", file) }
             if head.hasPrefix("memory") { return ("Updating memory", nil) }
@@ -41,6 +48,17 @@ public enum ToolPhrases {
                 return (words.isEmpty ? "Working" : words.prefix(1).uppercased() + words.dropFirst(), nil)
             }
         }
+    }
+
+    /// Where a Chrome tool is headed: "Gmail" for mail.google.com, otherwise the site without www.
+    private static func site(_ input: JSONValue?) -> String? {
+        guard var text = input?["url"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }
+        if !text.contains("://") { text = "https://" + text }
+        guard var host = URLComponents(string: text)?.host?.lowercased(), !host.isEmpty else { return nil }
+        if host.hasPrefix("www.") { host.removeFirst(4) }
+        let names = ["mail.google.com": "Gmail", "gmail.com": "Gmail", "calendar.google.com": "Google Calendar",
+                     "drive.google.com": "Google Drive", "docs.google.com": "Google Docs"]
+        return names[host] ?? host
     }
 
     public static func command(_ command: String) -> String {

@@ -100,6 +100,20 @@ import Foundation
         } catch { fail("testLexicalMissKeepsSavedPreferenceAvailable: \(error)") }
         do {
             let before = TestLog.failures
+            let suite = ChromePhraseTests()
+            suite.testChromeToolsReadAsPlainWords()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testChromeToolsReadAsPlainWords")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = ChromePhraseTests()
+            suite.testChromePhrasesWithoutAnAddressStayGeneric()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testChromePhrasesWithoutAnAddressStayGeneric")
+        }
+        do {
+            let before = TestLog.failures
             let suite = CoreTests()
             try suite.setUpWithError(); defer { try? suite.tearDownWithError() }
             try await suite.testMemoryPersistsAndCorrectionReplacesFact()
