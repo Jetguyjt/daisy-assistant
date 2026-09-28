@@ -12,6 +12,150 @@ import Foundation
         var count = 0
         do {
             let before = TestLog.failures
+            let suite = AlwaysOnTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testAnsweredRun()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testAnsweredRun")
+        } catch { fail("testAnsweredRun: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = AlwaysOnTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            suite.testFailedAndBlockedRuns()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testFailedAndBlockedRuns")
+        } catch { fail("testFailedAndBlockedRuns: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = AlwaysOnTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            suite.testRunsWithNothingToSay()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testRunsWithNothingToSay")
+        } catch { fail("testRunsWithNothingToSay: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = AlwaysOnTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            suite.testScriptOutputAndQuotedEarlierRuns()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testScriptOutputAndQuotedEarlierRuns")
+        } catch { fail("testScriptOutputAndQuotedEarlierRuns: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = AlwaysOnTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            suite.testSummaryIsShortAndPlain()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testSummaryIsShortAndPlain")
+        } catch { fail("testSummaryIsShortAndPlain: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = AlwaysOnTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testLatestRunsAcrossJobs()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testLatestRunsAcrossJobs")
+        } catch { fail("testLatestRunsAcrossJobs: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = AlwaysOnTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testJobsFile()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testJobsFile")
+        } catch { fail("testJobsFile: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = AlwaysOnTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testKanbanBoard()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testKanbanBoard")
+        } catch { fail("testKanbanBoard: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = AlwaysOnTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            suite.testNothingThereIsEmpty()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testNothingThereIsEmpty")
+        } catch { fail("testNothingThereIsEmpty: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = AlwaysOnTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testFeedReadsAndChangesNothing()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testFeedReadsAndChangesNothing")
+        } catch { fail("testFeedReadsAndChangesNothing: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = BudgetTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testReadsHermesUsage()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testReadsHermesUsage")
+        } catch { fail("testReadsHermesUsage: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = BudgetTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testUnavailableAndBrokenReadings()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testUnavailableAndBrokenReadings")
+        } catch { fail("testUnavailableAndBrokenReadings: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = BudgetTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testHoldsNewJobsAtEightyPercent()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testHoldsNewJobsAtEightyPercent")
+        } catch { fail("testHoldsNewJobsAtEightyPercent: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = BudgetTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testLevelIsTheFullestLiveWindow()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testLevelIsTheFullestLiveWindow")
+        } catch { fail("testLevelIsTheFullestLiveWindow: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = BudgetTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testMonitorHoldsAndLetsGo()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testMonitorHoldsAndLetsGo")
+        } catch { fail("testMonitorHoldsAndLetsGo: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = BudgetTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testPollingStartsAndStops()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testPollingStartsAndStops")
+        } catch { fail("testPollingStartsAndStops: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = BudgetTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testHelperScriptAgainstStandInHermes()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testHelperScriptAgainstStandInHermes")
+        } catch { fail("testHelperScriptAgainstStandInHermes: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = BudgetTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            suite.testPythonNextToHermes()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testPythonNextToHermes")
+        } catch { fail("testPythonNextToHermes: \(error)") }
+        do {
+            let before = TestLog.failures
             let suite = CapabilityTests()
             defer { suite.tearDown() }
             try await suite.testIndependentAdaptersComposeWithoutEngineChanges()
@@ -731,6 +875,34 @@ import Foundation
             count += 1
             print("\(TestLog.failures == before ? "PASS" : "FAIL") testUnsupportedModelToolCannotExecute")
         } catch { fail("testUnsupportedModelToolCannotExecute: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = PowerTests()
+            suite.testClickToTalkOnlyOnBatteryWithTheWakeWord()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testClickToTalkOnlyOnBatteryWithTheWakeWord")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = PowerTests()
+            suite.testMonitorFollowsTheCharger()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testMonitorFollowsTheCharger")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = PowerTests()
+            suite.testStartReadsTheSourceAgain()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testStartReadsTheSourceAgain")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = PowerTests()
+            suite.testIOKitNames()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testIOKitNames")
+        }
         do {
             let before = TestLog.failures
             let suite = RecallTests()
