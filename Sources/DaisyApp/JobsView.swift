@@ -7,6 +7,10 @@ import DaisyCore
 struct JobsView: View {
     @ObservedObject var jobs: JobsModel
     @ObservedObject var approvals: ApprovalQueue
+    /// Hermes's scheduled jobs and Kanban board, shown under the jobs list.
+    var alwaysOn: AlwaysOnFeed? = nil
+    /// For "Run them anyway" when queued jobs are held near the usage limit.
+    var budget: BudgetMonitor? = nil
     @State private var goal = ""
     @State private var title = ""
 
@@ -24,6 +28,9 @@ struct JobsView: View {
                      ? "Jobs run two at a time; the rest wait. Anything a job wants to send or change stops at a card like any other."
                      : "Background jobs need Hermes. Switch the brain in Setup.")
                     .font(.system(size: 11)).foregroundStyle(jobs.available ? HUD.dim : HUD.amber)
+                if let held = jobs.held {
+                    BudgetHoldNotice(reason: held) { budget?.allowAnyway() }
+                }
             }
             .padding(.bottom, 4)
             if jobs.jobs.isEmpty {
@@ -37,6 +44,7 @@ struct JobsView: View {
                 Button("Clear finished") { jobs.clearFinished() }
                     .buttonStyle(HUDButtonStyle(kind: .ghost, compact: true)).padding(.top, 4)
             }
+            if let alwaysOn { AlwaysOnView(feed: alwaysOn) }
         }
     }
 

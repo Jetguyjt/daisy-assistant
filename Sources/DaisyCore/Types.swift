@@ -32,6 +32,8 @@ public struct Configuration: Codable, Sendable {
     public var speechInput: SpeechInputSettings?
     /// Set once the Daisy voice default has been applied, so choosing George later on purpose sticks.
     public var daisyVoiceApplied: Bool?
+    /// Click to talk on battery and holding background jobs near the usage limit. Nil means defaults.
+    public var alwaysOn: AlwaysOnSettings?
     public init() {}
 
     /// Jarvis spoke as George; Daisy's voice is Heart. Settings carried over from Jarvis (or with no

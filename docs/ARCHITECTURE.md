@@ -75,6 +75,14 @@ Each job gets its own Hermes session. Before its first prompt, the session is li
 
 Hermes's own `delegate_task` isn't used in Daisy sessions: over ACP its background results never come back (`daisy-check --delegation`, checked 2026-09-27), so the persona tells Hermes not to call it.
 
+## Always on
+
+Hermes's gateway can run as a LaunchAgent (`scripts/hermes.d/60-gateway.sh`, opt-in) and runs scheduled jobs while Daisy is closed; the guard loads in it and treats every cron run as read-only. `DAISY_CRON=1` adds two read-only jobs: an overnight inbox triage and a morning digest of the repos listed in `~/.hermes/daisy/repo-digest.txt`. The JOBS tab reads `~/.hermes/cron/output/`, `cron/jobs.json` and `kanban.db` (read-only) through `AlwaysOnFeed`.
+
+`BudgetMonitor` reads the 5-hour and weekly usage windows by running Hermes's Python with a short script around `agent/account_usage.py`, every ten minutes once Hermes is connected, and `JobsModel` holds new background jobs while either is at 80%. `PowerMonitor` (IOKit) turns the wake word's open mic into click to talk on battery, since an open mic keeps the Mac awake, and `LoginItem` (`SMAppService.mainApp`) opens Daisy at login.
+
+Kanban workers run as other Hermes profiles (`hermes -p <name>`) and load only that profile's plugins, so the guard isn't there unless it's installed into that profile too. `HERMES_SAFE_MODE=1` skips every plugin, the guard included.
+
 ## Sign-in
 
 Daisy never handles OpenAI credentials. `hermes auth add openai-codex` (or `hermes model` → ChatGPT or Codex Subscription) runs a device-code login in Terminal and stores tokens in `~/.hermes/auth.json`. Hermes refreshes them itself. Daisy only reads whether `initialize` reports a working provider, and shows the command when it doesn't. On first run Daisy waits for **Connect** instead of starting Hermes on its own, because starting Hermes can trigger a token refresh.

@@ -14,6 +14,7 @@ One-time Hermes setup:
 curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash   # only if Hermes isn't installed
 hermes auth add openai-codex      # device-code login in Terminal; Hermes keeps the tokens
 bash scripts/setup-hermes.sh      # Daisy plugin: persona, and approval before sends, deletes and calendar changes
+DAISY_GATEWAY=1 DAISY_CRON=1 bash scripts/setup-hermes.sh   # optional: Hermes's gateway as a LaunchAgent, and two read-only morning jobs (inbox triage, repo digest)
 open ~/Applications/Daisy.app    # first launch: press Connect
 ```
 

@@ -180,7 +180,7 @@ final class BudgetTests {
             windows: tuple = ()
             unavailable_reason: Optional[str] = None
 
-        _USAGE_FETCHERS = {"openai-codex": None, "anthropic": None}
+        _USAGE_FETCHERS = {"openai-codex": None}
 
         def fetch_account_usage(provider, base_url=None, api_key=None):
             if os.environ.get("STAND_IN_MODE") == "none":

@@ -29,7 +29,8 @@ struct ContentView: View {
                         switch model.tab {
                         case "Memory": MemoryView(model: model)
                         case "Tasks": TasksView(model: model)
-                        case "Jobs": JobsView(jobs: model.jobs, approvals: model.approvalQueue)
+                        case "Jobs": JobsView(jobs: model.jobs, approvals: model.approvalQueue,
+                                              alwaysOn: model.usesHermes ? model.alwaysOn : nil, budget: model.budget)
                         case "Connections": ConnectionsView(model: model)
                         case "Settings": SettingsView(model: model)
                         case "Capabilities": CapabilitiesView(model: model)
@@ -333,7 +334,8 @@ struct ContentView: View {
                     }
                     .help("Turn Daisy's spoken replies on or off")
                     HUDSwitch(title: "ALWAYS LISTENING", isOn: model.alwaysListening,
-                              detail: model.alwaysListening ? (model.standby ? "Say “Hey Daisy”" : "Arming mic…") : "Mic off between turns") {
+                              detail: model.alwaysListening ? (model.batteryHold ? BatteryListening.note : model.standby ? "Say “Hey Daisy”" : "Arming mic…")
+                                                            : "Mic off between turns") {
                         model.setAlwaysListening(!model.alwaysListening)
                     }
                     .help("Keep the mic open for “Hey Daisy” (⌘⇧L)")
@@ -389,6 +391,7 @@ struct ContentView: View {
                 readout("MEMORY", "\(model.memories.count) saved") { model.tab = "Memory" }
                 readout("TASKS", "\(model.tasks.filter { $0.status != "done" }.count) open") { model.tab = "Tasks" }
                 JobsReadout(jobs: model.jobs) { model.tab = "Jobs" }
+                if model.usesHermes { BudgetReadout(budget: model.budget) }
             }
             .padding(16)
             }
@@ -738,6 +741,12 @@ private struct SettingsView: View {
                 field("whisper-cli") { TextField("whisper-cli executable", text: $model.config.whisperExecutable).hudField() }
                 field("Whisper model") { TextField("ggml .bin model", text: $model.config.whisperModel).hudField() }
             }
+            AlwaysOnSettingsSection(loginItem: model.loginItem, power: model.power, budget: model.budget,
+                                    clickToTalkOnBattery: Binding(get: { model.config.alwaysOn?.clickToTalkOnBatteryEnabled ?? true },
+                                                                  set: { model.setClickToTalkOnBattery($0) }),
+                                    holdJobsNearLimit: Binding(get: { model.config.alwaysOn?.holdJobsEnabled ?? true },
+                                                               set: { model.setHoldJobsNearLimit($0) }),
+                                    usesHermes: model.usesHermes)
             section("FILES") {
                 Toggle("Filename search in the chosen folder", isOn: $model.config.allowFileSearch).toggleStyle(.switch)
                 note(model.selectedFolder?.path ?? "No folder selected")

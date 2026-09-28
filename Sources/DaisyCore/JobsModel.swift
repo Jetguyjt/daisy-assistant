@@ -23,6 +23,11 @@ public struct JobAnnouncement: Sendable, Equatable {
     @Published public private(set) var plans: [UUID: AgentPlan] = [:]
     /// A job finished, failed, or needs an OK.
     public var onAnnouncement: ((JobAnnouncement) -> Void)?
+    /// Asked before a queued job starts. A reason holds new jobs back (running ones carry on); the app
+    /// passes BudgetMonitor's, so jobs wait while a usage window is about 80% used.
+    public var holdNewJobs: (() -> String?)?
+    /// Why queued jobs are waiting, besides the two-at-a-time limit.
+    @Published public private(set) var held: String?
     public let limit: Int
     /// Largest goal accepted; the rest of the request is Daisy's note to the worker.
     public static let maxGoalBytes = HermesBackend.maxRequestBytes - 2_000
@@ -118,10 +123,15 @@ public struct JobAnnouncement: Sendable, Equatable {
         """
     }
 
+    /// Looks again at whether queued jobs may start; call it when what `holdNewJobs` reads changes.
+    public func recheck() { pump() }
+
     // MARK: Running
 
     private func pump() {
         guard backend != nil else { return }
+        held = queued.isEmpty ? nil : holdNewJobs?()
+        guard held == nil else { return }
         // Oldest first.
         for job in jobs.reversed() where job.status == .queued && tasks[job.id] == nil {
             guard tasks.count < limit else { return }

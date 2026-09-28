@@ -291,7 +291,7 @@ struct ComposerBar: View {
                     ListeningStrip(audio: model.audio, preparing: model.phase == .preparing).frame(height: 34)
                 } else {
                     ComposerEditor(state: composer,
-                                   placeholder: model.alwaysListening ? "Message Daisy, or say “Hey Daisy”" : "Message Daisy",
+                                   placeholder: model.alwaysListening && !model.batteryHold ? "Message Daisy, or say “Hey Daisy”" : "Message Daisy",
                                    height: $height, onSubmit: model.submit, onEscape: model.interrupt,
                                    onArrowUp: model.editLastMessage)
                         .frame(height: height)

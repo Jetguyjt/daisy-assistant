@@ -8,3 +8,4 @@
 - Anything else that edits `config.yaml` calls `backup_config` first.
 - Never read or print credentials (`auth.json`, `google_token.json`, `.env`).
 - Available: `$HERMES` (the CLI), `$HERMES_HOME`, `$REPO_DIR`.
+- Optional features read a `DAISY_*` flag: 1 turns it on, 0 takes it out, unset leaves it and prints how (`DAISY_CHROME_DEVTOOLS`, `DAISY_GATEWAY`, `DAISY_CRON`, `DAISY_INSTALL_APPLE_CLIS`). Shared helpers for the always-on fragments are in `scripts/alwayson/`.

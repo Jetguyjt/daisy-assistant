@@ -85,6 +85,14 @@ struct ConversationItem: Identifiable {
     lazy var jobs: JobsModel = makeJobs()
     /// What Hermes learned on its own, for the Memory tab.
     lazy var learned = LearnedMemory()
+    /// Hermes's scheduled-job runs and Kanban board, for the JOBS tab.
+    lazy var alwaysOn = AlwaysOnFeed()
+    /// The ChatGPT usage windows, read through Hermes; new background jobs wait near the limit.
+    lazy var budget: BudgetMonitor = makeBudget()
+    /// Mains or battery: on battery the wake word's always-open mic becomes click to talk.
+    let power = PowerMonitor()
+    /// Open at login (System Settings → General → Login Items).
+    let loginItem = LoginItem()
     /// The agent's plan for the current (or last) turn, when it keeps one.
     @Published var plan: AgentPlan?
     /// Job news that came in mid-turn, said once Daisy is free.
@@ -132,6 +140,13 @@ struct ConversationItem: Identifiable {
     var busy: Bool { phase != .idle }
     var listeningMode: ListeningMode { ListeningMode(rawValue: config.listeningMode ?? "") ?? .wakeWord }
     var alwaysListening: Bool { listeningMode == .wakeWord }
+    /// On battery (Setup → Click to talk on battery), the wake word's always-open mic becomes click to talk.
+    var batteryHold: Bool {
+        BatteryListening.clickToTalk(wakeWordChosen: listeningMode == .wakeWord,
+                                     enabled: config.alwaysOn?.clickToTalkOnBatteryEnabled ?? true, source: power.source)
+    }
+    /// The mode in effect right now: the one picked in Setup, except click to talk during `batteryHold`.
+    var activeListeningMode: ListeningMode { batteryHold ? .manual : listeningMode }
     /// Hermes is the default brain; the on-device engine is an opt-in fallback.
     var usesHermes: Bool { (config.agentBackend ?? "hermes") != "local" }
     var bookmarkURL: URL { Configuration.dataDirectory.appendingPathComponent("folder.bookmark") }
@@ -202,6 +217,9 @@ struct ConversationItem: Identifiable {
         audio.speechWorker = speechWorker
         audio.onAudio = { [weak self] chunk in self?.observe(chunk) }
         audio.onEngineLost = { [weak self] in self?.engineLost() }
+        // On battery the wake word's open mic closes (it keeps the Mac awake); on the charger it opens again.
+        power.onChange = { [weak self] _ in self?.applyListeningMode() }
+        power.start()
         // Helpers a crashed or force-quit Daisy left running (whisper-server, ollama serve, workers).
         Task.detached { ChildProcesses.shared.sweepOnce() }
         applySpeechInput()
@@ -271,6 +289,8 @@ struct ConversationItem: Identifiable {
             let link = await backend.connect()
             guard !Task.isCancelled else { return }
             agentLink = link; connected = link.isReady
+            // Usage is read through Hermes, so only once Hermes is connected (never before the first Connect).
+            if link.isReady, usesHermes { budget.start() }
             if link.isReady, usesHermes, config.hermesConnected != true {
                 config.hermesConnected = true
                 try? config.save()
@@ -324,7 +344,37 @@ struct ConversationItem: Identifiable {
     private func makeJobs() -> JobsModel {
         let jobs = JobsModel(backend: backend as? JobBackend, approvals: approvalQueue)
         jobs.onAnnouncement = { [weak self] note in self?.announce(note) }
+        jobs.holdNewJobs = { [weak self] in
+            guard let self, self.config.alwaysOn?.holdJobsEnabled ?? true else { return nil }
+            return self.budget.holdReason
+        }
         return jobs
+    }
+
+    private func makeBudget() -> BudgetMonitor {
+        let path = config.hermesExecutable?.trimmingCharacters(in: .whitespaces) ?? ""
+        let acp = HermesBackend.locate(path.isEmpty ? nil : URL(fileURLWithPath: path))
+        let budget = BudgetMonitor(source: HermesUsageSource(python: HermesUsageSource.python(nextTo: acp)))
+        budget.onChange = { [weak self] in self?.jobs.recheck() }
+        return budget
+    }
+
+    /// Setup → Click to talk on battery. Saved at once, like the always-listening switch.
+    func setClickToTalkOnBattery(_ on: Bool) {
+        var settings = config.alwaysOn ?? AlwaysOnSettings()
+        settings.clickToTalkOnBattery = on
+        config.alwaysOn = settings
+        do { try config.save() } catch { notice = error.localizedDescription }
+        applyListeningMode()
+    }
+
+    /// Setup → Hold background jobs near the usage limit. Saved at once.
+    func setHoldJobsNearLimit(_ on: Bool) {
+        var settings = config.alwaysOn ?? AlwaysOnSettings()
+        settings.holdJobsNearLimit = on
+        config.alwaysOn = settings
+        do { try config.save() } catch { notice = error.localizedDescription }
+        jobs.recheck()
     }
 
     /// Job news goes in the transcript, and is said out loud once Daisy isn't busy.
@@ -639,7 +689,7 @@ struct ConversationItem: Identifiable {
     /// Called after settings change and at launch. Wake-word mode keeps the mic open; the others
     /// open it only while a conversation is going.
     func applyListeningMode() {
-        switch listeningMode {
+        switch activeListeningMode {
         case .wakeWord: armStandby()
         case .manual, .handsFree:
             disarmStandby()
@@ -651,14 +701,14 @@ struct ConversationItem: Identifiable {
     /// Standby can be armed while idle, or while a turn waits on a card after `park`.
     private var canStandBy: Bool { !busy || phase == .awaitingApproval }
     private func armStandby() {
-        guard listeningMode == .wakeWord, canStandBy, !standby else { return }
+        guard activeListeningMode == .wakeWord, canStandBy, !standby else { return }
         standbyWork?.cancel()
         standbyWork = Task { [weak self] in
             guard let self else { return }
             guard await self.audio.requestMicrophone() else {
                 self.notice = "Allow Daisy in System Settings → Privacy & Security → Microphone to use the wake word."; return
             }
-            guard !Task.isCancelled, self.listeningMode == .wakeWord, self.canStandBy else { return }
+            guard !Task.isCancelled, self.activeListeningMode == .wakeWord, self.canStandBy else { return }
             do { try self.audio.startEngine() } catch { self.notice = error.localizedDescription; return }
             self.wake.reset()
             self.startWakeWordModel()
@@ -716,7 +766,7 @@ struct ConversationItem: Identifiable {
             default: break
             }
         case .speaking:
-            guard listeningMode != .manual, audio.echoCancellation else { return }
+            guard activeListeningMode != .manual, audio.echoCancellation else { return }
             if bargeEndpointer.observe(power: chunk.power, duration: chunk.duration, speech: chunk.speech) == .speechStarted { bargeIn() }
         case .idle, .awaitingApproval:
             guard standby else { return }
@@ -779,7 +829,7 @@ struct ConversationItem: Identifiable {
             let url = try audio.endCapture()
             // Click to talk: the mic's job is done, so it closes before the reply plays (there's no
             // talking over Daisy in this mode, so nothing needs it open).
-            if listeningMode == .manual { audio.stopEngine() }
+            if activeListeningMode == .manual { audio.stopEngine() }
             phase = .transcribing
             work = Task {
                 defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
@@ -803,7 +853,7 @@ struct ConversationItem: Identifiable {
     }
     private func abandonListening() {
         audio.discardCapture(); holdRequested = false
-        if purpose == .command, listeningMode == .manual { notice = "No speech was detected. Click Record, speak, then pause." }
+        if purpose == .command, activeListeningMode == .manual { notice = "No speech was detected. Click Record, speak, then pause." }
         phase = .idle; rest()
     }
     private func bargeIn() {
@@ -812,7 +862,7 @@ struct ConversationItem: Identifiable {
     }
     private func finishTurn() {
         phase = .idle; currentStep = nil
-        let again = voiceTurn && listeningMode != .manual
+        let again = voiceTurn && activeListeningMode != .manual
         voiceTurn = false
         // Job news that came in during the turn goes first; the follow-up can wait.
         if !pendingAnnouncements.isEmpty { readAloud(pendingAnnouncements.joined(separator: " ")); pendingAnnouncements = []; return }
@@ -821,7 +871,7 @@ struct ConversationItem: Identifiable {
     /// Back to whatever idle means for the current mode: standby with the mic open, or mic off.
     private func rest() {
         phase = .idle
-        switch listeningMode {
+        switch activeListeningMode {
         case .wakeWord: armStandby()
         case .manual, .handsFree: if !audio.capturing { audio.stopEngine() }
         }
@@ -830,7 +880,7 @@ struct ConversationItem: Identifiable {
         standby = false
         wakeTurn = false; wake.reset()
         if phase == .listening || phase == .preparing { holdRequested = false; phase = .idle; notice = "The audio device changed. Try again." }
-        guard listeningMode == .wakeWord, !busy else { return }
+        guard activeListeningMode == .wakeWord, !busy else { return }
         Task { [weak self] in
             try? await Task.sleep(nanoseconds: 1_000_000_000)
             self?.armStandby()
@@ -985,6 +1035,7 @@ struct ConversationItem: Identifiable {
                 approvalQueue.withdrawAll()
                 jobs.use(backend as? JobBackend)
             }
+            if !usesHermes { budget.stop() }
             connected = false; connectWhenAllowed()
             if config.speakResponses { Task { await speechWorker.warmUp() } }
             applySpeechInput()
@@ -995,6 +1046,7 @@ struct ConversationItem: Identifiable {
     }
     func shutdown() async {
         startup?.cancel(); healthMonitor?.cancel(); stop()
+        budget.stop(); power.stop()
         audio.stopEngine()
         selectedFolder?.stopAccessingSecurityScopedResource()
         await speechWorker.stop()

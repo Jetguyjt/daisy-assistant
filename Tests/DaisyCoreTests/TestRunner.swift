@@ -528,6 +528,14 @@ import Foundation
         } catch { fail("testResumedSessionReplaysHistoryAndUnknownOnesStartFresh: \(error)") }
         do {
             let before = TestLog.failures
+            let suite = JobsHoldTests()
+            defer { suite.tearDown() }
+            try await suite.testHeldJobsWaitUntilTheHoldLifts()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testHeldJobsWaitUntilTheHoldLifts")
+        } catch { fail("testHeldJobsWaitUntilTheHoldLifts: \(error)") }
+        do {
+            let before = TestLog.failures
             let suite = JobsTests()
             try suite.setUp(); defer { suite.tearDown() }
             try await suite.testTwoSessionsInterleaveAndEachGetsItsOwnUpdates()
