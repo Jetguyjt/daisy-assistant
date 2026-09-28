@@ -62,7 +62,7 @@ Notes: [orchestrator.md](research/orchestrator.md)
 ## Chrome and Mac control
 
 - [ ] Plugin tools `chrome_tabs` / `chrome_focus` / `chrome_open` over AppleScript, registered into `hermes-acp`
-  - built and tested with fakes (`hermes/test_daisy_chrome.py`; the tab script runs in jsc against a pretend Chrome). Not run against Chrome yet; the Automation prompt hasn't been seen
+  - built and tested with fakes (`hermes/test_daisy_chrome.py`; the tab script runs in jsc against a pretend Chrome). Live 2026-09-28: "search Google for …" went through `chrome_open` and opened the results in my Chrome. `chrome_tabs` / `chrome_focus` wait on the Automation prompt, which should come from Daisy.app
 - [ ] `daisy-chrome` skill: reuse an open tab before opening a new one ("check my email" → Gmail tab)
   - `hermes/skills/daisy-chrome`, installed by `scripts/hermes.d/30-chrome.sh`; "check my email" is one `chrome_open(..., reuse=true)` so it never stops at a card
 - [ ] `computer_use` into ACP sessions through a plugin tool (keeps Hermes's hard-blocks); check how its approvals behave over ACP
@@ -130,8 +130,8 @@ Notes: [persona.md](research/persona.md)
 - [ ] Opt-in folder indexing: a Hermes cron job that writes a "where I left off" note per repo in folders I pick
   - built as the morning repo digest (see Integrations); not run live
 - Not needed: showing running subagents (`delegate_task`) in the HUD, since Daisy doesn't use it; background jobs show in the JOBS tab
-- [ ] Recall check in `daisy-check`: teach facts on day one, ask on day seven, plus a correction case and a "you don't know that" case
-  - built: `daisy-check --recall` (tested against stand-ins); not run live yet
+- [x] Recall check in `daisy-check`: teach facts on day one, ask on day seven, plus a correction case and a "you don't know that" case
+  - live 2026-09-28: `daisy-check --recall` passed 4 of 4 (said in passing, asked to remember, a correction, never told) and took its test entries back out. Same-day, not a week apart
 
 ## Integrations still open
 
