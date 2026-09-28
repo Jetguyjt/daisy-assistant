@@ -46,6 +46,7 @@ Notes: [orchestrator.md](research/orchestrator.md)
 - [ ] Worker sessions: `session/new` per background job (max 2–3), route updates by session ID, job ledger + jobs panel, speak results when done
   - built (max 2, roles.json marks them for the guard, `/job` or the JOBS tab); passes against scripted stand-ins, not run live yet
 - [ ] Fix or patch ACP so delegation results come back (read `completion_queue`, or run delegations synchronously)
+  - not doing it for now: Hermes 0.21 always runs top-level delegations in the background and ignores the model's `background` flag (`tools/delegate_tool.py`), so a plugin can't make them synchronous; only a patch to Hermes could. Daisy's own job sessions cover background work instead
 - [ ] `hermes gateway` as a LaunchAgent: cron, Kanban, Telegram/iMessage from my phone
 - [ ] Daisy shows cron output (`~/.hermes/cron/output/`) and the Kanban board
 - [ ] Budget: cheaper `delegation.model`, poll usage windows, pause background work around 80%, add a fallback provider
