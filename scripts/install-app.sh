@@ -1,7 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-if [ ! -f "$REPO_DIR/dist/Daisy.zip" ]; then bash "$REPO_DIR/scripts/build-app.sh"; fi
+# Always build first, so what gets installed is the code as it is now, not an old zip.
+bash "$REPO_DIR/scripts/build-app.sh"
 INSTALL_DIR="$HOME/Applications"
 mkdir -p "$INSTALL_DIR"
 # Before anything creates Daisy's folder, carry over the old Jarvis one.
@@ -26,4 +27,6 @@ if [ -e "$INSTALL_DIR/Daisy.app" ]; then
 fi
 ditto -x -k --norsrc --noextattr "$REPO_DIR/dist/Daisy.zip" "$INSTALL_DIR"
 codesign --verify --deep --strict "$INSTALL_DIR/Daisy.app"
+# ~/Applications/Daisy.app is the only copy; tell Launch Services about the new build.
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$INSTALL_DIR/Daisy.app" || true
 echo "Installed $INSTALL_DIR/Daisy.app"

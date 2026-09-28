@@ -25,7 +25,9 @@ python3 scripts/write-defaults.py "$REPO_DIR" "$APP_DIR/Contents/Resources/Runti
 xattr -cr "$APP_DIR"
 codesign --force --sign - --identifier com.local.daisy.desktop "$APP_DIR"
 codesign --verify --deep --strict "$APP_DIR"
-# A zip survives iCloud/File Provider folders without Finder metadata altering the bundle.
+# A zip survives iCloud/File Provider folders without Finder metadata altering the bundle. Only the
+# zip is kept here: a second Daisy.app in the repo shows up in Spotlight and the Dock next to the
+# installed one in ~/Applications.
 ditto --norsrc --noextattr -c -k --keepParent "$APP_DIR" "$REPO_DIR/dist/Daisy.zip"
-ditto --norsrc --noextattr "$APP_DIR" "$REPO_DIR/dist/Daisy.app"
-echo "Built $REPO_DIR/dist/Daisy.zip (verified in $STAGING_DIR)"
+rm -rf "$STAGING_DIR"
+echo "Built $REPO_DIR/dist/Daisy.zip. Install it with scripts/install-app.sh."
