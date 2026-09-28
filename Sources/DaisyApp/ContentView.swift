@@ -371,10 +371,7 @@ struct ContentView: View {
         if let first = reply.firstText { return String(format: "%.1fs · first word %.1fs", reply.total, first) }
         return String(format: "%.1fs", reply.total)
     }
-    private var voiceName: String {
-        let id = model.config.naturalVoice ?? "bm_george"
-        return NaturalSpeech.voices.first { $0.id == id }?.name.components(separatedBy: " ").first ?? id
-    }
+    private var voiceName: String { NaturalSpeech.shortName(for: model.config.naturalVoice ?? NaturalSpeech.defaultVoice) }
 
     private func readout(_ label: String, _ value: String, color: Color = HUD.ice, action: (() -> Void)? = nil) -> some View {
         HStack(alignment: .bottom, spacing: 8) {
@@ -688,22 +685,9 @@ private struct SettingsView: View {
                     }
                     .labelsHidden().fixedSize()
                 }
-                field("Voice") {
-                    Picker("", selection: Binding(get: { model.config.naturalVoice ?? "bm_george" }, set: { model.config.naturalVoice = $0 })) {
-                        ForEach(NaturalSpeech.voices) { voice in Text(voice.name).tag(voice.id) }
-                    }
-                    .labelsHidden().fixedSize()
-                }
-                field("Speed") {
-                    HStack {
-                        Slider(value: Binding(get: { model.config.speechRate ?? 1 }, set: { model.config.speechRate = $0 }), in: 0.75...1.3, step: 0.05).frame(maxWidth: 220)
-                        Text(String(format: "%.2f×", model.config.speechRate ?? 1)).font(HUD.readout(11)).foregroundStyle(HUD.steel)
-                    }
-                }
-                HStack {
-                    Button("Preview voice") { model.previewVoice() }.buttonStyle(HUDButtonStyle(kind: .ghost, compact: true)).disabled(model.busy)
-                    if model.busy { Button("Stop") { model.interrupt() }.buttonStyle(HUDButtonStyle(kind: .danger, compact: true)) }
-                }
+                VoiceSettingsView(voice: Binding(get: { model.config.naturalVoice ?? NaturalSpeech.defaultVoice }, set: { model.config.naturalVoice = $0 }),
+                                  speed: Binding(get: { model.config.speechRate ?? 1 }, set: { model.config.speechRate = $0 }),
+                                  busy: model.busy, preview: { model.previewVoice() }, stop: { model.interrupt() })
                 note("\(model.audio.microphoneStatus) · Input: \(model.audio.inputDeviceName)")
                 Button("Sound input settings") {
                     NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.sound?input")!)

@@ -15,7 +15,7 @@ config = {
     "speakResponses": True,
     "allowFileSearch": True,
     "voice": "Samantha",
-    "naturalVoice": "bm_george",
+    "naturalVoice": "af_heart",
     "speechRate": 1.0,
     "browserNode": shutil.which("node") or str(pathlib.Path.home() / ".local/bin/node"),
 }

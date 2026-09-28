@@ -161,6 +161,13 @@ struct ConversationItem: Identifiable {
             store = try MemoryStore(url: Configuration.dataDirectory.appendingPathComponent("memory.sqlite"))
             taskStore = try TaskStore(url: Configuration.dataDirectory.appendingPathComponent("tasks.json"))
         } catch { notice = "Setup needs attention: \(error.localizedDescription)" }
+        // Jarvis spoke as George, and every save wrote that default into config.json. Daisy's voice
+        // is Heart, so a saved George switches once; choosing George again later sticks.
+        var voiceSwitched = false
+        if !UserDefaults.standard.bool(forKey: "adoptedHeartVoice") {
+            UserDefaults.standard.set(true, forKey: "adoptedHeartVoice")
+            if config.naturalVoice == "bm_george" { config.naturalVoice = NaturalSpeech.defaultVoice; try? config.save(); voiceSwitched = true }
+        }
         // Folder access is tied to the app that granted it, so a bookmark made by the old Jarvis app
         // (or one that has gone bad) can't be resolved. Drop it and ask for the folder again.
         var folderLost = false
@@ -181,6 +188,8 @@ struct ConversationItem: Identifiable {
                 + (folderLost ? " Choose your search folder again in Setup." : "")
         } else if folderLost, notice == nil {
             notice = "Choose your search folder again in Setup; macOS no longer recognizes the old one."
+        } else if voiceSwitched, notice == nil {
+            notice = "Daisy speaks with the Heart voice now. Pick another in Setup → Voice."
         }
         if listeningMode != .wakeWord { quietMode = listeningMode }
         audio.speechWorker = speechWorker
@@ -319,7 +328,7 @@ struct ConversationItem: Identifiable {
         endVoice()
         let token = generation
         Task {
-            try? await audio.speak(line, voice: config.naturalVoice ?? "bm_george", speed: config.speechRate ?? 1) { }
+            try? await audio.speak(line, voice: config.naturalVoice ?? NaturalSpeech.defaultVoice, speed: config.speechRate ?? 1) { }
             guard generation == token, phase == .awaitingApproval else { return }
             if listeningMode == .wakeWord { armStandby() }
         }
@@ -401,7 +410,7 @@ struct ConversationItem: Identifiable {
         bargeEndpointer = SpeechEndpointer(settings: .bargeIn)
         work = Task {
             do {
-                try await audio.speak(speech, voice: config.naturalVoice ?? "bm_george", speed: config.speechRate ?? 1) {
+                try await audio.speak(speech, voice: config.naturalVoice ?? NaturalSpeech.defaultVoice, speed: config.speechRate ?? 1) {
                     if self.generation == token { self.phase = .speaking }
                 }
             } catch { }
@@ -447,8 +456,11 @@ struct ConversationItem: Identifiable {
                             if config.speakResponses { say(feed.update(liveText), token: token) }
                         case .tool(let tool):
                             track(tool)
+                            // A short sentence held back for the next one goes out now: the tool may take a while.
+                            if config.speakResponses { say(feed.flush(liveText), token: token) }
                         case .approval(let request):
                             approvalQueue.add(request, from: .conversation, voice: voiceTurn); phase = .awaitingApproval
+                            if config.speakResponses { say(feed.flush(liveText), token: token) }
                         case .approvalResolved(let id, let allowed):
                             approvalQueue.settled(id, allowed: allowed)
                             if phase == .awaitingApproval { phase = approvalQueue.items(from: .conversation).isEmpty ? .working : .awaitingApproval }
@@ -526,7 +538,7 @@ struct ConversationItem: Identifiable {
             let (stream, continuation) = AsyncStream<String>.makeStream()
             voiceChunks = continuation
             bargeEndpointer = SpeechEndpointer(settings: .bargeIn)
-            let voice = config.naturalVoice ?? "bm_george", speed = config.speechRate ?? 1
+            let voice = config.naturalVoice ?? NaturalSpeech.defaultVoice, speed = config.speechRate ?? 1
             voicePlayback = Task { [weak self] in
                 guard let self else { return }
                 try await self.audio.speak(stream, voice: voice, speed: speed) {
@@ -753,7 +765,7 @@ struct ConversationItem: Identifiable {
         work = Task {
             do {
                 try await audio.speak("Good evening. I'm Daisy. I can help you think through an idea, find what you need, and work through a task with you.",
-                                      voice: config.naturalVoice ?? "bm_george", speed: config.speechRate ?? 1) {
+                                      voice: config.naturalVoice ?? NaturalSpeech.defaultVoice, speed: config.speechRate ?? 1) {
                     if self.generation == token { self.phase = .speaking }
                 }
                 if generation == token { phase = .idle; rest() }

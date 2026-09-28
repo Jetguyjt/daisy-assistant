@@ -61,6 +61,7 @@ import DaisyCore
                 print(SpeechText.spoken(from: text))
                 return
             }
+            if args.dropFirst().first == "--voice-ab" { try await VoiceAB.run(Array(args.dropFirst(2))); return }
             if args.dropFirst().first == "--endpoint", args.count > 2 {
                 // Replay a WAV through the endpointer in 50 ms steps and print what it would have done.
                 let file = try AVAudioFile(forReading: URL(fileURLWithPath: args[2]))
@@ -117,12 +118,12 @@ import DaisyCore
                 await speech.shutdown()
                 let sentence = "The paper draft is due in the middle of October, so the results section comes first."
                 await time("kokoro, one process") {
-                    try await NaturalSpeech.synthesize(text: sentence, voice: "bm_george", speed: 1, input: folder.appendingPathComponent("a.txt"), output: folder.appendingPathComponent("a.wav"))
+                    try await NaturalSpeech.synthesize(text: sentence, voice: NaturalSpeech.defaultVoice, speed: 1, input: folder.appendingPathComponent("a.txt"), output: folder.appendingPathComponent("a.wav"))
                 }
                 let worker = SpeechWorker()
-                await time("kokoro worker, start + first sentence") { _ = try await worker.synthesize(text: sentence, voice: "bm_george", speed: 1, output: folder.appendingPathComponent("b.wav")) }
-                await time("kokoro worker, warm sentence") { _ = try await worker.synthesize(text: sentence, voice: "bm_george", speed: 1, output: folder.appendingPathComponent("c.wav")) }
-                await time("kokoro worker, short first chunk") { _ = try await worker.synthesize(text: "Sure. The draft is due mid-October.", voice: "bm_george", speed: 1, output: folder.appendingPathComponent("d.wav")) }
+                await time("kokoro worker, start + first sentence") { _ = try await worker.synthesize(text: sentence, voice: NaturalSpeech.defaultVoice, speed: 1, output: folder.appendingPathComponent("b.wav")) }
+                await time("kokoro worker, warm sentence") { _ = try await worker.synthesize(text: sentence, voice: NaturalSpeech.defaultVoice, speed: 1, output: folder.appendingPathComponent("c.wav")) }
+                await time("kokoro worker, short first chunk") { _ = try await worker.synthesize(text: "Sure. The draft is due mid-October.", voice: NaturalSpeech.defaultVoice, speed: 1, output: folder.appendingPathComponent("d.wav")) }
                 await worker.stop()
                 return
             }
@@ -230,7 +231,7 @@ import DaisyCore
             let phrase = "Find my latest resume."
             let voiceStart = Date()
             let natural = folder.appendingPathComponent("natural.wav")
-            try await NaturalSpeech.synthesize(text: phrase, voice: "bm_george", speed: 1,
+            try await NaturalSpeech.synthesize(text: phrase, voice: NaturalSpeech.defaultVoice, speed: 1,
                 input: folder.appendingPathComponent("input.txt"), output: natural)
             try await LocalProcess.run(executable: URL(fileURLWithPath: "/usr/bin/afconvert"),
                 arguments: [natural.path, audio.path, "-f", "WAVE", "-d", "LEI16@16000", "-c", "1"])
