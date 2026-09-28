@@ -13,7 +13,7 @@ cp ".build/$BUILD_MODE/Daisy" "$APP_DIR/Contents/MacOS/Daisy"
 cp scripts/Info.plist "$APP_DIR/Contents/Info.plist"
 ICONSET="$STAGING_DIR/AppIcon.iconset"
 mkdir -p "$ICONSET"
-swift scripts/make-icon.swift "$STAGING_DIR/icon.png"
+".build/$BUILD_MODE/daisy-check" --render-icon "$STAGING_DIR/icon.png"
 for px in 16 32 128 256 512; do
   sips -z $px $px "$STAGING_DIR/icon.png" --out "$ICONSET/icon_${px}x${px}.png" >/dev/null
   sips -z $((px * 2)) $((px * 2)) "$STAGING_DIR/icon.png" --out "$ICONSET/icon_${px}x${px}@2x.png" >/dev/null

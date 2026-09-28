@@ -1,19 +1,66 @@
+import AppKit
+import DaisyCore
+import Observation
 import SwiftUI
 
-/// Palette and type for the HUD. Near-black ground with a warm cast, arc-reactor red, amber (gold)
-/// only for decisions, hot pink only for stop and delete.
+/// The chosen accent and the palette worked out from it. Views read colors through `HUD`, which
+/// reads this, so Observation redraws exactly the views that use a color when the accent changes.
+@Observable final class ThemeStore {
+    static let shared = ThemeStore()
+    private static let key = "themeAccent"
+
+    private(set) var accent: RGB
+    private(set) var palette: ThemePalette
+    @ObservationIgnored private var iconUpdate: Task<Void, Never>?
+
+    private init() {
+        let saved = UserDefaults.standard.string(forKey: Self.key).flatMap(RGB.init(hex:))
+        accent = saved ?? ThemePalette.defaultAccent
+        palette = ThemePalette.derived(from: saved ?? ThemePalette.defaultAccent)
+    }
+
+    func set(_ color: RGB) {
+        guard color != accent else { return }
+        accent = color
+        palette = ThemePalette.derived(from: color)
+        UserDefaults.standard.set(color.hex, forKey: Self.key)
+        scheduleDockIcon()
+    }
+    func reset() { set(ThemePalette.defaultAccent) }
+
+    /// The Dock shows the icon in the current accent while the app runs. Redrawn after the picker
+    /// settles rather than on every drag step.
+    func scheduleDockIcon(delay: Duration = .milliseconds(250)) {
+        iconUpdate?.cancel()
+        let palette = palette
+        iconUpdate = Task { @MainActor in
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled, let data = AppIconArt.png(palette: palette, size: 512) else { return }
+            NSApp.applicationIconImage = NSImage(data: data)
+        }
+    }
+}
+
+extension Color {
+    init(_ rgb: RGB) { self.init(.sRGB, red: rgb.r, green: rgb.g, blue: rgb.b) }
+}
+
+/// Palette and type for the HUD. Near-black ground tinted by the accent, the accent itself, gold
+/// only for decisions, pink only for stop and delete (both move if the accent sits too close).
 enum HUD {
-    static let void = Color(red: 0.047, green: 0.024, blue: 0.028)
-    static let deep = Color(red: 0.078, green: 0.035, blue: 0.042)
-    static let panel = Color(red: 0.150, green: 0.055, blue: 0.066)
-    static let line = Color(red: 0.98, green: 0.30, blue: 0.30)
-    static let accent = Color(red: 0.98, green: 0.26, blue: 0.26)
-    static let ember = Color(red: 0.72, green: 0.12, blue: 0.16)
-    static let ice = Color(red: 0.95, green: 0.90, blue: 0.90)
-    static let steel = Color(red: 0.80, green: 0.70, blue: 0.70)
-    static let dim = Color(red: 0.62, green: 0.48, blue: 0.49)
-    static let amber = Color(red: 0.96, green: 0.70, blue: 0.28)
-    static let crimson = Color(red: 0.98, green: 0.32, blue: 0.64)
+    private static var palette: ThemePalette { ThemeStore.shared.palette }
+    static var void: Color { Color(palette.void) }
+    static var deep: Color { Color(palette.deep) }
+    static var panel: Color { Color(palette.panel) }
+    static var line: Color { Color(palette.line) }
+    static var accent: Color { Color(palette.accent) }
+    static var ember: Color { Color(palette.ember) }
+    static var thinking: Color { Color(palette.thinking) }
+    static var ice: Color { Color(palette.ice) }
+    static var steel: Color { Color(palette.steel) }
+    static var dim: Color { Color(palette.dim) }
+    static var amber: Color { Color(palette.approval) }
+    static var crimson: Color { Color(palette.danger) }
 
     /// Small tracked caps for readouts and field labels.
     static func label(_ size: CGFloat = 9) -> Font { .system(size: size, weight: .medium, design: .monospaced) }
@@ -26,17 +73,19 @@ enum HUD {
 /// Window ground: a 28pt line grid, a faint glow in the middle, scanlines and a vignette.
 struct HUDBackground: View {
     var body: some View {
+        // Read here so the grid redraws when the accent changes; the Canvas closure alone isn't tracked.
+        let ground = HUD.void, glow = HUD.accent, gridLine = HUD.line
         ZStack {
             Canvas { context, size in
                 let rect = CGRect(origin: .zero, size: size)
-                context.fill(Path(rect), with: .color(HUD.void))
-                context.fill(Path(rect), with: .radialGradient(Gradient(colors: [HUD.accent.opacity(0.045), .clear]),
+                context.fill(Path(rect), with: .color(ground))
+                context.fill(Path(rect), with: .radialGradient(Gradient(colors: [glow.opacity(0.045), .clear]),
                                                                center: CGPoint(x: size.width / 2, y: size.height / 2),
                                                                startRadius: 0, endRadius: max(size.width, size.height) * 0.62))
                 var grid = Path()
                 for x in stride(from: 0, through: size.width, by: 28) { grid.move(to: CGPoint(x: x, y: 0)); grid.addLine(to: CGPoint(x: x, y: size.height)) }
                 for y in stride(from: 0, through: size.height, by: 28) { grid.move(to: CGPoint(x: 0, y: y)); grid.addLine(to: CGPoint(x: size.width, y: y)) }
-                context.stroke(grid, with: .color(HUD.line.opacity(0.05)), lineWidth: 1)
+                context.stroke(grid, with: .color(gridLine.opacity(0.05)), lineWidth: 1)
                 var scan = Path()
                 for y in stride(from: 3, through: size.height, by: 4) { scan.addRect(CGRect(x: 0, y: y, width: size.width, height: 1)) }
                 context.fill(scan, with: .color(.white.opacity(0.012)))
@@ -114,7 +163,7 @@ struct HUDButtonStyle: ButtonStyle {
     enum Kind { case primary, critical, danger, ghost }
     var kind: Kind = .ghost
     var compact = false
-    func makeBody(configuration: Configuration) -> some View {
+    func makeBody(configuration: ButtonStyleConfiguration) -> some View {
         HUDButtonBody(configuration: configuration, kind: kind, compact: compact)
     }
 }

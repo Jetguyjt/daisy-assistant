@@ -7,7 +7,7 @@ enum OrbMood: Equatable {
         switch self {
         case .approval: return HUD.amber
         case .offline: return HUD.crimson
-        case .thinking: return Color(red: 1.0, green: 0.50, blue: 0.30)
+        case .thinking: return HUD.thinking
         default: return HUD.accent
         }
     }
@@ -48,6 +48,8 @@ struct OrbView: View {
     var body: some View {
         let rate = mood.active ? 30.0 : 20.0
         let slowed = activeState == .inactive ? min(rate, 12) : rate
+        // Touch the palette so an accent change redraws the core even while its animation is paused.
+        let _ = HUD.accent
         TimelineView(.animation(minimumInterval: 1 / slowed, paused: reduceMotion || !visible)) { timeline in
             let time = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
             Canvas { context, size in draw(context, size: size, time: time) }

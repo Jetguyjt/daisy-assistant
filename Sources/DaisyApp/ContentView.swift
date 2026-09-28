@@ -642,6 +642,7 @@ private struct SettingsView: View {
     @ObservedObject var model: AppModel
     var body: some View {
         HUDPage(kicker: "SYSTEM CONFIGURATION", title: "Settings", width: 760) {
+            AppearanceSection()
             section("AGENT") {
                 field("Brain") {
                     Picker("", selection: Binding(get: { model.usesHermes ? "hermes" : "local" }, set: { model.config.agentBackend = $0 })) {

@@ -701,6 +701,48 @@ import Foundation
         }
         do {
             let before = TestLog.failures
+            let suite = ThemeTests()
+            suite.testDefaultRedMatchesTheShippedTheme()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testDefaultRedMatchesTheShippedTheme")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = ThemeTests()
+            try suite.testHexRoundTripsAndRejectsJunk()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testHexRoundTripsAndRejectsJunk")
+        } catch { fail("testHexRoundTripsAndRejectsJunk: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = ThemeTests()
+            suite.testHSBRoundTrips()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testHSBRoundTrips")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = ThemeTests()
+            suite.testDecisionAndDangerColorsMoveAwayFromTheAccent()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testDecisionAndDangerColorsMoveAwayFromTheAccent")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = ThemeTests()
+            suite.testDarkAccentsAreLiftedAndGroundsStayDark()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testDarkAccentsAreLiftedAndGroundsStayDark")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = ThemeTests()
+            try suite.testIconRendersAPNG()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testIconRendersAPNG")
+        } catch { fail("testIconRendersAPNG: \(error)") }
+        do {
+            let before = TestLog.failures
             let suite = VoiceBlendTests()
             suite.testDefaultVoiceAndTheCatalog()
             count += 1

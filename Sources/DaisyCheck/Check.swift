@@ -8,6 +8,14 @@ import DaisyCore
         let runtime = LocalRuntime()
         do {
             let args = CommandLine.arguments
+            if args.dropFirst().first == "--render-icon" {
+                // Used by build-app.sh: the bundle icon comes from the same drawing as the Dock icon.
+                guard args.count >= 3 else { print("usage: daisy-check --render-icon out.png [#RRGGBB]"); exit(2) }
+                let accent = args.count >= 4 ? RGB(hex: args[3]) : ThemePalette.defaultAccent
+                guard let accent, let png = AppIconArt.png(palette: .derived(from: accent)) else { print("could not render the icon"); exit(1) }
+                try png.write(to: URL(fileURLWithPath: args[2]))
+                exit(0)
+            }
             if args.dropFirst().first == "--delegation" { exit(await DelegationCheck.run(Array(args.dropFirst(2)))) }
             if args.dropFirst().first == "--hermes" {
                 // Live run through the same ACP bridge the app uses. Approvals are always declined,
