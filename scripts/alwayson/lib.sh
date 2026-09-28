@@ -1,4 +1,5 @@
 # shellcheck shell=bash
+# shellcheck disable=SC2034  # DAISY_MODEL and DAISY_PROVIDER are read by the fragments that source this
 # Shared by the always-on fragments in scripts/hermes.d (gateway, budget, cron). Sourced; it only
 # defines functions and changes nothing. Needs $HERMES, $HERMES_HOME and $REPO_DIR from setup-hermes.sh.
 
