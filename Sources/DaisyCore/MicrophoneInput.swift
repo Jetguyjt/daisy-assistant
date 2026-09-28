@@ -1,6 +1,18 @@
 import AVFoundation
 import Foundation
 
+/// One chunk of microphone audio at 16 kHz mono: the samples, their power in dBFS, how long they
+/// last, and the voice activity probability for the chunk when Silero runs (nil when it doesn't).
+public struct AudioChunk: Sendable {
+    public let samples: [Int16]
+    public let power: Float
+    public let duration: TimeInterval
+    public let speech: Float?
+    public init(samples: [Int16], power: Float, duration: TimeInterval, speech: Float? = nil) {
+        self.samples = samples; self.power = power; self.duration = duration; self.speech = speech
+    }
+}
+
 /// Channel 0 of whatever the input node delivers, resampled to 16 kHz mono Int16 for Whisper and
 /// the endpointer. AVAudioConverter does not downmix when the channel count shrinks: it writes
 /// silence. The built-in mic delivers three channels and voice processing delivers seven, with
