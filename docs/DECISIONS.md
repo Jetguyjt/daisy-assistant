@@ -79,3 +79,15 @@ Capture moved from AVAudioRecorder to AVAudioEngine with Apple voice processing 
 ## 010 — Jarvis becomes DAISY (2026-09-27)
 
 The voice moves from British male to American female (Kokoro `af_heart`), so the name changed with it: DAISY, "Definitely An Intelligent System, Yeah." Everything was renamed in one pass: the app and bundle ID (`com.local.daisy.desktop`), Swift targets and modules, the Hermes plugin (`hermes/daisy`, `DAISY_SESSION`), scripts, docs and the GitHub repo. The wake phrase is "hey daisy", and Whisper's misspellings of it are accepted. The first launch moves `~/Library/Application Support/Jarvis` to `.../Daisy` and rewrites the saved paths inside `config.json`, falling back to the old folder if the move fails. The new bundle ID means macOS asks for microphone and automation permissions again. Entries above this one keep the old name because that's what it was called then.
+
+## 011 — Heart stays local on Kokoro (2026-09-27)
+
+Daisy speaks with Kokoro's `af_heart`, its only A-graded voice, and a 70/30 Heart + Bella blend is one setting away (`af_heart:0.7,af_bella:0.3`, mixed from the two style vectors inside the worker). Every other English Kokoro voice stays selectable, including the British ones Jarvis used. A hosted voice (Cartesia, OpenAI) and Qwen3-TTS were left out on purpose: the local voice costs nothing per sentence, works offline, and a hosted one would need its own key and send every answer out. The worker now trims silence to an even 200 ms between chunks, and the text it reads has numbers, money, times, dates and abbreviations written out as words, because espeak reads "3.5" as "three. five". How it sounds is for me to judge by ear; `daisy-check --voice-ab` plays the comparisons.
+
+## 012 — The guard rebuilt around one action per card (2026-09-28)
+
+A stress test of the first guard found ways around it in every category: a chained command whose card showed only the harmless half, recipients hidden past the card's line limit, sends through `mail`, `curl -F` or `osascript`, deletes through aliases and `find -delete`, no guard at all in cron or gateway sessions, and nothing stopping a web page from steering a memory write. Every one of those became a test first, failing on the old guard.
+
+The new guard reads commands the way bash will and refuses chains unless every step only reads, so a card always shows exactly one action in full. Risky actions become typed plugin tools that declare what they do, and the guard judges them by that declaration instead of parsing arguments; the shell route to the same action is refused. It loads in every Hermes process, blocks when it errors, gives background jobs and cron runs read-only roles, adds a card for memory writes and new sites once a turn has read outside content, limits a session to five cards a minute, and gives each card its own rule key so nothing can be approved for good. It's still a reader of commands, not a sandbox.
+
+Hermes's `delegate_task` stays off in Daisy sessions: checked live, its background results never come back over ACP. Background work runs as Daisy's own jobs instead, each in a Hermes session the guard knows is read-only.
