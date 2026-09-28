@@ -3,33 +3,40 @@
 Daisy is the face and the voice. Hermes Agent is the agent runtime. OpenAI, through Hermes's ChatGPT/Codex subscription sign-in, is the reasoning model. Daisy doesn't know or care which model Hermes uses.
 
 ```text
-┌──────────────────────── this Mac ─────────────────────────────────────────┐
-│                                                                            │
-│  Daisy.app (SwiftUI)                                                      │
-│    HUD, orb, transcript, approval cards                                    │
-│    mic → Silero → wake word → Apple speech (whisper fallback)   Kokoro → speakers
-│         │                                            ▲                     │
-│         ▼                                            │ sentences as they   │
-│    AppModel ──► AgentBackend ──────────────────────── stream in            │
-│                    │                                                       │
-│                    ├─ HermesBackend ──stdio JSON-RPC (ACP)──► hermes-acp   │
-│                    │                                            │          │
-│                    │        Hermes: tool loop, sessions (state.db),        │
-│                    │        memory (MEMORY.md, USER.md), skills, MCP,      │
-│                    │        approvals, provider sign-in (auth.json)        │
-│                    │                                            │          │
-│                    └─ LocalBackend (optional): Ollama + Swift tool loop    │
-│                                                                 │          │
-└─────────────────────────────────────────────────────────────────┼──────────┘
-                                                                  ▼
-                                         OpenAI (ChatGPT/Codex subscription)
+┌───────────────────────────── this Mac ──────────────────────────────────┐
+│                                                                          │
+│  Daisy.app (SwiftUI)                                                     │
+│    HUD, transcript, approval queue (cards count down; no answer = no)    │
+│    JOBS tab (background jobs, cron output)                               │
+│    mic → Silero → "hey daisy" → Apple speech (Whisper fallback)          │
+│    Kokoro worker → speakers, text shown as it's spoken                   │
+│         │                                                                │
+│    AppModel ─► AgentBackend ─┬─ HermesBackend ─ ACP over stdio ─┐        │
+│                              └─ LocalBackend (optional Ollama)  │        │
+│                                                                 ▼        │
+│  hermes-acp: one conversation session + up to 2 job sessions             │
+│    (job sessions listed in ~/.hermes/daisy/roles.json)                   │
+│    Hermes: tool loop, sessions, memory files, skills, MCP, sign-in       │
+│    Daisy plugin (hermes/daisy):                                          │
+│      guard ── every tool call: run, card, or block (every process)       │
+│      typed tools ─┬─ chrome_*  → your Chrome (AppleScript)               │
+│                   ├─ gmail_*, calendar_*, drive_* → Google APIs          │
+│                   ├─ computer_* → other apps (cua-driver)                │
+│                   └─ contacts_* → daisy-contacts (Contacts)              │
+│      persona, learned-memory log                                         │
+│                                                                          │
+│  hermes gateway (optional, launchd): cron jobs, same plugin and guard    │
+│    (read-only) → ~/.hermes/cron/output → shown in Daisy                  │
+└─────────────────────────────────┬────────────────────────────────────────┘
+                                  ▼
+                    OpenAI (ChatGPT/Codex subscription)
 ```
 
 ## What runs where
 
-Local: the Daisy app, speech-to-text (whisper.cpp), text-to-speech (Kokoro), the wake word, Hermes itself, its tools (file search, terminal, skills), its session database and memory files, and anything in the optional local backend.
+Local: the Daisy app, speech-to-text (Apple's on-device recognizer, whisper.cpp as the fallback), text-to-speech (Kokoro), the wake word, Hermes itself, its tools (file search, terminal, skills), Chrome and Contacts lookups, other-app control through cua-driver, its session database and memory files, and anything in the optional local backend.
 
-Remote: whatever Hermes sends OpenAI for a turn. That is the request, the conversation so far in that session, Hermes's system prompt (including its memory snapshot and the Daisy persona), and the results of tools it ran for that request. File search results reach the model as names and paths, not folder dumps; the persona tells Hermes to pass only what the task needs. That is guidance to the model, not an enforced filter.
+Remote: whatever Hermes sends OpenAI for a turn. That is the request, the conversation so far in that session, Hermes's system prompt (including its memory snapshot and the Daisy persona), and the results of tools it ran for that request, including email headers, calendar events or a screenshot when a tool fetched them. Gmail, Calendar and Drive calls go from this Mac to Google with the sign-in the `google-workspace` skill keeps in `~/.hermes/google_token.json`. File search results reach the model as names and paths, not folder dumps; the persona tells Hermes to pass only what the task needs. That is guidance to the model, not an enforced filter.
 
 Offline, Daisy still runs: the HUD shows the agent as offline, `/find` still does a direct filename search in the chosen folder, and the on-device backend can be switched on in Setup.
 
