@@ -33,7 +33,7 @@ final class ComposerTextView: NSTextView {
     override func keyDown(with event: NSEvent) {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         switch event.keyCode {
-        case 36, 76 where !hasMarkedText():
+        case 36 where !hasMarkedText(), 76 where !hasMarkedText():
             if expanded {
                 if flags.contains(.command) { onSubmit?(); return }
             } else if !flags.contains(.shift), !flags.contains(.option) {

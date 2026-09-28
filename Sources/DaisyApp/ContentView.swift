@@ -5,6 +5,8 @@ struct ContentView: View {
     @ObservedObject var model: AppModel
     @Namespace private var orbSpace
     @AppStorage("telemetryCollapsed") private var telemetryCollapsed = false
+    @State private var showingChats = false
+    @State private var atBottom = true
 
     private static let tabs: [(id: String, label: String, symbol: String)] = [
         ("Assistant", "DAISY", "circle.hexagongrid"), ("Tasks", "TASKS", "checklist"),
@@ -73,6 +75,14 @@ struct ContentView: View {
             Spacer()
             StatusPill(text: linkText, color: linkColor, lit: model.connected)
             MicPill(audio: model.audio, phase: model.phase, standby: model.standby)
+            if model.usesHermes {
+                Button { model.refreshChats(); showingChats = true } label: { Label("Chats", systemImage: "clock.arrow.circlepath") }
+                    .buttonStyle(HUDButtonStyle(kind: .ghost, compact: true))
+                    .help("Earlier conversations")
+                    .popover(isPresented: $showingChats, arrowEdge: .bottom) {
+                        ChatsList(model: model) { showingChats = false }
+                    }
+            }
             Button { model.clearConversation() } label: { Label("New conversation", systemImage: "plus.circle") }
                 .buttonStyle(HUDButtonStyle(kind: .ghost, compact: true))
                 .help("New conversation (⌘N)")
@@ -238,9 +248,22 @@ struct ContentView: View {
                 .padding(.horizontal, 24).padding(.vertical, 20)
             }
             .scrollIndicators(.never)
-            .onChange(of: model.messages.count) { withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo("bottom", anchor: .bottom) } }
-            .onChange(of: model.liveText) { proxy.scrollTo("bottom", anchor: .bottom) }
+            .modifier(BottomTracker(atBottom: $atBottom))
+            // Follow new text only while already at the bottom, so reading back isn't yanked away.
+            .onChange(of: model.messages.count) { if atBottom { withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo("bottom", anchor: .bottom) } } }
+            .onChange(of: model.liveText) { if atBottom { proxy.scrollTo("bottom", anchor: .bottom) } }
             .onChange(of: model.approvals.count) { withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo("bottom", anchor: .bottom) } }
+            .overlay(alignment: .bottomTrailing) {
+                if !atBottom {
+                    Button { withAnimation(.easeOut(duration: 0.3)) { proxy.scrollTo("bottom", anchor: .bottom) } } label: {
+                        Image(systemName: "arrow.down").font(.system(size: 12, weight: .bold))
+                            .frame(width: 32, height: 32).foregroundStyle(HUD.void)
+                            .background(Rectangle().fill(HUD.accent))
+                    }
+                    .buttonStyle(.plain).padding(16).help("Jump to latest").accessibilityLabel("Jump to latest")
+                    .transition(.opacity)
+                }
+            }
         }
         .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.035),
                                      .init(color: .black, location: 0.965), .init(color: .clear, location: 1)],
@@ -784,5 +807,64 @@ struct HUDPage<Content: View>: View {
         .scrollIndicators(.never)
         .hudPanel(radius: 16)
         .padding(.horizontal, 16).padding(.bottom, 16)
+    }
+}
+
+/// Tracks whether the transcript is scrolled to the bottom (macOS 15+; earlier versions always follow).
+private struct BottomTracker: ViewModifier {
+    @Binding var atBottom: Bool
+    func body(content: Content) -> some View {
+        if #available(macOS 15.0, *) {
+            content.onScrollGeometryChange(for: Bool.self) { geometry in
+                geometry.contentOffset.y + geometry.containerSize.height >= geometry.contentSize.height - 60
+            } action: { _, bottom in
+                if bottom != atBottom { atBottom = bottom }
+            }
+        } else {
+            content
+        }
+    }
+}
+
+/// Earlier conversations, newest first. Picking one reopens it where it left off.
+private struct ChatsList: View {
+    @ObservedObject var model: AppModel
+    let close: () -> Void
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("RECENT CHATS").hudCaption(HUD.accent)
+                Spacer()
+                Button { model.clearConversation(); close() } label: { Label("New", systemImage: "plus") }
+                    .buttonStyle(HUDButtonStyle(kind: .ghost, compact: true))
+            }
+            .padding(12)
+            Rectangle().fill(HUD.line.opacity(0.15)).frame(height: 1)
+            if model.chats.isEmpty {
+                Text("No earlier chats yet.").font(.system(size: 12)).foregroundStyle(HUD.dim).padding(12)
+            }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(model.chats) { chat in
+                        Button { model.openChat(chat.id); close() } label: {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(chat.title).font(.system(size: 12.5, weight: .medium)).foregroundStyle(HUD.ice).lineLimit(2)
+                                if let updated = chat.updated {
+                                    Text(updated.formatted(.relative(presentation: .named))).font(HUD.readout(9.5)).foregroundStyle(HUD.dim)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 12).padding(.vertical, 9)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .overlay(alignment: .bottom) { Rectangle().fill(HUD.line.opacity(0.08)).frame(height: 1) }
+                    }
+                }
+            }
+            .frame(maxHeight: 360)
+        }
+        .frame(width: 320)
+        .background(HUD.deep)
     }
 }

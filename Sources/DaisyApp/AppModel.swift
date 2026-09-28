@@ -310,6 +310,23 @@ struct ConversationItem: Identifiable {
         messages.removeSubrange(index...)
         run(text)
     }
+    /// Earlier Hermes conversations, newest first, for the Chats list.
+    @Published var chats: [AgentSession] = []
+    func refreshChats() {
+        let backend = self.backend
+        Task { chats = await backend.sessions() }
+    }
+    /// Reopens an earlier conversation; Hermes replays it and the transcript shows the last part.
+    func openChat(_ id: String) {
+        stop(clearNotice: true)
+        let backend = self.backend
+        Task {
+            guard let history = await backend.open(session: id) else { notice = "That chat couldn't be opened."; return }
+            messages = history.suffix(60).map { ConversationItem(role: $0.role == "user" ? "user" : "assistant", text: $0.text) }
+            activity = []; recentSearch = nil; liveText = ""
+            rest()
+        }
+    }
     func copy(_ text: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
