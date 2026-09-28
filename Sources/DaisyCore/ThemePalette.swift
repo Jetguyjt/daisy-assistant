@@ -70,8 +70,8 @@ public struct ThemePalette: Equatable, Sendable {
         ("Gold", RGB(0.96, 0.78, 0.30)), ("White", RGB(0.90, 0.92, 0.95))
     ]
 
-    static let gold = RGB(0.96, 0.70, 0.28)
-    static let pink = RGB(0.98, 0.32, 0.64)
+    public static let gold = RGB(0.96, 0.70, 0.28)
+    public static let pink = RGB(0.98, 0.32, 0.64)
 
     public static func derived(from input: RGB) -> ThemePalette {
         var (h, s, v) = input.hsb

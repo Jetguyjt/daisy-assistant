@@ -1,5 +1,5 @@
 import Foundation
-@testable import DaisyCore
+import DaisyCore
 
 final class ThemeTests {
     private func close(_ a: RGB, _ b: RGB, within tolerance: Double = 0.03) -> Bool {

@@ -1,5 +1,5 @@
 import Foundation
-@testable import DaisyCore
+import DaisyCore
 
 final class VoiceDefaultTests {
     func testJarvisGeorgeAndMissingVoiceBecomeHeart() {
