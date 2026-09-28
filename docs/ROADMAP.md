@@ -50,11 +50,11 @@ Notes: [orchestrator.md](research/orchestrator.md)
 - [ ] Fix or patch ACP so delegation results come back (read `completion_queue`, or run delegations synchronously)
   - not doing it for now: Hermes 0.21 always runs top-level delegations in the background and ignores the model's `background` flag (`tools/delegate_tool.py`), so a plugin can't make them synchronous; only a patch to Hermes could. Daisy's own job sessions cover background work instead
 - [ ] `hermes gateway` as a LaunchAgent: cron, Kanban, Telegram/iMessage from my phone
-  - built: `scripts/hermes.d/60-gateway.sh` runs `hermes gateway install` with `DAISY_GATEWAY=1` (`DAISY_GATEWAY=0` uninstalls). The guard loads there (Hermes source checked, cron role tested). Not installed yet
+  - built: `scripts/hermes.d/60-gateway.sh` runs `hermes gateway install` with `DAISY_GATEWAY=1` (`DAISY_GATEWAY=0` uninstalls). The guard loads there (Hermes source checked, cron role tested). Installed 2026-09-28: launchd supervises it, and its log says it runs for cron with no messaging platforms. The phone side isn't set up (see [phone.md](research/phone.md))
 - [ ] Daisy shows cron output (`~/.hermes/cron/output/`) and the Kanban board
   - built: under the jobs list in the JOBS tab, read-only (tests with sample run files and a throwaway kanban.db); not seen live
 - [ ] Budget: cheaper `delegation.model`, poll usage windows, pause background work around 80%, add a fallback provider
-  - built: the `delegation.model` rule in `61-budget.sh` (newest "mini" model Hermes lists), usage windows read through Hermes's Python every 10 minutes and shown under USAGE, new background jobs held at 80% with "Run them anyway". The fallback provider is mine to pick (options in orchestrator.md). Not run live
+  - built: the `delegation.model` rule in `61-budget.sh` (newest "mini" model Hermes lists), usage windows read through Hermes's Python every 10 minutes and shown under USAGE, new background jobs held at 80% with "Run them anyway". The fallback provider is mine to pick (options in orchestrator.md). `delegation.model` stays unset for now: Hermes lists no mini model for openai-codex. Not run live
 - [ ] Launch at login (`SMAppService.mainApp`); push-to-talk on battery
   - built: Setup → Always on (open at login off by default; click to talk on battery on by default). The Login Items prompt and a real unplug not seen yet
 - [ ] Later, if 24/7 matters: gateway on a home box or VPS with its own device-code login (never copy `auth.json`)
@@ -139,9 +139,10 @@ Notes: [persona.md](research/persona.md)
 - [ ] iMessage: `imsg` CLI, permissions, contact mapping (overlaps with the Contacts item)
   - built: `imsg_send` (saved nickname, then Contacts; anything that isn't exactly one person and one number is refused with who it could be). Card shows the exact number, service and whole message. Tests only; no text sent yet, and the Automation prompt not seen. No reading tool: it would need Full Disk Access
 - [ ] Reminders and Notes
+  - `remindctl` 0.3.8 installed 2026-09-28
   - built: `reminders_list` / `reminders_add` / `reminders_complete` on `remindctl` (not installed yet: `brew install steipete/tap/remindctl`), and `notes_search` / `notes_read` / `notes_create` / `notes_append` straight through osascript, not `memo` (details in [INTEGRATIONS.md](INTEGRATIONS.md#notes)). Tests only
 - [ ] Specialist agents on cron (inbox triage overnight, repo digests), in the spirit of lukebuildsai's setup
-  - built: `DAISY_CRON=1` adds the inbox triage (5:30) and the repo digest (7:00), both read-only; folders go in `~/.hermes/daisy/repo-digest.txt`. Not run live
+  - built: `DAISY_CRON=1` adds the inbox triage (5:30) and the repo digest (7:00), both read-only; folders go in `~/.hermes/daisy/repo-digest.txt`. Scheduled 2026-09-28; not run yet
 
 ## Voice loop and app
 
