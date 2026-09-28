@@ -3,6 +3,7 @@ Run: python3 hermes/test_daisy_learned.py"""
 
 import importlib.util
 import json
+import logging
 import os
 import shutil
 import stat
@@ -125,6 +126,12 @@ class Context:
 ctx = Context()
 learned.register(ctx)
 check("registers tool_execution middleware", ctx.middleware == [("tool_execution", learned.around_tool)])
+logging.getLogger("daisy.learned").disabled = True
+try:
+    learned.register(object())  # a Hermes without middleware
+except Exception:
+    check("an older Hermes doesn't break the plugin's registration", False)
+logging.getLogger("daisy.learned").disabled = False
 
 write_user(["Josh is in high school", "Uses Outlook for mail"])
 

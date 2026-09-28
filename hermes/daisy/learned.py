@@ -56,7 +56,12 @@ _finished: Dict[str, int] = {}
 
 
 def register(ctx) -> None:
-    ctx.register_middleware("tool_execution", around_tool)
+    """Never raises, so it can't take the guard's registration down with it. A Hermes without
+    middleware just runs without the log."""
+    try:
+        ctx.register_middleware("tool_execution", around_tool)
+    except Exception as error:
+        log.warning("learned log is off: %s", error)
 
 
 def home() -> Path:
