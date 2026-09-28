@@ -7,11 +7,14 @@ case "$BUILD_MODE" in release|debug) ;; *) echo "Use release or debug"; exit 1;;
 # Only what the bundle needs: the test runner uses @testable imports, which a release build refuses.
 swift build -c "$BUILD_MODE" --product Daisy
 swift build -c "$BUILD_MODE" --product daisy-check
+swift build -c "$BUILD_MODE" --product daisy-contacts
 STAGING_DIR="$(mktemp -d "${TMPDIR:-/tmp}/daisy-build.XXXXXX")"
 APP_DIR="$STAGING_DIR/Daisy.app"
 mkdir -p "$REPO_DIR/dist"
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 cp ".build/$BUILD_MODE/Daisy" "$APP_DIR/Contents/MacOS/Daisy"
+# The Contacts helper the Hermes plugin runs; signed before the bundle so --deep --strict passes.
+cp ".build/$BUILD_MODE/daisy-contacts" "$APP_DIR/Contents/MacOS/daisy-contacts"
 cp scripts/Info.plist "$APP_DIR/Contents/Info.plist"
 ICONSET="$STAGING_DIR/AppIcon.iconset"
 mkdir -p "$ICONSET"
@@ -25,6 +28,7 @@ rm -rf "$ICONSET" "$STAGING_DIR/icon.png"
 python3 scripts/write-defaults.py "$REPO_DIR" "$APP_DIR/Contents/Resources/RuntimeDefaults.json"
 # Finder/iCloud metadata on development folders can make ad-hoc signing fail.
 xattr -cr "$APP_DIR"
+codesign --force --sign - --identifier com.local.daisy.contacts "$APP_DIR/Contents/MacOS/daisy-contacts"
 codesign --force --sign - --identifier com.local.daisy.desktop "$APP_DIR"
 codesign --verify --deep --strict "$APP_DIR"
 # A zip survives iCloud/File Provider folders without Finder metadata altering the bundle. Only the

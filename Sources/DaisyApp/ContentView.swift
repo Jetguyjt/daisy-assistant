@@ -580,7 +580,7 @@ private struct MemoryView: View {
     @State private var notes: [String] = []
     var body: some View {
         HUDPage(kicker: "KNOWLEDGE STORE / \(model.memories.count) SAVED", title: "Memory") {
-            if model.usesHermes { hermes }
+            if model.usesHermes { hermes; LearnedView(learned: model.learned).padding(.top, 10) }
             HStack {
                 Text(model.usesHermes ? "ON-DEVICE MEMORY · OLD ENGINE" : "\(model.memories.count) SAVED").hudCaption(model.usesHermes ? HUD.dim : HUD.accent)
                 Spacer()

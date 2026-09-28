@@ -17,6 +17,7 @@ import DaisyCore
                 exit(0)
             }
             if args.dropFirst().first == "--delegation" { exit(await DelegationCheck.run(Array(args.dropFirst(2)))) }
+            if args.dropFirst().first == "--recall" { exit(await RecallCheck.run(Array(args.dropFirst(2)))) }
             if args.dropFirst().first == "--hermes" {
                 // Live run through the same ACP bridge the app uses. Approvals are always declined,
                 // so a check can never send, delete or change anything.

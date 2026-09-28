@@ -34,7 +34,10 @@ FAILED = "Daisy's guard hit an error, so this was blocked: {error}"
 NOBODY = "Blocked by Daisy's guard: {what} needs a yes, but {why}."
 TOO_MANY = "Blocked by Daisy's guard: too many approvals in a row, ask the user first before trying more."
 # What a typed read tool brings into the turn, going by the words in its name.
-TYPED_READS = (({"mail", "gmail", "email", "inbox", "outlook"}, "email"),
+# Contacts and confirmed nicknames come from the user's own address book and cards, so a lookup brings in nothing
+# from outside (checked first, since "contacts_search" also has "search" in it).
+TYPED_READS = (({"contact", "contacts", "alias", "aliases", "nickname", "nicknames"}, ""),
+               ({"mail", "gmail", "email", "inbox", "outlook"}, "email"),
                ({"imsg", "message", "messages", "sms", "chat", "chats", "imessage"}, "messages"),
                ({"doc", "docs", "drive", "sheet", "sheets", "slide", "slides", "file", "files", "note", "notes",
                  "pdf", "document", "documents"}, "documents"),

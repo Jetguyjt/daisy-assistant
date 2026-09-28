@@ -93,7 +93,13 @@ The guard reads commands; it is not a sandbox. `hermes/test_daisy_guard.py` and 
 
 ## Memory
 
-Personal memory belongs to Hermes, so it survives model changes. Hermes keeps `~/.hermes/memories/USER.md` (about the user) and `MEMORY.md` (its notes), and its `session_search` tool finds earlier conversations. The Memory tab shows both files read-only. Changes go through Daisy ("Remember that…", "forget…"). The older SQLite memory remains for the local backend, with a button to hand each entry to Hermes. ChatGPT's own memory is not available through this sign-in and isn't used.
+Personal memory belongs to Hermes, so it survives model changes. Hermes keeps `~/.hermes/memories/USER.md` (about the user) and `MEMORY.md` (its notes), and its `session_search` tool finds earlier conversations. The Memory tab shows both files. Changes go through Daisy ("Remember that…", "forget…"). ChatGPT's own memory is not available through this sign-in and isn't used.
+
+Hermes also saves things on its own: every 3 turns (`memory.nudge_interval`, set by `scripts/hermes.d/10-memory.sh`) a background review re-reads the conversation. The plugin logs every memory write and who made it (`$HERMES_HOME/daisy/learned.jsonl`), and the Memory tab's Learned feed lists what the review saved, with Undo and Edit. Those edit the files the way Hermes does: under the same `.lock`, re-read inside it, in its exact `\n§\n` form and within its size limits, so a running session never writes over them.
+
+The old SQLite memory moves into Hermes's files once (`hermes-memory-move.json` in Daisy's data folder is the marker and the report); whatever doesn't fit stays there and is named. While Hermes is the brain nothing new is written to SQLite; the on-device backend still reads it.
+
+Nicknames: `contacts_search` looks people up through `daisy-contacts` (a small helper inside Daisy.app that reads names, numbers and emails from Contacts), and `contacts_alias_save` remembers "Bubba means Robert Lukose" in `$HERMES_HOME/daisy/aliases.json` after a card. Sends still show who they go to on their own card.
 
 ## Adding tools
 

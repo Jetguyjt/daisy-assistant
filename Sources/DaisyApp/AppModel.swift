@@ -83,6 +83,8 @@ struct ConversationItem: Identifiable {
     lazy var approvalQueue: ApprovalQueue = makeApprovalQueue()
     /// Background jobs, each in a Hermes session of its own.
     lazy var jobs: JobsModel = makeJobs()
+    /// What Hermes learned on its own, for the Memory tab.
+    lazy var learned = LearnedMemory()
     /// The agent's plan for the current (or last) turn, when it keeps one.
     @Published var plan: AgentPlan?
     /// Job news that came in mid-turn, said once Daisy is free.
@@ -207,7 +209,12 @@ struct ConversationItem: Identifiable {
         Task.detached { ChildProcesses.shared.sweepOnce() }
         applySpeechInput()
         Task {
+            // No new memories in the old store while Hermes keeps them.
+            await store?.refuseWrites(usesHermes ? MemoryStore.keptByHermes : nil)
             await reloadMemories(); await reloadTasks()
+            // Once, the old store's memories move into Hermes's files; what doesn't fit stays and is named.
+            if usesHermes, config.hermesConnected == true, let store, let moved = await learned.moveOldMemories(from: store),
+               moved.worthMentioning, notice == nil { notice = moved.summary }
             if config.speakResponses { await speechWorker.warmUp() }
             applyListeningMode()
         }
@@ -238,7 +245,7 @@ struct ConversationItem: Identifiable {
                 // A home-folder cwd keeps Hermes in assistant mode; a repo would switch it to coding mode.
                 workingDirectory: FileManager.default.homeDirectoryForCurrentUser,
                 sessionFile: Configuration.dataDirectory.appendingPathComponent("hermes-session"),
-                environment: ["DAISY_SESSION": "1"]))
+                environment: ["DAISY_SESSION": "1", "DAISY_CONTACTS_BIN": Bundle.main.url(forAuxiliaryExecutable: "daisy-contacts")?.path ?? ""]))
         }
         return LocalBackend { [weak self] text in
             guard let self else { throw CancellationError() }
@@ -502,6 +509,7 @@ struct ConversationItem: Identifiable {
                     messages.append(reply); liveText = ""; voiceReveal = nil
                 }
                 if !usesHermes { await reloadMemories(); await reloadTasks() }
+                if usesHermes { learned.refresh() }
                 try await finishVoice(token: token)
                 settleReply()
                 if generation == token { finishTurn() }
@@ -974,6 +982,8 @@ struct ConversationItem: Identifiable {
             if config.speakResponses { Task { await speechWorker.warmUp() } }
             applySpeechInput()
             applyListeningMode()
+            let hermes = usesHermes, store = self.store
+            Task { await store?.refuseWrites(hermes ? MemoryStore.keptByHermes : nil) }
         } catch { notice = error.localizedDescription }
     }
     func shutdown() async {

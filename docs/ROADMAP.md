@@ -113,13 +113,19 @@ Notes: [persona.md](research/persona.md)
 ## Learning without /remember
 
 - [ ] Make Hermes's background review run more often (`memory.nudge_interval` is 10 user turns; try 3)
+  - `scripts/hermes.d/10-memory.sh` sets it to 3 when setup runs
 - [ ] "Learned" feed in the Memory tab with undo/edit for anything Hermes saved on its own
+  - built: the plugin logs every memory write with its origin, and the feed edits under Hermes's own lock (tests, including Hermes's own drift check on files Daisy wrote). Not seen with a live background review yet
 - [ ] One memory store: move the old SQLite memories into Hermes and stop writing to both
+  - built: a one-time move at launch (what doesn't fit stays and is named), and SQLite refuses new writes while Hermes is the brain. Not run on my real store yet
 - [ ] Contacts tool (`CNContactStore`) that Hermes can call, plus an alias table (nickname → contact, learned the first time I confirm who I meant)
-- [ ] Try the `holographic` memory plugin for aliases and facts that won't fit in `USER.md`
+  - built: `daisy-contacts` inside Daisy.app plus `contacts_search` / `contacts_alias_save` (a card to save a nickname). Not run against my Contacts; the permission prompt is Daisy's
+- [x] Try the `holographic` memory plugin for aliases and facts that won't fit in `USER.md`
+  - read, not switched: it doesn't resolve single-word nicknames, misses what the background review learns, and drifts from `MEMORY.md` (details in [learning.md](research/learning.md))
 - [ ] Opt-in folder indexing: a Hermes cron job that writes a "where I left off" note per repo in folders I pick
-- [ ] Show running subagents (`delegate_task`) in the HUD
+- Not needed: showing running subagents (`delegate_task`) in the HUD, since Daisy doesn't use it; background jobs show in the JOBS tab
 - [ ] Recall check in `daisy-check`: teach facts on day one, ask on day seven, plus a correction case and a "you don't know that" case
+  - built: `daisy-check --recall` (tested against stand-ins); not run live yet
 
 ## Integrations still open
 

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import os
 
-from . import registry, tools  # noqa: F401  (importing tools fills the registry)
+from . import learned, registry, tools  # noqa: F401  (importing tools fills the registry)
 from .guard import classify, classify_command, on_pre_tool_call
 from .persona import PERSONA, persona_section
 
@@ -31,6 +31,7 @@ def register(ctx) -> None:
     # The guard runs in every Hermes process (Daisy, CLI, gateway, cron) and blocks if it fails.
     # The persona and the typed tools are Daisy's alone.
     ctx.register_hook("pre_tool_call", on_pre_tool_call)
+    learned.register(ctx)  # logs each memory write and who made it, for the Learned feed
     if not ACTIVE:
         return
     ctx.register_system_prompt_section("daisy-persona", persona_section, max_chars=4000)
