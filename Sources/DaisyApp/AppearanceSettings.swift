@@ -14,11 +14,11 @@ struct AppearanceSection: View {
             HStack(spacing: 12) {
                 Text("Accent").font(.system(size: 12)).foregroundStyle(HUD.steel).frame(width: 110, alignment: .leading)
                 ColorPicker("Accent", selection: accentBinding, supportsOpacity: false).labelsHidden()
-                TextField("#FA4242", text: $hex)
+                TextField("#FAEAB7", text: $hex)
                     .hudField().frame(width: 110)
                     .onSubmit(applyHex)
-                    .help("Six hex digits, like #FA4242")
-                Button("Reset to red") { theme.reset() }
+                    .help("Six hex digits, like #FAEAB7")
+                Button("Reset") { theme.reset() }
                     .buttonStyle(HUDButtonStyle(kind: .ghost, compact: true))
                     .disabled(theme.accent == ThemePalette.defaultAccent)
             }
@@ -43,7 +43,7 @@ struct AppearanceSection: View {
                 swatch("Approve", HUD.amber)
                 swatch("Stop", HUD.crimson)
             }
-            Text(hexInvalid ? "That isn't a hex color. Use six digits, like #FA4242."
+            Text(hexInvalid ? "That isn't a hex color. Use six digits, like #FAEAB7."
                  : "Backgrounds, text and the core take this hue. Approve and stop colors change on their own if the accent gets too close to them.")
                 .font(.system(size: 11)).foregroundStyle(hexInvalid ? HUD.amber : HUD.dim)
         }

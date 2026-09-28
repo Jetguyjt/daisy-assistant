@@ -863,9 +863,16 @@ import Foundation
         do {
             let before = TestLog.failures
             let suite = ThemeTests()
-            suite.testDefaultRedMatchesTheShippedTheme()
+            suite.testDefaultIsCream()
             count += 1
-            print("\(TestLog.failures == before ? "PASS" : "FAIL") testDefaultRedMatchesTheShippedTheme")
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testDefaultIsCream")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = ThemeTests()
+            suite.testRedPresetMatchesTheEarlierTheme()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testRedPresetMatchesTheEarlierTheme")
         }
         do {
             let before = TestLog.failures

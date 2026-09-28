@@ -62,10 +62,11 @@ public struct ThemePalette: Equatable, Sendable {
     public var ice, steel, dim: RGB
     public var approval, danger: RGB
 
-    /// The arc-reactor red the app ships with.
-    public static let defaultAccent = RGB(0.98, 0.26, 0.26)
+    /// The warm cream the app ships with, #FAEAB7.
+    public static let defaultAccent = RGB(hex: "#FAEAB7")!
+    public static let red = RGB(0.98, 0.26, 0.26)
     public static let presets: [(name: String, color: RGB)] = [
-        ("Red", defaultAccent), ("Cyan", RGB(0.36, 0.88, 0.90)), ("Blue", RGB(0.33, 0.56, 1.0)),
+        ("Cream", defaultAccent), ("Red", red), ("Cyan", RGB(0.36, 0.88, 0.90)), ("Blue", RGB(0.33, 0.56, 1.0)),
         ("Violet", RGB(0.66, 0.45, 1.0)), ("Green", RGB(0.30, 0.90, 0.52)), ("Orange", RGB(1.0, 0.55, 0.18)),
         ("Gold", RGB(0.96, 0.78, 0.30)), ("White", RGB(0.90, 0.92, 0.95))
     ]

@@ -6,8 +6,17 @@ final class ThemeTests {
         abs(a.r - b.r) <= tolerance && abs(a.g - b.g) <= tolerance && abs(a.b - b.b) <= tolerance
     }
 
-    func testDefaultRedMatchesTheShippedTheme() {
+    func testDefaultIsCream() {
+        expectEqual(ThemePalette.defaultAccent.hex, "#FAEAB7")
         let p = ThemePalette.derived(from: ThemePalette.defaultAccent)
+        expectEqual(p.accent.hex, "#FAEAB7")
+        // Cream sits next to the gold approval color, so approvals move to violet to stay distinct.
+        expectFalse(p.approval == ThemePalette.gold)
+        expectEqual(p.danger, ThemePalette.pink)
+    }
+
+    func testRedPresetMatchesTheEarlierTheme() {
+        let p = ThemePalette.derived(from: ThemePalette.red)
         expectTrue(close(p.accent, RGB(0.98, 0.26, 0.26)))
         expectTrue(close(p.void, RGB(0.047, 0.024, 0.028)))
         expectTrue(close(p.panel, RGB(0.150, 0.055, 0.066)))
