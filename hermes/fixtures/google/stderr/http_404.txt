@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "~/.hermes/skills/productivity/google-workspace/scripts/google_api.py", line 606, in drive_get
+    result = service.files().get(fileId=args.file_id, fields=fields).execute()
+googleapiclient.errors.HttpError: <HttpError 404 when requesting https://www.googleapis.example.com/drive/v3/files/1MissingFile0000000000000?fields=id&alt=json returned "File not found: 1MissingFile0000000000000.". Details: "[{'message': 'File not found: 1MissingFile0000000000000.', 'domain': 'global', 'reason': 'notFound', 'location': 'fileId', 'locationType': 'parameter'}]">

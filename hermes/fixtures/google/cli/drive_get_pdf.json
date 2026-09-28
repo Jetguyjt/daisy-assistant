@@ -1,0 +1,16 @@
+{
+  "id": "1ResumePdf000000000000000",
+  "name": "Resume.pdf",
+  "mimeType": "application/pdf",
+  "modifiedTime": "2026-08-02T15:00:00.000Z",
+  "size": "84211",
+  "webViewLink": "https://drive.example.com/file/d/1ResumePdf000000000000000/view",
+  "parents": [
+    "0AFolderRoot000000"
+  ],
+  "owners": [
+    {
+      "emailAddress": "josh@example.com"
+    }
+  ]
+}

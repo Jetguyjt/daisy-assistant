@@ -1,0 +1,15 @@
+{
+  "id": "1EssayDoc0000000000000000",
+  "name": "Common App essay draft",
+  "mimeType": "application/vnd.google-apps.document",
+  "modifiedTime": "2026-09-27T22:41:05.000Z",
+  "webViewLink": "https://docs.example.com/document/d/1EssayDoc0000000000000000/edit",
+  "parents": [
+    "0AFolderRoot000000"
+  ],
+  "owners": [
+    {
+      "emailAddress": "josh@example.com"
+    }
+  ]
+}

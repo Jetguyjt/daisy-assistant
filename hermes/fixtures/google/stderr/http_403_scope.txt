@@ -1,0 +1,3 @@
+Traceback (most recent call last):
+  File "<string>", line 97, in send
+googleapiclient.errors.HttpError: <HttpError 403 when requesting https://gmail.googleapis.example.com/gmail/v1/users/me/messages/send?alt=json returned "Request had insufficient authentication scopes.". Details: "[{'message': 'Insufficient Permission', 'domain': 'global', 'reason': 'insufficientPermissions'}]">

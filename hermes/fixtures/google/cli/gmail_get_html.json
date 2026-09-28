@@ -1,0 +1,12 @@
+{
+  "id": "18c0ffee0003",
+  "threadId": "18c0ffee0003",
+  "from": "Weekly Digest <news@example.com>",
+  "to": "josh@example.com",
+  "subject": "Your week in review",
+  "date": "Sun, 27 Sep 2026 18:00:00 +0000",
+  "labels": [
+    "INBOX"
+  ],
+  "body": "<html><head><title>Digest</title><style>p { color: red; }</style></head><body><script>alert('hi')</script><p>Here&#39;s your week &amp; more.</p><div>Three new posts<br>One new follower</div><table><tr><td>Read more at news.example.com</td></tr></table></body></html>"
+}

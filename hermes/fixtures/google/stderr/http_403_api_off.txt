@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "~/.hermes/skills/productivity/google-workspace/scripts/google_api.py", line 588, in drive_search
+    ).execute()
+googleapiclient.errors.HttpError: <HttpError 403 when requesting https://www.googleapis.example.com/drive/v3/files?q=x&alt=json returned "Google Drive API has not been used in project 123456789 before or it is disabled. Enable it by visiting https://console.example.com/apis/api/drive.googleapis.com/overview?project=123456789 then retry.". Details: "[{'message': 'Google Drive API has not been used in project 123456789 before or it is disabled.', 'domain': 'usageLimits', 'reason': 'accessNotConfigured'}]">

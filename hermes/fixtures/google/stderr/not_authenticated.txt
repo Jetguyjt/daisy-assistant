@@ -1,0 +1,2 @@
+Not authenticated. Run the setup script first:
+  python ~/.hermes/skills/productivity/google-workspace/scripts/setup.py

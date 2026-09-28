@@ -1,0 +1,13 @@
+{
+  "id": "18c0ffee0001",
+  "threadId": "18c0ffee0001",
+  "from": "Dad <dad@example.com>",
+  "to": "josh@example.com",
+  "subject": "Dinner Sunday?",
+  "date": "Mon, 28 Sep 2026 08:12:00 -0400",
+  "labels": [
+    "UNREAD",
+    "INBOX"
+  ],
+  "body": "Hey Josh,\r\n\r\nAre you free Sunday at 6? Mom's making lasagna.\r\n\r\n\r\n\r\nDad\r\n"
+}

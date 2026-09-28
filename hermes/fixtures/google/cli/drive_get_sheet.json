@@ -1,0 +1,15 @@
+{
+  "id": "1BudgetSheet00000000000000",
+  "name": "Budget 2026",
+  "mimeType": "application/vnd.google-apps.spreadsheet",
+  "modifiedTime": "2026-09-20T18:04:11.000Z",
+  "webViewLink": "https://docs.example.com/spreadsheets/d/1BudgetSheet00000000000000/edit",
+  "parents": [
+    "0AFolderRoot000000"
+  ],
+  "owners": [
+    {
+      "emailAddress": "josh@example.com"
+    }
+  ]
+}
