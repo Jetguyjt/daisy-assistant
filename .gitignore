@@ -7,3 +7,4 @@ dist/
 *.aiff
 .env
 config.local.json
+__pycache__/
