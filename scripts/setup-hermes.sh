@@ -1,7 +1,7 @@
 #!/bin/bash
 # Installs the Daisy plugin into Hermes and turns it on, then applies every config fragment in
-# scripts/hermes.d/. The plugin only acts in sessions Daisy starts (DAISY_SESSION=1): the Daisy
-# persona, typed tools, and a yes-first gate for sends, deletes and calendar changes. Sign-in stays
+# scripts/hermes.d/. The approval guard loads in every Hermes process (Daisy, CLI, gateway, cron);
+# the Daisy persona and typed tools only in sessions Daisy starts (DAISY_SESSION=1). Sign-in stays
 # with Hermes; this script never reads or touches its credentials.
 #
 # Fragments (scripts/hermes.d/NN-name.sh) are sourced in order. They must be idempotent: check

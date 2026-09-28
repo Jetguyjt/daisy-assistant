@@ -1,6 +1,6 @@
 name: daisy
 version: "0.1.0"
-description: "Daisy desktop client: the Daisy persona, and a yes-first gate for messages, email, calendar changes, posts and deletes. Only active when Daisy starts Hermes (DAISY_SESSION=1); CLI, cron and gateway sessions are untouched."
+description: "Daisy desktop client: the Daisy persona and typed tools in Daisy sessions, and an approval guard in every Hermes process (Daisy, CLI, gateway, cron) for messages, email, calendar changes, shares, posts and deletes."
 author: "Daisy"
 provides_hooks:
   - pre_tool_call

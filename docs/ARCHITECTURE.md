@@ -74,15 +74,22 @@ Daisy never handles OpenAI credentials. `hermes auth add openai-codex` (or `herm
 
 ## Approvals
 
-Hermes asks before dangerous shell commands and before file edits in its default mode. It doesn't ask before a skill sends a message or email or changes a calendar. `hermes/daisy` is a small Hermes plugin that closes that gap for Daisy sessions only (`DAISY_SESSION=1`):
+Hermes asks before dangerous shell commands and before file edits in its default mode. It doesn't ask before a skill sends a message or email or changes a calendar. The guard in `hermes/daisy/guard/` closes that gap. It's a `pre_tool_call` hook in every Hermes process (Daisy, CLI, gateway, cron), and for each tool call it lets it run, blocks it, or escalates it to Hermes's own approval gate, which reaches Daisy over ACP as a card:
 
-- a `pre_tool_call` hook escalates sends (iMessage, Mail, email CLIs), calendar writes, GitHub posts and deletes to Hermes's own approval gate. Denied, timed out or unanswered means blocked.
-- Daisy shows each request as an amber card with the exact content and **Cancel / Send**. It only ever answers "once"; an "always" answer is sent back as "once". Nothing is remembered as always-allowed.
+- typed tools are judged by the risk they declare (below). Everything else goes through the command rules: `shell.py` reads a command the way bash will, `commands.py` knows what each program does, `code.py` reads `execute_code` and inline scripts, and `classify.py` covers the rest (MCP tools, browser and computer-use actions).
+- chained commands are refused unless every step only reads this Mac, so a card always shows one action, in full. The shell route to something a typed tool does (a Gmail send through a skill's CLI) is refused and points at the tool.
+- once a turn has read mail, web pages, files or messages, a memory write or a site the turn hasn't touched yet needs a card, and the card says what was read first (`taint.py`).
+- roles (`roles.py`): background jobs only read; cron runs only read, plus actions pre-approved with fixed values in `~/.hermes/daisy/cron-allow.json`. Where nobody could answer a card (yolo, one-shot runs, webhooks) it's blocked instead.
+- more than five cards in a minute in one session are refused, `javascript:` links always are, and so are writes to the guard's own files.
+- an error inside the guard blocks the call, because Hermes would otherwise run the tool.
+
+In the app:
+
+- each request is an amber card with the exact content and **Cancel / Send**. Daisy only ever answers "once"; an "always" answer is sent back as "once", and every card has its own rule key, so nothing is remembered as always-allowed.
 - no answer is no. Hermes gives up after 60 seconds, so the card counts down, and at 54 seconds it's declined and taken down (the bridge declines at 57 as a backstop). Cards go as soon as their turn or job ends, and job cards say which job asked.
 - in a voice turn, a card left waiting for 3 seconds frees the voice: Daisy says "I've left that for you to approve." and, in wake-word mode, goes back to listening while the card stays up.
-- it also adds the Daisy persona as a system-prompt section. `$HERMES_HOME/daisy-persona.md` replaces it without touching code.
 
-The guard pattern-matches commands; it is not a sandbox. `python3 hermes/test_daisy_guard.py` lists what it stops and what it lets through. Install with `bash scripts/setup-hermes.sh`.
+The guard reads commands; it is not a sandbox. `hermes/test_daisy_guard.py` and `hermes/test_daisy_guard_bypass.py` list what it stops and what it lets through. Install with `bash scripts/setup-hermes.sh`. The plugin also adds the Daisy persona as a system-prompt section in Daisy sessions; `$HERMES_HOME/daisy-persona.md` replaces it without touching code.
 
 ## Memory
 
@@ -107,7 +114,7 @@ Use Hermes, not Daisy code:
 
 A new family is one file in `hermes/daisy/tools/` that calls `registry.add(TypedTool(...))` at import. The tools package imports every file in it, so nothing else changes. Typed tools register into the `hermes-acp` toolset, which is what Daisy's sessions get.
 
-The guard (`hermes/daisy/guard/`) decides from that metadata alone: `read` runs, anything else stops at a card, and every approval is for that one call only. It never parses a typed tool's arguments. Untyped routes (`terminal`, `execute_code`, MCP tools) still go through the command rules in `guard/classify.py`.
+The guard decides from that metadata alone: `read` runs, anything else stops at a card, and every approval is for that one call only. It never parses a typed tool's arguments. A read tool's name says what it brings into the turn: a name with mail, message, doc, drive, file, calendar, web, page, tab or search in it marks the turn as having read outside content, and a name with open or navigate in it needs a card once that has happened.
 
 ### Hermes settings
 

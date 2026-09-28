@@ -67,7 +67,7 @@ struct QueuedApprovalCard: View {
     /// The button says what will happen: Send, Delete, Run… or Allow.
     private var verb: String {
         let first = item.approval.title.split(separator: " ").first.map(String.init) ?? ""
-        return ["Send", "Delete", "Create", "Change", "Run", "Move", "Post", "Update", "Open", "Edit", "Share"].contains(first) ? first : "Allow"
+        return ["Send", "Delete", "Create", "Change", "Run", "Move", "Post", "Update", "Open", "Edit", "Share", "Upload", "Install", "Push", "Publish", "Type", "Press", "Click", "Save", "Empty"].contains(first) ? first : "Allow"
     }
 
     private func looksLikeCode(_ detail: String) -> Bool {

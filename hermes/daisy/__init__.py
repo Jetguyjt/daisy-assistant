@@ -2,10 +2,11 @@
 yes-first gate in front of them.
 
 Hermes asks before dangerous shell commands and file edits, but a message, an email or a calendar
-change can go out through a skill's CLI with no prompt. In Daisy sessions (DAISY_SESSION=1) the
-guard escalates those calls to Hermes's own approval gate, which reaches Daisy over ACP as a
-permission request and shows up as a card with the exact content. Denied, timed out or unanswered
-means blocked.
+change can go out through a skill's CLI with no prompt. The guard closes that gap in every Hermes
+process (Daisy, CLI, gateway, cron): it escalates those calls to Hermes's own approval gate, which
+reaches Daisy over ACP as a permission request and shows up as a card with the exact content.
+Denied, timed out or unanswered means blocked, and so does an error inside the guard. The persona
+and the typed tools are only for sessions Daisy starts (DAISY_SESSION=1).
 
 Layout: persona.py (who Daisy is), registry.py (the typed-tool contract), guard/ (what needs a
 yes), tools/ (one file per tool family).
