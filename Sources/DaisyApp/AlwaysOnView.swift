@@ -7,7 +7,6 @@ import DaisyCore
 /// every minute while this is on screen.
 struct AlwaysOnView: View {
     @ObservedObject var feed: AlwaysOnFeed
-    var budget: BudgetMonitor?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -19,7 +18,6 @@ struct AlwaysOnView: View {
             }
             Text("Hermes's scheduled jobs and Kanban board. They run in Hermes's gateway, so they carry on while Daisy is closed; nothing here sends anything.")
                 .font(.system(size: 11.5)).foregroundStyle(HUD.dim).fixedSize(horizontal: false, vertical: true)
-            if let budget { BudgetHoldNotice(budget: budget) }
             scheduled
             latest
             kanban

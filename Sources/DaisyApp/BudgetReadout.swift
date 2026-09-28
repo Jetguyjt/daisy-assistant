@@ -24,22 +24,21 @@ struct BudgetReadout: View {
     private var held: Bool { budget.holdReason != nil }
 }
 
-/// Above the jobs list while new background jobs are held: why, and a way to run them anyway until the
-/// window resets.
+/// Under the Start job row while queued jobs are held back (JobsModel.held): why, and a way to run them
+/// anyway until the window resets.
 struct BudgetHoldNotice: View {
-    @ObservedObject var budget: BudgetMonitor
+    let reason: String
+    let runAnyway: () -> Void
 
     var body: some View {
-        if let reason = budget.holdReason {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Image(systemName: "gauge.with.dots.needle.67percent").foregroundStyle(HUD.amber)
-                Text(reason).font(.system(size: 12)).foregroundStyle(HUD.amber).fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 8)
-                Button("Run them anyway") { budget.allowAnyway() }
-                    .buttonStyle(HUDButtonStyle(kind: .ghost, compact: true))
-                    .help("New jobs start again until that window resets")
-            }
-            .padding(.vertical, 6)
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Image(systemName: "gauge.with.dots.needle.67percent").foregroundStyle(HUD.amber)
+            Text(reason).font(.system(size: 12)).foregroundStyle(HUD.amber).fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 8)
+            Button("Run them anyway", action: runAnyway)
+                .buttonStyle(HUDButtonStyle(kind: .ghost, compact: true))
+                .help("Queued jobs start again until that window resets")
         }
+        .padding(.vertical, 4)
     }
 }
