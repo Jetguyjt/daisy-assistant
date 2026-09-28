@@ -38,12 +38,16 @@ struct ConversationItem: Identifiable {
     var receipts: [CapabilityReceipt] = []
     /// Approvals given or refused during this answer, e.g. "Approved: Send an iMessage to Dad".
     var decisions: [String] = []
+    /// Files sent with a user message, by name.
+    var attachments: [String] = []
 }
 
 @MainActor final class AppModel: ObservableObject {
     @Published var config = Configuration()
     @Published var phase: AssistantPhase = .idle
-    @Published var input = ""
+    /// The message being written. Its own object, so typing doesn't redraw the whole window.
+    let composer = ComposerState()
+    @Published var composerExpanded = false
     @Published var messages: [ConversationItem] = []
     @Published var memories: [Memory] = []
     @Published var selectedFolder: URL?
@@ -251,22 +255,61 @@ struct ConversationItem: Identifiable {
     var agentDetail: String? { if case .ready(let detail) = agentLink { return detail }; return nil }
 
     func submit() {
-        let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
+        let text = composer.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let files = composer.attachments
+        guard !text.isEmpty || !files.isEmpty else { return }
         // Hermes gets up to 100 KB; the on-device model's small context keeps it at 4,000 bytes.
         if usesHermes {
             guard text.utf8.count <= HermesBackend.maxRequestBytes else { notice = "Please keep each message under 100 KB."; return }
         } else {
             guard text.utf8.count <= 4000 else { notice = "Please keep each request under 4,000 UTF-8 bytes so it fits the local context window."; return }
+            guard files.isEmpty else { notice = "Attachments need Hermes. Switch the brain in Setup."; return }
         }
-        input = ""; run(text)
+        let attachments: [AgentAttachment]
+        do { attachments = try files.map(Attachments.load) } catch { notice = error.localizedDescription; return }
+        composer.text = ""; composer.attachments = []; composerExpanded = false
+        run(text, attachments: attachments)
     }
-    func run(_ text: String, spoken: Bool = false) {
+    /// ↑ in an empty composer: bring back the last thing you sent to edit it.
+    func editLastMessage() {
+        guard let last = messages.last(where: { $0.role == "user" }) else { return }
+        composer.set(last.text)
+    }
+    /// Sends the last question again in place of its answer.
+    func retryLast() {
+        guard let index = messages.lastIndex(where: { $0.role == "user" }) else { return }
+        let text = messages[index].text
+        stop(clearNotice: true)
+        messages.removeSubrange(index...)
+        run(text)
+    }
+    func copy(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+    /// Reads one message aloud with the current voice.
+    func readAloud(_ text: String) {
+        stop(clearNotice: true)
+        let token = generation
+        let speech = SpeechText.spoken(from: text)
+        guard !speech.isEmpty else { return }
+        phase = .synthesizing
+        bargeEndpointer = SpeechEndpointer(settings: .bargeIn)
+        work = Task {
+            do {
+                try await audio.speak(speech, voice: config.naturalVoice ?? "bm_george", speed: config.speechRate ?? 1) {
+                    if self.generation == token { self.phase = .speaking }
+                }
+            } catch { }
+            if generation == token { phase = .idle; rest() }
+        }
+    }
+    func run(_ text: String, spoken: Bool = false, attachments: [AgentAttachment] = []) {
         stop(clearNotice: true)
         standby = false; voiceTurn = spoken
         let token = generation
         turnHistory = messages.filter { $0.role == "user" || $0.role == "assistant" }.suffix(8).map { ChatMessage(role: $0.role, content: $0.text) }
-        messages.append(ConversationItem(role: "user", text: text))
+        messages.append(ConversationItem(role: "user", text: text, attachments: attachments.map(\.name)))
         if messages.count > 100 { messages.removeFirst(messages.count - 100) }
         phase = .thinking
         activity = []; liveText = ""; approvals = []; decisions = []; feed = SpeechFeed()
@@ -285,7 +328,7 @@ struct ConversationItem: Identifiable {
                     let receipt = try await session.execute(.init(name: "search_files", arguments: ["query": .string(String(text.dropFirst(6)))]))
                     receipts = [receipt]; liveText = receipt.output.summary
                 } else {
-                    for try await event in backend.send(text) {
+                    for try await event in backend.send(AgentPrompt(text: text, attachments: attachments)) {
                         try Task.checkCancellation()
                         guard generation == token else { return }
                         switch event {

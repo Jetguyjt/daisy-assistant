@@ -41,6 +41,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
                 Divider()
             }
+            CommandGroup(after: .textEditing) {
+                Button(model.composerExpanded ? "Collapse message editor" : "Expand message editor") { model.composerExpanded.toggle() }
+                    .keyboardShortcut("e", modifiers: [.command, .shift])
+            }
             CommandMenu("Voice") {
                 Button("Start / finish recording") { model.toggleListening() }.keyboardShortcut(.space, modifiers: [.command, .shift])
                 Button(model.alwaysListening ? "Turn off always listening" : "Turn on always listening") {
