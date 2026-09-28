@@ -1,0 +1,1 @@
+Error Domain=NSCocoaErrorDomain Code=513 "You don’t have permission to save the file “imsg” in the folder “Attachments”." UserInfo={NSFilePath=/Users/me/Library/Messages/Attachments/imsg, NSUnderlyingError=0x600000c3c0f0 {Error Domain=NSPOSIXErrorDomain Code=1 "Operation not permitted"}}

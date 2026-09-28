@@ -1,0 +1,1 @@
+applescript send failed (not_started): Messages automation failed with AppleScript error -1728. The operation did not start; retry is safe.

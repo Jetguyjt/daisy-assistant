@@ -1,0 +1,1 @@
+AppleScript failed: Could not securely open attachment at /private/tmp/daisy-files/photo.jpg: Too many levels of symbolic links

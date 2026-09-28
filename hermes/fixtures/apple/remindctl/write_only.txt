@@ -1,0 +1,1 @@
+Reminders access is write-only. Switch to Full Access in System Settings > Privacy & Security > Reminders.

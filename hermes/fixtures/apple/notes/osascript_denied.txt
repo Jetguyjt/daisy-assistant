@@ -1,0 +1,1 @@
+execution error: Error: Error: Not authorized to send Apple events to Notes. (-1743)
