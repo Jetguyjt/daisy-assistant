@@ -1,19 +1,19 @@
 import SwiftUI
 
-/// Palette and type for the HUD. Near-black ground, arc-reactor cyan, amber only for decisions,
-/// crimson only for stop and delete.
+/// Palette and type for the HUD. Near-black ground with a warm cast, arc-reactor red, amber (gold)
+/// only for decisions, hot pink only for stop and delete.
 enum HUD {
-    static let void = Color(red: 0.024, green: 0.043, blue: 0.071)
-    static let deep = Color(red: 0.040, green: 0.067, blue: 0.098)
-    static let panel = Color(red: 0.067, green: 0.118, blue: 0.157)
-    static let line = Color(red: 0.36, green: 0.88, blue: 0.90)
-    static let cyan = Color(red: 0.36, green: 0.88, blue: 0.90)
-    static let blue = Color(red: 0.31, green: 0.55, blue: 0.95)
-    static let ice = Color(red: 0.86, green: 0.90, blue: 0.925)
-    static let steel = Color(red: 0.66, green: 0.74, blue: 0.79)
-    static let dim = Color(red: 0.49, green: 0.58, blue: 0.63)
-    static let amber = Color(red: 0.94, green: 0.68, blue: 0.27)
-    static let crimson = Color(red: 0.88, green: 0.27, blue: 0.24)
+    static let void = Color(red: 0.047, green: 0.024, blue: 0.028)
+    static let deep = Color(red: 0.078, green: 0.035, blue: 0.042)
+    static let panel = Color(red: 0.150, green: 0.055, blue: 0.066)
+    static let line = Color(red: 0.98, green: 0.30, blue: 0.30)
+    static let accent = Color(red: 0.98, green: 0.26, blue: 0.26)
+    static let ember = Color(red: 0.72, green: 0.12, blue: 0.16)
+    static let ice = Color(red: 0.95, green: 0.90, blue: 0.90)
+    static let steel = Color(red: 0.80, green: 0.70, blue: 0.70)
+    static let dim = Color(red: 0.62, green: 0.48, blue: 0.49)
+    static let amber = Color(red: 0.96, green: 0.70, blue: 0.28)
+    static let crimson = Color(red: 0.98, green: 0.32, blue: 0.64)
 
     /// Small tracked caps for readouts and field labels.
     static func label(_ size: CGFloat = 9) -> Font { .system(size: size, weight: .medium, design: .monospaced) }
@@ -30,7 +30,7 @@ struct HUDBackground: View {
             Canvas { context, size in
                 let rect = CGRect(origin: .zero, size: size)
                 context.fill(Path(rect), with: .color(HUD.void))
-                context.fill(Path(rect), with: .radialGradient(Gradient(colors: [HUD.cyan.opacity(0.045), .clear]),
+                context.fill(Path(rect), with: .radialGradient(Gradient(colors: [HUD.accent.opacity(0.045), .clear]),
                                                                center: CGPoint(x: size.width / 2, y: size.height / 2),
                                                                startRadius: 0, endRadius: max(size.width, size.height) * 0.62))
                 var grid = Path()
@@ -87,7 +87,7 @@ struct CornerBrackets: Shape {
 /// Flat gradient plate with a cut outline and lit brackets.
 struct HUDPanel: ViewModifier {
     var radius: CGFloat = 14
-    var tint: Color = HUD.cyan
+    var tint: Color = HUD.accent
     var brackets = true
     func body(content: Content) -> some View {
         content
@@ -99,7 +99,7 @@ struct HUDPanel: ViewModifier {
 }
 
 extension View {
-    func hudPanel(radius: CGFloat = 14, tint: Color = HUD.cyan, brackets: Bool = true) -> some View {
+    func hudPanel(radius: CGFloat = 14, tint: Color = HUD.accent, brackets: Bool = true) -> some View {
         modifier(HUDPanel(radius: radius, tint: tint, brackets: brackets))
     }
     /// Section caption: small tracked caps.
@@ -108,7 +108,7 @@ extension View {
     }
 }
 
-/// Buttons: primary is lit cyan, critical is amber (approve, send), danger is crimson (stop,
+/// Buttons: primary is lit red, critical is amber (approve, send), danger is pink (stop,
 /// delete), ghost is an outline for everything else. Square, monospace caps.
 struct HUDButtonStyle: ButtonStyle {
     enum Kind { case primary, critical, danger, ghost }
@@ -126,7 +126,7 @@ private struct HUDButtonBody: View {
     @Environment(\.isEnabled) private var enabled
     @State private var hovering = false
     var body: some View {
-        let color: Color = kind == .critical ? HUD.amber : kind == .danger ? HUD.crimson : HUD.cyan
+        let color: Color = kind == .critical ? HUD.amber : kind == .danger ? HUD.crimson : HUD.accent
         let filled = kind != .ghost
         configuration.label
             .font(.system(size: compact ? 10 : 11, weight: .semibold, design: .monospaced))
@@ -169,11 +169,11 @@ struct HUDSwitch: View {
         Button(action: action) {
             HStack(spacing: 10) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(title).font(HUD.label(10)).tracking(1.6).foregroundStyle(isOn ? HUD.cyan : HUD.steel)
+                    Text(title).font(HUD.label(10)).tracking(1.6).foregroundStyle(isOn ? HUD.accent : HUD.steel)
                     Text(detail ?? (isOn ? "ON" : "OFF")).font(.system(size: 10)).foregroundStyle(HUD.dim)
                 }
                 ZStack(alignment: isOn ? .trailing : .leading) {
-                    Capsule().fill(isOn ? HUD.cyan.opacity(0.85) : Color.white.opacity(0.08))
+                    Capsule().fill(isOn ? HUD.accent.opacity(0.85) : Color.white.opacity(0.08))
                         .overlay(Capsule().strokeBorder(isOn ? .clear : HUD.dim.opacity(hovering ? 0.8 : 0.5), lineWidth: 1))
                         .frame(width: 34, height: 19)
                     Circle().fill(isOn ? HUD.void : HUD.dim).frame(width: 13, height: 13).padding(3)
@@ -211,7 +211,7 @@ struct StatusPill: View {
 struct LevelBars: View {
     let level: Double
     var bars = 12
-    var color: Color = HUD.cyan
+    var color: Color = HUD.accent
     var body: some View {
         HStack(alignment: .bottom, spacing: 2) {
             ForEach(0..<bars, id: \.self) { index in

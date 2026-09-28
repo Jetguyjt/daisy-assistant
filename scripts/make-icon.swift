@@ -1,4 +1,4 @@
-// Draws the Jarvis app icon (arc-reactor orb on a dark tile) as a 1024px PNG.
+// Draws the app icon (red arc-reactor orb on a dark tile) as a 1024px PNG.
 // Usage: swift scripts/make-icon.swift out.png
 import AppKit
 
@@ -10,8 +10,8 @@ NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
 let ctx = NSGraphicsContext.current!.cgContext
 let space = CGColorSpaceCreateDeviceRGB()
 func rgb(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat, _ a: CGFloat = 1) -> CGColor { CGColor(colorSpace: space, components: [r, g, b, a])! }
-let cyan = (r: CGFloat(0.36), g: CGFloat(0.88), b: CGFloat(0.90))
-func accent(_ a: CGFloat) -> CGColor { rgb(cyan.r, cyan.g, cyan.b, a) }
+let red = (r: CGFloat(0.98), g: CGFloat(0.26), b: CGFloat(0.26))
+func accent(_ a: CGFloat) -> CGColor { rgb(red.r, red.g, red.b, a) }
 
 // macOS icon grid: 824pt tile centered in 1024 with a continuous-corner radius.
 let tile = CGRect(x: 100, y: 100, width: 824, height: 824)
@@ -20,12 +20,12 @@ let c = CGPoint(x: 512, y: 512)
 
 ctx.saveGState()
 ctx.setShadow(offset: CGSize(width: 0, height: -12), blur: 28, color: rgb(0, 0, 0, 0.45))
-ctx.addPath(tilePath); ctx.setFillColor(rgb(0.024, 0.043, 0.071)); ctx.fillPath()
+ctx.addPath(tilePath); ctx.setFillColor(rgb(0.047, 0.024, 0.028)); ctx.fillPath()
 ctx.restoreGState()
 
 ctx.saveGState()
 ctx.addPath(tilePath); ctx.clip()
-let bg = CGGradient(colorsSpace: space, colors: [rgb(0.07, 0.13, 0.18), rgb(0.02, 0.035, 0.06)] as CFArray, locations: [0, 1])!
+let bg = CGGradient(colorsSpace: space, colors: [rgb(0.17, 0.06, 0.07), rgb(0.04, 0.02, 0.025)] as CFArray, locations: [0, 1])!
 ctx.drawLinearGradient(bg, start: CGPoint(x: 512, y: 924), end: CGPoint(x: 512, y: 100), options: [])
 // Faint HUD grid.
 ctx.setStrokeColor(accent(0.06)); ctx.setLineWidth(2)
@@ -76,7 +76,7 @@ ctx.setShadow(offset: .zero, blur: 40, color: accent(0.9))
 drawReactor(boost: 0.8)
 ctx.restoreGState()
 drawReactor(boost: 1)
-let core = CGGradient(colorsSpace: space, colors: [rgb(0.92, 1, 1), accent(1), accent(0)] as CFArray, locations: [0, 0.35, 1])!
+let core = CGGradient(colorsSpace: space, colors: [rgb(1, 0.93, 0.9), accent(1), accent(0)] as CFArray, locations: [0, 0.35, 1])!
 ctx.drawRadialGradient(core, startCenter: c, startRadius: 0, endCenter: c, endRadius: 16 * s, options: [])
 ctx.restoreGState()
 

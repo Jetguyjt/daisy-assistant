@@ -7,8 +7,8 @@ enum OrbMood: Equatable {
         switch self {
         case .approval: return HUD.amber
         case .offline: return HUD.crimson
-        case .thinking: return Color(red: 0.36, green: 0.72, blue: 1.0)
-        default: return HUD.cyan
+        case .thinking: return Color(red: 1.0, green: 0.50, blue: 0.30)
+        default: return HUD.accent
         }
     }
     /// Overall brightness, 0...1.

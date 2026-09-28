@@ -37,7 +37,7 @@ struct ContentView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .foregroundStyle(HUD.ice)
-        .tint(HUD.cyan)
+        .tint(HUD.accent)
         .onExitCommand { model.interrupt() }
     }
 
@@ -47,7 +47,7 @@ struct ContentView: View {
         VStack(spacing: 8) {
             Button { model.tab = "Assistant" } label: {
                 VStack(spacing: 3) {
-                    Text("J").font(.system(size: 14, weight: .bold, design: .monospaced)).foregroundStyle(HUD.cyan)
+                    Text("J").font(.system(size: 14, weight: .bold, design: .monospaced)).foregroundStyle(HUD.accent)
                     Text("JARVIS").font(HUD.label(7)).tracking(1.4).foregroundStyle(HUD.dim)
                 }
             }
@@ -79,7 +79,7 @@ struct ContentView: View {
                 .help("New conversation (⌘N)")
             TimelineView(.periodic(from: .now, by: 1)) { context in
                 Text(context.date, format: .dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits).second(.twoDigits))
-                    .font(HUD.readout(12)).foregroundStyle(HUD.cyan).monospacedDigit()
+                    .font(HUD.readout(12)).foregroundStyle(HUD.accent).monospacedDigit()
             }
             .frame(width: 70, alignment: .trailing)
         }
@@ -104,8 +104,8 @@ struct ContentView: View {
     }
     private var linkColor: Color {
         switch model.agentLink {
-        case .ready: return HUD.cyan
-        case .starting: return HUD.blue
+        case .ready: return HUD.accent
+        case .starting: return HUD.ember
         case .needsSetup: return HUD.amber
         case .offline: return HUD.crimson
         }
@@ -152,7 +152,7 @@ struct ContentView: View {
         case .synthesizing, .speaking: return .speaking
         }
     }
-    private var moodColor: Color { mood == .idle || mood == .standby ? HUD.cyan : mood.tint }
+    private var moodColor: Color { mood == .idle || mood == .standby ? HUD.accent : mood.tint }
 
     private var phaseTitle: String {
         switch model.phase {
@@ -268,7 +268,7 @@ struct ContentView: View {
                 }
                 .padding(.leading, 12).padding(.trailing, 6).padding(.vertical, 6)
                 .background(Rectangle().fill(HUD.void.opacity(0.7)))
-                .overlay(Rectangle().strokeBorder(inputFocused ? HUD.cyan.opacity(0.5) : HUD.line.opacity(0.2), lineWidth: 1))
+                .overlay(Rectangle().strokeBorder(inputFocused ? HUD.accent.opacity(0.5) : HUD.line.opacity(0.2), lineWidth: 1))
                 HUDSwitch(title: "ALWAYS LISTENING", isOn: model.alwaysListening,
                           detail: model.alwaysListening ? (model.standby ? "Say “Hey Jarvis”" : "Arming mic…") : "Mic off between turns") {
                     model.setAlwaysListening(!model.alwaysListening)
@@ -299,8 +299,8 @@ struct ContentView: View {
             Image(systemName: live ? "stop.fill" : preparing ? "xmark" : "mic.fill")
                 .font(.system(size: 13, weight: .semibold))
                 .frame(width: 34, height: 34)
-                .foregroundStyle(live ? HUD.void : HUD.cyan)
-                .background(Rectangle().fill(live ? HUD.crimson : HUD.cyan.opacity(0.08)))
+                .foregroundStyle(live ? HUD.void : HUD.accent)
+                .background(Rectangle().fill(live ? HUD.crimson : HUD.accent.opacity(0.08)))
         }
         .buttonStyle(.plain)
         .help(live ? "Finish and send (⌘⇧Space)" : "Talk (⌘⇧Space)")
@@ -314,7 +314,7 @@ struct ContentView: View {
                 .font(.system(size: 13, weight: .bold))
                 .frame(width: 34, height: 34)
                 .foregroundStyle(HUD.void)
-                .background(Rectangle().fill(HUD.cyan.opacity(empty ? 0.35 : 1)))
+                .background(Rectangle().fill(HUD.accent.opacity(empty ? 0.35 : 1)))
         }
         .buttonStyle(.plain).disabled(empty)
         .help("Send (Return)")
@@ -347,7 +347,7 @@ struct ContentView: View {
                 rule
             }
             HStack {
-                Text("SYSTEM TELEMETRY").hudCaption(HUD.cyan)
+                Text("SYSTEM TELEMETRY").hudCaption(HUD.accent)
                 Spacer()
                 Button { telemetryCollapsed = true } label: { Image(systemName: "chevron.right") }
                     .buttonStyle(.plain).foregroundStyle(HUD.dim).help("Hide telemetry")
@@ -426,7 +426,7 @@ private struct MicPill: View {
     var body: some View {
         let live = phase == .listening
         StatusPill(text: live ? "MIC LIVE" : standby ? "HEY JARVIS" : audio.engineRunning ? "MIC OPEN" : "MIC OFF",
-                   color: live ? HUD.crimson : audio.engineRunning ? HUD.cyan : HUD.dim, lit: audio.engineRunning)
+                   color: live ? HUD.crimson : audio.engineRunning ? HUD.accent : HUD.dim, lit: audio.engineRunning)
     }
 }
 
@@ -472,17 +472,17 @@ private struct RailButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: symbol).font(.system(size: 15, weight: selected ? .semibold : .regular))
-                .foregroundStyle(selected ? HUD.cyan : hovering ? HUD.ice : HUD.dim)
+                .foregroundStyle(selected ? HUD.accent : hovering ? HUD.ice : HUD.dim)
                 .frame(width: 40, height: 40)
-                .background(Rectangle().fill(selected ? HUD.cyan.opacity(0.1) : hovering ? Color.white.opacity(0.04) : .clear))
+                .background(Rectangle().fill(selected ? HUD.accent.opacity(0.1) : hovering ? Color.white.opacity(0.04) : .clear))
                 .overlay(alignment: .topTrailing) {
                     if let badge {
                         Text(badge).font(HUD.label(8)).foregroundStyle(HUD.void)
                             .padding(.horizontal, 3).frame(minWidth: 14, minHeight: 14)
-                            .background(Rectangle().fill(HUD.cyan)).offset(x: 3, y: -3)
+                            .background(Rectangle().fill(HUD.accent)).offset(x: 3, y: -3)
                     }
                 }
-                .overlay(alignment: .leading) { if selected { Rectangle().fill(HUD.cyan).frame(width: 1, height: 20).offset(x: -18) } }
+                .overlay(alignment: .leading) { if selected { Rectangle().fill(HUD.accent).frame(width: 1, height: 20).offset(x: -18) } }
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -499,8 +499,8 @@ private struct ActivityRow: View {
         HStack(spacing: 8) {
             Group {
                 switch item.state {
-                case .running: ProgressView().controlSize(.mini).tint(HUD.cyan)
-                case .done: Image(systemName: "checkmark.circle.fill").foregroundStyle(HUD.cyan)
+                case .running: ProgressView().controlSize(.mini).tint(HUD.accent)
+                case .done: Image(systemName: "checkmark.circle.fill").foregroundStyle(HUD.accent)
                 case .failed: Image(systemName: "xmark.octagon.fill").foregroundStyle(HUD.crimson)
                 }
             }
@@ -522,7 +522,7 @@ private struct LiveReply: View {
     let step: String
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            speaker("JARVIS", color: HUD.cyan)
+            speaker("JARVIS", color: HUD.accent)
             if text.isEmpty {
                 TimelineView(.periodic(from: .now, by: 0.35)) { timeline in
                     let dots = Int(timeline.date.timeIntervalSinceReferenceDate / 0.35) % 4
@@ -537,7 +537,7 @@ private struct LiveReply: View {
     }
     private var caret: AttributedString {
         var caret = AttributedString(" ▍")
-        caret.foregroundColor = HUD.cyan
+        caret.foregroundColor = HUD.accent
         return caret
     }
 }
@@ -572,8 +572,8 @@ private struct MessageView: View {
             Text(item.text).font(.system(size: 14)).lineSpacing(4).foregroundStyle(HUD.ice).textSelection(.enabled)
                 .padding(.horizontal, 12).padding(.vertical, 8)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Rectangle().fill(HUD.cyan.opacity(0.06)))
-                .overlay(alignment: .leading) { Rectangle().fill(HUD.cyan.opacity(0.4)).frame(width: 1) }
+                .background(Rectangle().fill(HUD.accent.opacity(0.06)))
+                .overlay(alignment: .leading) { Rectangle().fill(HUD.accent.opacity(0.4)).frame(width: 1) }
         }
     }
 
@@ -587,11 +587,11 @@ private struct MessageView: View {
 
     private var assistant: some View {
         VStack(alignment: .leading, spacing: 10) {
-            speaker("JARVIS", color: HUD.cyan, detail: item.detail)
+            speaker("JARVIS", color: HUD.accent, detail: item.detail)
             ForEach(item.decisions, id: \.self) { decision in
                 HStack(spacing: 6) {
                     Image(systemName: decision.hasPrefix("Approved") ? "checkmark.shield.fill" : "xmark.shield.fill")
-                        .foregroundStyle(decision.hasPrefix("Approved") ? HUD.cyan : HUD.amber)
+                        .foregroundStyle(decision.hasPrefix("Approved") ? HUD.accent : HUD.amber)
                     Text(decision).foregroundStyle(HUD.steel)
                 }
                 .font(.system(size: 11))
@@ -602,7 +602,7 @@ private struct MessageView: View {
                     ForEach(item.receipts) { receipt in
                         HStack(alignment: .top, spacing: 7) {
                             Image(systemName: receipt.status == .succeeded ? "checkmark.circle" : "exclamationmark.circle")
-                                .foregroundStyle(receipt.status == .succeeded ? HUD.cyan : HUD.amber)
+                                .foregroundStyle(receipt.status == .succeeded ? HUD.accent : HUD.amber)
                             Text(receipt.title).foregroundStyle(HUD.steel) + Text("  " + receipt.output.summary).foregroundStyle(HUD.dim)
                         }
                         .font(.system(size: 11)).textSelection(.enabled)
@@ -621,7 +621,7 @@ private struct MessageView: View {
                 .font(HUD.label(8.5)).tracking(1.3).foregroundStyle(HUD.dim).padding(.bottom, 8)
             ForEach(report.files.prefix(8)) { file in
                 HStack(spacing: 10) {
-                    Image(systemName: "doc.text").foregroundStyle(HUD.cyan).frame(width: 16)
+                    Image(systemName: "doc.text").foregroundStyle(HUD.accent).frame(width: 16)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(file.name).font(.system(size: 12, weight: .medium)).foregroundStyle(HUD.ice)
                         Text(file.path).font(.system(size: 10)).foregroundStyle(HUD.dim).lineLimit(1).truncationMode(.middle).textSelection(.enabled)
@@ -642,9 +642,9 @@ private struct MessageView: View {
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 10)
-        .background(Rectangle().fill(HUD.cyan.opacity(0.025)))
-        .overlay(Rectangle().strokeBorder(HUD.cyan.opacity(0.2), lineWidth: 1))
-        .overlay(CornerBrackets(length: 10).stroke(HUD.cyan, lineWidth: 1.5))
+        .background(Rectangle().fill(HUD.accent.opacity(0.025)))
+        .overlay(Rectangle().strokeBorder(HUD.accent.opacity(0.2), lineWidth: 1))
+        .overlay(CornerBrackets(length: 10).stroke(HUD.accent, lineWidth: 1.5))
     }
 }
 
@@ -662,7 +662,7 @@ private struct MemoryView: View {
         HUDPage(kicker: "KNOWLEDGE STORE / \(model.memories.count) SAVED", title: "Memory") {
             if model.usesHermes { hermes }
             HStack {
-                Text(model.usesHermes ? "ON-DEVICE MEMORY · OLD ENGINE" : "\(model.memories.count) SAVED").hudCaption(model.usesHermes ? HUD.dim : HUD.cyan)
+                Text(model.usesHermes ? "ON-DEVICE MEMORY · OLD ENGINE" : "\(model.memories.count) SAVED").hudCaption(model.usesHermes ? HUD.dim : HUD.accent)
                 Spacer()
                 if !model.usesHermes {
                     Button { key = ""; value = ""; editing = nil; adding = true } label: { Label("Add memory", systemImage: "plus") }
@@ -676,7 +676,7 @@ private struct MemoryView: View {
             ForEach(model.memories) { memory in
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text(memory.key).font(HUD.readout(11)).foregroundStyle(HUD.cyan).textSelection(.enabled)
+                        Text(memory.key).font(HUD.readout(11)).foregroundStyle(HUD.accent).textSelection(.enabled)
                         Spacer()
                         if model.usesHermes {
                             Button("Tell Hermes") { model.tab = "Assistant"; model.run("Remember this about me: \(memory.key) — \(memory.value)") }
@@ -723,7 +723,7 @@ private struct MemoryView: View {
     private var hermes: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("HERMES MEMORY").hudCaption(HUD.cyan)
+                Text("HERMES MEMORY").hudCaption(HUD.accent)
                 Spacer()
                 Button { reload() } label: { Image(systemName: "arrow.clockwise") }
                     .buttonStyle(HUDButtonStyle(kind: .ghost, compact: true)).help("Reload")
@@ -852,7 +852,7 @@ private struct SettingsView: View {
     }
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(title).hudCaption(HUD.cyan)
+            Text(title).hudCaption(HUD.accent)
             content()
         }
         .padding(.vertical, 14)
@@ -882,9 +882,9 @@ private struct CapabilitiesView: View {
                             Text(entry.definition.title).font(.system(size: 13.5, weight: .medium)).foregroundStyle(HUD.ice)
                             Text(entry.definition.effect == .readOnly ? "READ" : "REVIEW")
                                 .font(HUD.label(8)).tracking(1.2)
-                                .foregroundStyle(entry.definition.effect == .readOnly ? HUD.cyan : HUD.amber)
+                                .foregroundStyle(entry.definition.effect == .readOnly ? HUD.accent : HUD.amber)
                                 .padding(.horizontal, 6).padding(.vertical, 2)
-                                .overlay(Capsule().strokeBorder((entry.definition.effect == .readOnly ? HUD.cyan : HUD.amber).opacity(0.45), lineWidth: 1))
+                                .overlay(Capsule().strokeBorder((entry.definition.effect == .readOnly ? HUD.accent : HUD.amber).opacity(0.45), lineWidth: 1))
                         }
                         Text(entry.definition.description).font(.system(size: 11.5)).foregroundStyle(HUD.steel).fixedSize(horizontal: false, vertical: true)
                         Text(entry.definition.provider + (entry.unavailableReason.map { " · " + $0 } ?? ""))
@@ -915,7 +915,7 @@ struct HUDPage<Content: View>: View {
             VStack(alignment: .leading, spacing: 14) {
                 if let title {
                     VStack(alignment: .leading, spacing: 8) {
-                        if let kicker { Text(kicker).font(HUD.label(10)).tracking(1.6).foregroundStyle(HUD.cyan) }
+                        if let kicker { Text(kicker).font(HUD.label(10)).tracking(1.6).foregroundStyle(HUD.accent) }
                         Text(title).font(HUD.title).foregroundStyle(HUD.ice)
                     }
                     .padding(.bottom, 8)

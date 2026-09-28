@@ -22,7 +22,7 @@ struct ReviewCard: View {
                 Text("EXACT CONTENTS").font(HUD.label(8.5)).tracking(1.4).foregroundStyle(HUD.steel)
             }
             if let status = model.reviewStatus(review) {
-                Text(status).font(.system(size: 11.5)).foregroundStyle(HUD.cyan).textSelection(.enabled)
+                Text(status).font(.system(size: 11.5)).foregroundStyle(HUD.accent).textSelection(.enabled)
             } else {
                 HStack(spacing: 10) {
                     Button("Discard") { model.discardReview(review) }
@@ -45,11 +45,11 @@ struct ConnectionsView: View {
     var body: some View {
         HUDPage(kicker: "BROWSER LINK / " + (model.chromeConnected ? "CONNECTED" : "OFFLINE"), title: "Connections") {
             HStack(spacing: 12) {
-                Image(systemName: "globe").font(.system(size: 18)).foregroundStyle(HUD.cyan)
+                Image(systemName: "globe").font(.system(size: 18)).foregroundStyle(HUD.accent)
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Google Chrome").font(.system(size: 15, weight: .semibold)).foregroundStyle(HUD.ice)
                     Text(model.chromeConnected ? "CONNECTED" : model.chromeConnecting ? "WAITING FOR CHROME" : "NOT CONNECTED")
-                        .font(HUD.label(9)).tracking(1.4).foregroundStyle(model.chromeConnected ? HUD.cyan : HUD.amber)
+                        .font(HUD.label(9)).tracking(1.4).foregroundStyle(model.chromeConnected ? HUD.accent : HUD.amber)
                 }
                 Spacer()
                 if model.chromeConnected || model.chromeConnecting {
@@ -71,14 +71,14 @@ struct ConnectionsView: View {
             Text("Jarvis can list tabs, read page text and open new tabs. It can't type, click, run scripts or send anything. Pages without readable text are reported as such. Reconnect after relaunching.")
                 .font(.system(size: 11.5)).foregroundStyle(HUD.dim).lineSpacing(3)
             if let status = model.connectionNotice {
-                Text(status).font(.system(size: 12)).foregroundStyle(HUD.cyan).textSelection(.enabled)
+                Text(status).font(.system(size: 12)).foregroundStyle(HUD.accent).textSelection(.enabled)
             }
         }
     }
     private func step(_ number: Int, _ text: String) -> some View {
         HStack(spacing: 10) {
-            Text("\(number)").font(HUD.readout(10)).foregroundStyle(HUD.cyan)
-                .frame(width: 20, height: 20).overlay(Rectangle().strokeBorder(HUD.cyan.opacity(0.4), lineWidth: 1))
+            Text("\(number)").font(HUD.readout(10)).foregroundStyle(HUD.accent)
+                .frame(width: 20, height: 20).overlay(Rectangle().strokeBorder(HUD.accent.opacity(0.4), lineWidth: 1))
             Text(text).font(.system(size: 12.5)).foregroundStyle(HUD.ice.opacity(0.9))
         }
     }
@@ -104,7 +104,7 @@ struct TasksView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 10) {
                         Image(systemName: item.status == "done" ? "checkmark.circle.fill" : item.status == "in_progress" ? "circle.lefthalf.filled" : "circle")
-                            .foregroundStyle(item.status == "done" ? HUD.dim : HUD.cyan)
+                            .foregroundStyle(item.status == "done" ? HUD.dim : HUD.accent)
                         Text(item.title).font(.system(size: 14, weight: .medium)).foregroundStyle(item.status == "done" ? HUD.steel : HUD.ice)
                         Spacer()
                         Button("Edit") { editing = item }.buttonStyle(HUDButtonStyle(kind: .ghost, compact: true))
@@ -116,7 +116,7 @@ struct TasksView: View {
                         Text(item.status.replacingOccurrences(of: "_", with: " ").uppercased())
                         if !item.due.isEmpty { Text("· DUE " + item.due) }
                     }
-                    .font(HUD.label(9)).tracking(1.1).foregroundStyle(HUD.cyan.opacity(0.8))
+                    .font(HUD.label(9)).tracking(1.1).foregroundStyle(HUD.accent.opacity(0.8))
                     if !item.notes.isEmpty {
                         Text(item.notes).lineLimit(6).font(.system(size: 12.5)).foregroundStyle(HUD.steel).textSelection(.enabled)
                     }
