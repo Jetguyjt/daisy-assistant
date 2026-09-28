@@ -15,5 +15,6 @@ brew install ollama whisper-cpp python@3.11
 bash scripts/download-models.sh
 bash scripts/setup-voice.sh
 bash scripts/setup-speech.sh
+bash scripts/make-signing-identity.sh
 bash scripts/install-app.sh
 echo "Ready. Open ~/Applications/Daisy.app, then choose a folder."

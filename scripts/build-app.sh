@@ -26,10 +26,18 @@ done
 iconutil -c icns "$ICONSET" -o "$APP_DIR/Contents/Resources/AppIcon.icns"
 rm -rf "$ICONSET" "$STAGING_DIR/icon.png"
 python3 scripts/write-defaults.py "$REPO_DIR" "$APP_DIR/Contents/Resources/RuntimeDefaults.json"
-# Finder/iCloud metadata on development folders can make ad-hoc signing fail.
+# Finder/iCloud metadata on development folders can make signing fail.
 xattr -cr "$APP_DIR"
-codesign --force --sign - --identifier com.local.daisy.contacts "$APP_DIR/Contents/MacOS/daisy-contacts"
-codesign --force --sign - --identifier com.local.daisy.desktop "$APP_DIR"
+# The same certificate every build keeps Daisy the same app to macOS, so microphone, Contacts and
+# Automation permissions survive a reinstall. Without it (scripts/make-signing-identity.sh makes it)
+# the build is signed ad hoc and macOS asks for them again after every install.
+IDENTITY="${DAISY_SIGN_IDENTITY:-Daisy Local Signing}"
+if security find-certificate -c "$IDENTITY" >/dev/null 2>&1; then SIGN="$IDENTITY"; else
+  SIGN="-"
+  echo "Signing ad hoc: macOS will ask for the microphone again after this install. Run scripts/make-signing-identity.sh once to stop that."
+fi
+codesign --force --sign "$SIGN" --identifier com.local.daisy.contacts "$APP_DIR/Contents/MacOS/daisy-contacts"
+codesign --force --sign "$SIGN" --identifier com.local.daisy.desktop "$APP_DIR"
 codesign --verify --deep --strict "$APP_DIR"
 # A zip survives iCloud/File Provider folders without Finder metadata altering the bundle. Only the
 # zip is kept here: a second Daisy.app in the repo shows up in Spotlight and the Dock next to the
