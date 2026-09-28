@@ -262,6 +262,11 @@ for command in ("echo '{}' >> ~/.hermes/daisy/learned.jsonl", "rm $HERMES_HOME/d
     verdict = plugin.classify("terminal", {"command": command})
     check(f"the guard refuses {command!r}", verdict.decision == "block")
 check("write_file can't reach the log", plugin.classify("write_file", {"path": "~/.hermes/daisy/learned.jsonl"}).decision == "block")
+policy = importlib.import_module("daisy_plugin.guard.policy")
+blocked = policy.decide("terminal", {"command": "echo '{}' >> ~/.hermes/daisy/learned.jsonl"}, session_id="g-1", task_id="g-1", turn_id="t1")
+check("the guard's decision on a shell write to the log is a block", blocked and blocked["action"] == "block")
+check("memory writes themselves are judged as before: no card in a plain chat",
+      policy.decide("memory", {"action": "add", "target": "user", "content": "Likes jazz"}, session_id="g-2", task_id="g-2", turn_id="t1") is None)
 
 shutil.rmtree(HOME, ignore_errors=True)
 shutil.rmtree(blocked_home, ignore_errors=True)
