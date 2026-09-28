@@ -1159,6 +1159,13 @@ import Foundation
         }
         do {
             let before = TestLog.failures
+            let suite = ToolPhraseTests()
+            suite.testMessagesRemindersAndNotesReadAsPlainWords()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testMessagesRemindersAndNotesReadAsPlainWords")
+        }
+        do {
+            let before = TestLog.failures
             let suite = VoiceBlendTests()
             suite.testDefaultVoiceAndTheCatalog()
             count += 1

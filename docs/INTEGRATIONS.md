@@ -70,7 +70,7 @@ UI automation is a fallback when the structured interface proves insufficient, a
 
 ## Reminders
 
-Built, tests only: `reminders_list`, `reminders_add` and `reminders_complete` in `hermes/daisy/tools/apple.py`, on `remindctl` 0.3.8 (`brew install steipete/tap/remindctl`), which uses EventKit. All three stay hidden until remindctl is installed; `scripts/hermes.d/60-apple-clis.sh` installs it when run with `DAISY_INSTALL_APPLE_CLIS=1`.
+Built, tests only: `reminders_list`, `reminders_add` and `reminders_complete` in `hermes/daisy/tools/apple.py`, on `remindctl` 0.3.8 (`brew install steipete/tap/remindctl`), which uses EventKit. All three stay hidden until remindctl is installed; `scripts/hermes.d/70-apple-clis.sh` installs it when run with `DAISY_INSTALL_APPLE_CLIS=1`.
 
 - `reminders_list` reads: open ones by default, or today (with anything overdue), tomorrow, week, overdue, upcoming, completed, all, one date, one list, or a search. It gives ids, titles, lists, due dates in words and notes, labelled as information rather than instructions, since a shared list can have items other people added.
 - `reminders_add` is a card with the title, the list, the due date written out with its time zone ("Tuesday, September 29, 2026 at 8:00 AM EDT (UTC-04:00), tomorrow", or "all day"), whether it alerts, and the notes. The same moment goes to remindctl with its offset, so the card and the reminder can't disagree about the time. A list has to match one list by name, and the reminder goes to that list by id; otherwise it's refused with the list names.

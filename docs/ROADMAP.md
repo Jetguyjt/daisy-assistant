@@ -21,7 +21,7 @@ These gaps have to close before the tools below go live. Stress test in [orchest
   - guard side done: tests, and live on 2026-09-28 a chained `echo …; rm -f …` was refused (Hermes log: the terminal call returned the guard's message in 0.01s). The app's card scrolls instead of cutting off, not seen live yet
 - [ ] Typed plugin tools for risky actions (`gmail_send`, `drive_share`, `drive_delete`, `imsg_send`, `calendar_write`); block the same actions from `terminal` / `execute_code`
   - guard side done (tests): the shell route is refused and points at the typed tool once it exists, and gets a card until then
-  - Google side built (`gmail_send`, `drive_share`, `drive_delete`, `calendar_write` and the rest), tests only; `imsg_send` comes with the iMessage work
+  - Google side built (`gmail_send`, `drive_share`, `drive_delete`, `calendar_write` and the rest); `gmail_send` checked live. `imsg_send` built too (tests only)
 - [x] Guard loads in every Hermes process (cron, gateway), not just `DAISY_SESSION`; fails closed if it throws
   - tests, and `hermes plugins doctor --ci` registers the hook with and without `DAISY_SESSION=1`
 - [x] Allowlists per role, enforced by the plugin (chat, worker read-only, cron pre-approved)
@@ -132,7 +132,9 @@ Notes: [persona.md](research/persona.md)
 
 - [x] Install the `hermes/daisy` approval plugin (reinstalled under the new name 2026-09-27; `hermes plugins list` shows daisy enabled, jarvis gone)
 - [ ] iMessage: `imsg` CLI, permissions, contact mapping (overlaps with the Contacts item)
-- [ ] Reminders and Notes CLIs (`remindctl`, `memo`)
+  - built: `imsg_send` (saved nickname, then Contacts; anything that isn't exactly one person and one number is refused with who it could be). Card shows the exact number, service and whole message. Tests only; no text sent yet, and the Automation prompt not seen. No reading tool: it would need Full Disk Access
+- [ ] Reminders and Notes
+  - built: `reminders_list` / `reminders_add` / `reminders_complete` on `remindctl` (not installed yet: `brew install steipete/tap/remindctl`), and `notes_search` / `notes_read` / `notes_create` / `notes_append` straight through osascript, not `memo` (details in [INTEGRATIONS.md](INTEGRATIONS.md#notes)). Tests only
 - [ ] Specialist agents on cron (inbox triage overnight, repo digests), in the spirit of lukebuildsai's setup
 
 ## Voice loop and app

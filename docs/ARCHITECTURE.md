@@ -106,7 +106,7 @@ Hermes also saves things on its own: every 3 turns (`memory.nudge_interval`, set
 
 The old SQLite memory moves into Hermes's files once (`hermes-memory-move.json` in Daisy's data folder is the marker and the report); whatever doesn't fit stays there and is named. While Hermes is the brain nothing new is written to SQLite; the on-device backend still reads it.
 
-Nicknames: `contacts_search` looks people up through `daisy-contacts` (a small helper inside Daisy.app that reads names, numbers and emails from Contacts), and `contacts_alias_save` remembers "Bubba means Robert Lukose" in `$HERMES_HOME/daisy/aliases.json` after a card. Sends still show who they go to on their own card.
+Nicknames: `contacts_search` looks people up through `daisy-contacts` (a small helper inside Daisy.app that reads names, numbers and emails from Contacts), and `contacts_alias_save` remembers "Bubba means Robert Lukose" in `$HERMES_HOME/daisy/aliases.json` after a card. `imsg_send` resolves names the same way, saved nickname first, and refuses anything that isn't exactly one person and one number before a card is shown. Sends still show who they go to on their own card.
 
 ## Adding tools
 
@@ -125,7 +125,7 @@ Use Hermes, not Daisy code:
 - `card(args)`: the approval text in full. First line is the title ("Send an email to Dad"); the rest is the exact content, every recipient, Cc, Bcc and attachment, never cut short
 - `run(args)`: does the work and returns data
 
-A new family is one file in `hermes/daisy/tools/` that calls `registry.add(TypedTool(...))` at import. The tools package imports every file in it, so nothing else changes. Typed tools register into the `hermes-acp` toolset, which is what Daisy's sessions get. `computer.py` wraps Hermes's built-in `computer_use` handler in-process, so its hard-blocks apply: `computer_look` reads and `computer_act` is `ui`, a card per call. A tool whose card raises `registry.Refused` is blocked with that reason instead of carded.
+A new family is one file in `hermes/daisy/tools/` that calls `registry.add(TypedTool(...))` at import. The tools package imports every file in it, so nothing else changes. Typed tools register into the `hermes-acp` toolset, which is what Daisy's sessions get. `computer.py` wraps Hermes's built-in `computer_use` handler in-process, so its hard-blocks apply: `computer_look` reads and `computer_act` is `ui`, a card per call. A tool whose card raises `registry.Refused` is blocked with that reason instead of carded. `messages.py` (`imsg_send`) and `apple.py` (Reminders, Notes) run their CLIs as argv lists with every value as `--flag=value` or after `--`, and their `run()` only does what a card showed: it refuses a call the guard didn't card in the last five minutes, or one that would now do something else (a nickname, contact or attachment that changed after the card, or "tomorrow" once it's past midnight).
 
 The guard decides from that metadata alone: `read` runs, anything else stops at a card, and every approval is for that one call only. It never parses a typed tool's arguments. A read tool's name says what it brings into the turn: a name with mail, message, doc, drive, file, calendar, web, page, tab, search, computer or screen in it marks the turn as having read outside content, and a name with open or navigate in it needs a card once that has happened.
 

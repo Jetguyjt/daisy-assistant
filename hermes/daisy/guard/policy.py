@@ -39,6 +39,7 @@ TOO_MANY = "Blocked by Daisy's guard: too many approvals in a row, ask the user 
 TYPED_READS = (({"contact", "contacts", "alias", "aliases", "nickname", "nicknames"}, ""),
                ({"mail", "gmail", "email", "inbox", "outlook"}, "email"),
                ({"imsg", "message", "messages", "sms", "chat", "chats", "imessage"}, "messages"),
+               ({"reminder", "reminders"}, "reminders"),
                ({"doc", "docs", "drive", "sheet", "sheets", "slide", "slides", "file", "files", "note", "notes",
                  "pdf", "document", "documents"}, "documents"),
                ({"calendar", "event", "events", "invite", "invites"}, "calendar events"),

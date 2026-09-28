@@ -62,7 +62,9 @@ This installs Ollama, whisper.cpp and Python 3.11 through Homebrew, downloads Qw
 | Gmail, Calendar, Drive | Typed tools over Hermes's `google-workspace` skill: "check my email" reads headers and snippets, and every send, share, delete or calendar change waits on a card. Needs your own Google sign-in first (steps in [google.md](docs/research/google.md)) |
 | Other Mac apps | `computer_look` reads a window; every click, key or bit of typing through `computer_act` waits on a card that says exactly what it will do. Needs Accessibility and Screen Recording for CuaDriver |
 | Contacts | Looks people up by name or a nickname you've confirmed once ("Bubba" means Robert); the first lookup asks for Contacts access |
-| Messages | **Not wired yet.** `imsg` is installed; see [integration plan](docs/INTEGRATIONS.md) |
+| Messages | `imsg_send`: "Text Dad I'm on my way" resolves Dad through your saved nicknames, then Contacts, and waits on a card with the exact number and the whole message. Needs `imsg` and Automation access to Messages; it can't read your texts |
+| Reminders | List, add and check off Apple Reminders; every add or check-off waits on a card with the date in words. Needs `remindctl` (`brew install steipete/tap/remindctl`) and Reminders access |
+| Notes | Search and read Apple Notes, create a note or add to one; every change waits on a card with the whole text. Needs Automation access to Notes |
 | Wake word | "Hey Daisy", heard in Apple's streaming transcript (or by a trained openWakeWord model once there is one, see [wake word](docs/wake-word.md)); on/off switch on the main screen (⌘⇧L) |
 | Proactive suggestions, fine-tuning | **Not implemented** |
 

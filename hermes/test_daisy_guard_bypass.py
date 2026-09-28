@@ -14,6 +14,13 @@ from pathlib import Path
 
 HOME = Path(tempfile.mkdtemp(prefix="daisy-guard-"))
 os.environ["HERMES_HOME"] = str(HOME)
+# imsg_send takes over `imsg send` from the shell once imsg is installed. Point it where there's no imsg, so the
+# shell-route checks don't depend on this Mac. "Dad" is a saved nickname, so the imsg_send checks further down
+# resolve him without ever running the Contacts helper.
+os.environ["DAISY_IMSG_BIN"] = str(HOME / "no-imsg")
+(HOME / "daisy").mkdir()
+(HOME / "daisy" / "aliases.json").write_text(json.dumps({"version": 1, "aliases": {"dad": {
+    "nickname": "Dad", "name": "Dad", "phone": "+1 555 0100", "email": "", "saved": 0}}}))
 for name in ("HERMES_CRON_SESSION", "HERMES_SESSION_PLATFORM", "HERMES_SESSION_KEY", "HERMES_SESSION_ID",
              "HERMES_SINGLE_QUERY_SESSION", "HERMES_YOLO_MODE"):
     os.environ.pop(name, None)

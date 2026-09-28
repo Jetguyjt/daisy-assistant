@@ -24,4 +24,16 @@ final class ToolPhraseTests {
         expectEqual(ToolPhrases.describe(title: "drive_share", kind: "other").title, "Sharing a Drive file")
         expectEqual(ToolPhrases.describe(title: "tool_describe", kind: "other").title, "Getting a tool ready")
     }
+
+    func testMessagesRemindersAndNotesReadAsPlainWords() {
+        let text: JSONValue = ["to": "Dad", "text": "secret words"]
+        expectEqual(ToolPhrases.describe(title: "imsg_send", kind: "other", input: text).title, "Texting Dad")
+        expectFalse(ToolPhrases.describe(title: "imsg_send", kind: "other", input: text).title.contains("secret"))
+        expectEqual(ToolPhrases.describe(title: "imsg_send", kind: "other").title, "Sending a text")
+        expectEqual(ToolPhrases.describe(title: "imsg_send", kind: "other", input: ["to": "Dad\nand everyone"]).title, "Sending a text")
+        expectEqual(ToolPhrases.describe(title: "reminders_add", kind: "other").title, "Adding a reminder")
+        expectEqual(ToolPhrases.describe(title: "reminders_list", kind: "other").title, "Checking your reminders")
+        expectEqual(ToolPhrases.describe(title: "notes_search", kind: "other").title, "Checking your notes")
+        expectEqual(ToolPhrases.describe(title: "notes_append", kind: "other").title, "Adding to a note")
+    }
 }

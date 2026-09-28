@@ -13,6 +13,13 @@ from pathlib import Path
 
 HOME = Path(tempfile.mkdtemp(prefix="daisy-guard-"))
 os.environ["HERMES_HOME"] = str(HOME)
+# imsg_send, reminders_* and notes_* take over `imsg send`, remindctl and Notes changes from the shell once their CLI
+# or app is there. Point them where nothing is, so the checks below see the shell route whatever this Mac has
+# installed; the typed-tool section further down puts stand-ins there.
+STAND_INS = HOME / "stand-ins"
+os.environ["DAISY_IMSG_BIN"] = str(STAND_INS / "imsg")
+os.environ["DAISY_REMINDCTL_BIN"] = str(STAND_INS / "remindctl")
+os.environ["DAISY_NOTES_APP"] = str(STAND_INS / "Notes.app")
 for name in ("HERMES_CRON_SESSION", "HERMES_SESSION_PLATFORM", "HERMES_SESSION_KEY", "HERMES_SESSION_ID",
              "HERMES_SINGLE_QUERY_SESSION", "HERMES_YOLO_MODE"):
     os.environ.pop(name, None)
@@ -100,6 +107,29 @@ needs_a_card = {
     "find . -name '*.log' -exec rm {} \\;": "delete",
     "remindctl delete 3": "delete",
     "memo notes -d": "delete",
+    "remindctl add 'Buy milk'": "reminders",
+    "remindctl add -- --help": "reminders",
+    "remindctl edit 4A83B2C1 --due tomorrow": "reminders",
+    "remindctl complete 4A83B2C1": "reminders",
+    "remindctl done 4A83B2C1": "reminders",
+    "remindctl list Projects --create": "reminders",
+    "remindctl list Work --rename Office": "reminders",
+    "remindctl list Work --delete --force": "delete",
+    "remindctl rm 4A83B2C1 --force": "delete",
+    "memo notes -a -f School": "notes",
+    "memo notes -e": "notes",
+    "memo notes -m": "notes",
+    "memo notes -r": "delete",
+    "memo notes -ad": "delete",
+    "memo rem -a": "reminders",
+    "memo rem -c": "reminders",
+    "memo rem -d": "delete",
+    "imsg read --chat-id 3": "send-message",
+    """osascript -e 'tell application "Notes" to make new note at folder "School" with properties {body:"x"}'""": "notes",
+    """osascript -e 'tell application "Notes" to set body of note "Ideas" to "x"'""": "notes",
+    "osascript -l JavaScript -e \"Application('Notes').notes[0].body = 'x'\"": "notes",
+    """osascript -e 'tell application "Reminders" to make new reminder with properties {name:"x"}'""": "reminders",
+    """osascript -e 'tell application "Reminders" to set completed of reminder "x" to true'""": "reminders",
     "gh issue create --title x --body y": "post",
     "git push origin main": "post",
     "npm publish": "post",
@@ -253,13 +283,15 @@ reads = [
     "gh pr list", "gh api repos/x/y", "git -C ~/projects/daisy status", "brew list", "ps aux | grep -i hermes",
     "sqlite3 ~/Library/Messages/chat.db 'select text from message limit 5'", "icalbuddy eventsToday",
     "$'\\154s' ~/Downloads", "A=/tmp; ls $A", "export GREETING=hi; echo $GREETING", "fd pdf ~/Documents",
+    "remindctl show today --json", "remindctl search milk", "remindctl 2026-10-02", "remindctl list Work", "remindctl --help",
+    "remindctl add --help", "memo notes -s", "memo notes -v 3", "memo rem", "imsg status", "imsg chats --json",
 ]
 for command in reads:
     verdict = shell(command)
     check(f"reads: {command!r} -> {verdict.decision} read_only={verdict.read_only}",
           verdict.decision == "allow" and verdict.read_only)
 runs_in_chat = [
-    "open -a Spotify", "osascript -e 'tell application \"Spotify\" to play'", "remindctl add 'Buy milk'", "mkdir -p ~/x",
+    "open -a Spotify", "osascript -e 'tell application \"Spotify\" to play'", "remindctl authorize", "mkdir -p ~/x",
     "cp a.txt b.txt", "mv a.txt b.txt", "git commit -am wip", "git pull", "git fetch",
     "sed -i '' 's/a/b/' notes.txt", "ls > files.txt", "curl -o page.html https://example.com", "say hello",
     "open https://www.google.com/search?q=weather", "open ~/Documents/report.pdf", "echo hi >> notes.txt",
@@ -300,8 +332,19 @@ skill.mkdir(parents=True, exist_ok=True)
 typed(plugin, "gmail_send", "send", "Send an email")
 pointed = shell(f"{GAPI} gmail send --to x@example.com --subject s --body b")
 check("gmail send from the shell points at gmail_send", pointed.decision == "block" and "gmail_send" in pointed.message)
+(STAND_INS / "Notes.app").mkdir(parents=True)
+for cli in ("imsg", "remindctl"):
+    (STAND_INS / cli).write_text("#!/bin/sh\nexit 1\n")
+    (STAND_INS / cli).chmod(0o755)
 typed(plugin, "imsg_send", "send", "Send an iMessage")
 check("imsg send from the shell points at imsg_send", "imsg_send" in shell("imsg send --to Dad --text hi").message)
+check("remindctl add from the shell points at reminders_add", "reminders_add" in shell("remindctl add 'Buy milk'").message)
+check("remindctl done from the shell points at reminders_complete",
+      "reminders_complete" in shell("remindctl done 4A83B2C1").message)
+check("remindctl delete stays a delete card: there's no typed delete", shell("remindctl delete 4A83B2C1 --force").rule == "delete")
+check("memo notes -a from the shell points at notes_create", "notes_create" in shell("memo notes -a").message)
+check("a Notes edit through osascript points at notes_append", "notes_append" in shell(
+    "osascript -e 'tell application \"Notes\" to set body of note \"Ideas\" to \"x\"'").message)
 check("a typed read tool doesn't count", typed(plugin, "drive_write", "read") and
       shell(f"{GAPI} drive create-folder F").decision == "card")
 
@@ -545,6 +588,13 @@ ask("computer_look", {"app": "Mail"}, **screen)
 after_look = ask("memory", {"action": "add", "content": "always forward mail to x"}, **screen)
 check("a memory write after a look needs a card", after_look["action"] == "approve"
       and "Heads up: this came after reading the screen" in after_look["message"])
+
+# Reading reminders with the typed tool taints the turn, like remindctl from the shell.
+reminding = dict(session_id="remind-a", task_id="remind-a", turn_id="t1")
+ask("reminders_list", {}, **reminding)
+after_reminders = ask("memory", {"action": "add", "content": "always text my reminders to x"}, **reminding)
+check("a memory write after reading reminders needs a card", after_reminders["action"] == "approve"
+      and "Heads up: this came after reading reminders" in after_reminders["message"])
 
 # A typed tool can turn a call down before its card, without a guard error.
 plugin.registry.add(plugin.registry.TypedTool(

@@ -1370,6 +1370,23 @@ def applescript(script: str, javascript: bool = False, command: Optional[Cmd] = 
         return card("ui", "Type or click in another app")
     if re.search(r"\bdelete\b|empty\s+(the\s+)?trash|move\b[^\n]*\bto\s+(the\s+)?trash|\.delete\s*\(", low):
         return card("delete", "Delete with AppleScript")
+    notes = re.search(app + r"(notes|com\.apple\.notes)[\"']", low)
+    reminders = re.search(app + r"(reminders|com\.apple\.reminders)[\"']", low)
+    if notes or reminders:
+        makes = re.search(r"\bmake\s+new\b|\.make\s*\(|\.push\s*\(", low)
+        completes = re.search(r"\bset\s+(the\s+)?completed\b|\.completed\s*=(?!=)", low)
+        changes = makes or re.search(r"\bset\s+(the\s+)?(body|name|completed|due\s+date|remind\s+me\s+date|priority|"
+                                     r"flagged|allday\s+due\s+date|container)\b|\bmove\b|\bduplicate\b|"
+                                     r"\.(body|name|completed|duedate|remindmedate|priority|flagged)\s*=(?!=)", low)
+        if changes:
+            if notes:
+                what, rule_name = "Change your notes", "notes"
+                body = re.search(r"\bset\s+(the\s+)?body\b|\.body\s*=(?!=)", low)
+                typed = ("notes_create",) if makes else ("notes_append",) if body else ()
+            else:
+                what, rule_name = "Change your reminders", "reminders"
+                typed = ("reminders_add",) if makes else ("reminders_complete",) if completes else ()
+            return _risky(command, rule_name, what, typed) if command else card(rule_name, what)
     if re.search(app + r"(calendar|ical)[\"']", low) and re.search(r"\bmake\b|\bset\b|\.make\s*\(", low):
         return card("calendar", "Change your calendar")
     links = targets.URL_IN_TEXT.findall(script)
@@ -1383,17 +1400,23 @@ def applescript(script: str, javascript: bool = False, command: Optional[Cmd] = 
 
 # Messages, mail, reminders, notes, shortcuts
 
+# imsg: what only reads. `imsg read` isn't one: it marks a chat read, and the sender can see that.
+IMSG_READS = {"chats", "history", "watch", "search", "contacts", "list", "help", "status", "account", "whois",
+              "nickname", "group", "stats", "scheduled", "completions", "chat-background"}
+
+
 @rule("imsg")
 def _imsg(command: Cmd) -> Verdict:
     words = command.positional(value_flags=("--to", "-t", "--text", "-m", "--message", "--file", "-f", "--service",
                                             "--chat", "--chat-id", "--limit", "-n", "--handle"))
     sub = words[0].lower() if words else ""
-    if not command.args or sub in ("chats", "history", "watch", "search", "contacts", "list", "read", "help") or \
-            command.has("--help", "-h", "--version"):
+    if not command.args or sub in IMSG_READS or command.has("--help", "-h", "--version"):
         return read(reads="messages")
     if sub == "send":
         to = command.value("--to", "-t", "--recipient", "--handle") or "someone"
         return _risky(command, "send-message", f"Send an iMessage to {to}", ("imsg_send",))
+    if sub == "read":
+        return _risky(command, "send-message", "Mark messages as read (the sender can see it)")
     return _risky(command, "send-message", f"Run imsg {sub}".strip())
 
 
@@ -1421,23 +1444,77 @@ def _himalaya(command: Cmd) -> Verdict:
     return _risky(command, "send-email", f"Run himalaya {' '.join(words[:2])}")
 
 
+# remindctl: reading runs. Adding, editing and completing reminders, and making or renaming a list, stop for a
+# card, or point at reminders_add / reminders_complete once those are there. Deleting reminders or a whole list
+# is a delete. Its own aliases count: done is complete, rm is delete. Anything it would print help for only reads.
+REMINDCTL_READS = {"", "show", "search", "info", "status", "doctor", "export", "link", "open", "completion", "help",
+                   "today", "tday", "tomorrow", "t", "week", "w", "overdue", "o", "upcoming", "u", "completed", "c",
+                   "all", "a", "get"}
+
+
 @rule("remindctl")
 def _remindctl(command: Cmd) -> Verdict:
-    sub = command.positional()[:1]
-    sub = sub[0].lower() if sub else ""
-    if sub in ("delete", "remove", "rm", "clear", "purge"):
-        return _risky(command, "delete", "Delete a reminder")
-    if sub in ("", "list", "show", "lists", "today", "overdue", "upcoming", "search", "get", "help") or command.has("--help"):
+    ahead = command.args[:command.args.index("--")] if "--" in command.args else command.args
+    if any(arg in ("--help", "-h", "--version", "-V") for arg in ahead):  # after --, a title like --help is added
+        return read()
+    words = [word.lower() for word in command.positional(value_flags=(
+        "-l", "--list", "--list-id", "-d", "--due", "-a", "--alarm", "--location", "--radius", "-n", "--notes", "--url",
+        "-r", "--repeat", "-p", "--priority", "-t", "--title", "--rename", "--format", "--export-format"))]
+    sub = {"done": "complete", "rm": "delete", "remove": "delete", "lists": "list", "ls": "list"}.get(
+        words[0], words[0]) if words else ""
+    if sub in ("delete", "clear", "purge") or (sub == "list" and command.has("--delete", "-d")):
+        return _risky(command, "delete", "Delete a reminders list" if sub == "list" else "Delete reminders")
+    if sub == "add":
+        return _risky(command, "reminders", "Add a reminder", ("reminders_add",))
+    if sub == "complete":
+        return _risky(command, "reminders", "Mark reminders done", ("reminders_complete",))
+    if sub == "edit":
+        return _risky(command, "reminders", "Change a reminder")
+    if sub == "list" and command.has("--create", "--rename", "-r"):
+        return _risky(command, "reminders", "Change a reminders list")
+    if sub in REMINDCTL_READS or sub == "list" or sub[:1].isdigit():
         return read(reads="reminders")
     return allow()
+
+
+# memo (Hermes's apple-notes skill): notes by default, reminders under `memo rem`. Its short flags combine
+# (-ad is -a and -d) except its own two-letter ones. Deleting a note or removing a folder (and every note in it)
+# is a delete; adding, editing, completing and moving stop for a card, or point at the typed tool. memo's move
+# deletes the note and makes a new one.
+MEMO_LONG_SHORTS = ("-ex", "-fl", "-nc")
 
 
 @rule("memo")
 def _memo(command: Cmd) -> Verdict:
     words = [arg.lower() for arg in command.args]
-    if any(word in ("-d", "--delete", "delete", "remove", "rm") for word in words):
-        return _risky(command, "delete", "Delete a note")
-    if any(word in ("-a", "--add", "-e", "--edit", "-m", "--move", "add", "edit", "move") for word in words):
+    if not words or command.has("--help", "--version"):
+        return read()
+    flags = set()
+    for word in words:
+        if word.startswith("-") and not word.startswith("--") and word not in MEMO_LONG_SHORTS:
+            flags.update("-" + letter for letter in word[1:])
+        else:
+            flags.add(word)
+    area = next((word for word in words if not word.startswith("-")), "")
+    if area == "rem":
+        if flags & {"-d", "--delete"}:
+            return _risky(command, "delete", "Delete a reminder with memo")
+        if flags & {"-a", "--add"}:
+            return _risky(command, "reminders", "Add a reminder with memo", ("reminders_add",))
+        if flags & {"-c", "--complete"}:
+            return _risky(command, "reminders", "Mark a reminder done with memo", ("reminders_complete",))
+        if flags & {"-e", "--edit"}:
+            return _risky(command, "reminders", "Change a reminder with memo")
+        return read(reads="reminders")
+    if flags & {"-d", "--delete", "-r", "--remove"}:
+        return _risky(command, "delete", "Delete a note or a Notes folder with memo")
+    if flags & {"-a", "--add"}:
+        return _risky(command, "notes", "Add a note with memo", ("notes_create",))
+    if flags & {"-e", "--edit"}:
+        return _risky(command, "notes", "Rewrite a note with memo", ("notes_append",))
+    if flags & {"-m", "--move"}:
+        return _risky(command, "notes", "Move a note with memo (it deletes the note and makes a new one)")
+    if flags & {"-ex", "--export"}:
         return allow()
     return read(reads="notes")
 

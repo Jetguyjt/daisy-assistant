@@ -52,6 +52,14 @@ public enum ToolPhrases {
         case "drive_delete": return ("Deleting a Drive file", nil)
         case "docs_write": return ("Editing a Google Doc", nil)
         case "sheets_write": return ("Editing a Google Sheet", nil)
+        case "imsg_send": return (texting(input), nil)
+        case "reminders_list": return ("Checking your reminders", nil)
+        case "reminders_add": return ("Adding a reminder", nil)
+        case "reminders_complete": return ("Checking off a reminder", nil)
+        case "notes_search": return ("Checking your notes", nil)
+        case "notes_read": return ("Reading a note", nil)
+        case "notes_create": return ("Writing a new note", nil)
+        case "notes_append": return ("Adding to a note", nil)
         default:
             if head.hasPrefix("patch") { return ("Editing a file", file) }
             if head.hasPrefix("memory") { return ("Updating memory", nil) }
@@ -92,6 +100,13 @@ public enum ToolPhrases {
         case "focus_app": return app.isEmpty ? "Switching apps" : "Switching to \(app)"
         default: return "Clicking" + place
         }
+    }
+
+    /// "Texting Dad": who, as the user said it (or the number). Never the message.
+    private static func texting(_ input: JSONValue?) -> String {
+        let to = (input?["to"]?.stringValue ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !to.isEmpty, to.count <= 40, !to.contains(where: \.isNewline) else { return "Sending a text" }
+        return "Texting \(to)"
     }
 
     /// Where a Chrome tool is headed: "Gmail" for mail.google.com, otherwise the site without www.

@@ -12,7 +12,9 @@
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>NSHighResolutionCapable</key><true/>
 <key>NSMicrophoneUsageDescription</key><string>Daisy listens for “Hey Daisy” when that mode is on, and records when you click Record. Speech is turned into text on this Mac, by Apple's on-device recognizer or whisper.cpp, and the audio is deleted afterward.</string>
-<key>NSAppleEventsUsageDescription</key><string>Daisy lists your Chrome tabs, switches to one and opens pages when you ask. It never runs anything inside a web page.</string>
+<key>NSAppleEventsUsageDescription</key><string>Daisy sends the texts you approve through Messages, reads your notes and adds the ones you approve in Notes, and lists your Chrome tabs, switches to one and opens pages when you ask. It never runs anything inside a web page.</string>
+<key>NSRemindersUsageDescription</key><string>Daisy reads your reminders, and adds or checks off the ones you approve.</string>
+<key>NSRemindersFullAccessUsageDescription</key><string>Daisy reads your reminders, and adds or checks off the ones you approve.</string>
 <key>NSContactsUsageDescription</key><string>Daisy looks up the person you mean when you ask it to text or email someone. It reads names, phone numbers and email addresses only, on this Mac.</string>
 <key>NSSpeechRecognitionUsageDescription</key><string>Daisy turns what you say into text on this Mac with Apple's on-device speech recognizer. Audio isn't sent anywhere.</string>
 <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
