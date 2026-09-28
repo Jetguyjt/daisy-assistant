@@ -329,6 +329,7 @@ for source, rule in {
           verdict.decision == "card" and verdict.rule == rule)
 check("code cards show the code", "shutil.rmtree('/tmp/x')" in code("import shutil\nshutil.rmtree('/tmp/x')").detail)
 check("code that writes files persists", code("open('/tmp/out.txt', 'w').write('x')").persists)
+check("a pathlib write counts too", code("from pathlib import Path\nPath('/tmp/x').open('w').write('x')").persists)
 check("code naming Daisy's guard settings is refused", code(
     "import os\nopen(os.path.expanduser('~/.hermes/daisy/cron-allow.json'), 'w').write('{}')").decision == "block")
 check("an MCP write naming the guard settings is refused", plugin.classify(

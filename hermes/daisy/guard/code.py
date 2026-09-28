@@ -9,9 +9,15 @@ from __future__ import annotations
 
 import ast
 import re
+import warnings
 from typing import Dict, List, Optional, Set
 
 from .verdict import Verdict, allow, card, read
+
+# Code is parsed under its own file name, so odd escapes in it don't print warnings into Hermes's logs.
+SOURCE_NAME = "<daisy-guard>"
+warnings.filterwarnings("ignore", category=SyntaxWarning, module=re.escape(SOURCE_NAME))
+warnings.filterwarnings("ignore", category=DeprecationWarning, module=re.escape(SOURCE_NAME))
 
 PURE_MODULES = {
     "math", "cmath", "statistics", "decimal", "fractions", "numbers", "random", "datetime", "time", "calendar",
@@ -61,7 +67,7 @@ def classify_code(source: str, language: str = "python") -> Verdict:
         return read()
     if language == "python":
         try:
-            tree = ast.parse(source)
+            tree = ast.parse(source, filename=SOURCE_NAME)
         except (SyntaxError, ValueError, RecursionError, MemoryError):
             tree = None
         if tree is not None:
@@ -170,10 +176,14 @@ def _python(tree: ast.AST, source: str) -> Verdict:
                     found["send"].append(f"{name}({keyword.arg}=)")
             if name.startswith("urllib.request.urlopen") and len(node.args) > 1:
                 found["send"].append(name)
-            if name in ("open", "io.open", "codecs.open", "os.open", "os.fdopen") or name.endswith(".open"):
+            method = node.func.attr if isinstance(node.func, ast.Attribute) else ""
+            if name in ("open", "io.open", "codecs.open", "os.open", "os.fdopen") or method == "open":
                 mode = ""
-                if len(node.args) > 1 and isinstance(node.args[1], ast.Constant):
-                    mode = str(node.args[1].value)
+                # open(path, mode), or path.open(mode) where the mode comes first.
+                for argument in node.args[:2]:
+                    if isinstance(argument, ast.Constant) and isinstance(argument.value, str) and \
+                            re.fullmatch(r"[rwxabtU+]+", argument.value):
+                        mode = argument.value
                 for keyword in node.keywords:
                     if keyword.arg in ("mode", "flags") and isinstance(keyword.value, ast.Constant):
                         mode = str(keyword.value.value)
