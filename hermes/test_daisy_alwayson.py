@@ -7,8 +7,8 @@ import importlib.util
 import json
 import logging
 import os
-import re
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -635,5 +635,6 @@ check("gateway and cron together: no warning about firing", "only fire while the
 check("gateway and cron together: the model list is read once",
       done.returncode == 0 and len(with_gateway.jobs()) == 2)
 
+shutil.rmtree(ROOT, ignore_errors=True)
 print("always-on checks:", "ok" if failures == 0 else f"{failures} failed")
 sys.exit(1 if failures else 0)
