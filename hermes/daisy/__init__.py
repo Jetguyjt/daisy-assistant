@@ -27,8 +27,10 @@ _on_pre_tool_call = on_pre_tool_call
 
 
 def register(ctx) -> None:
+    # The guard runs in every Hermes process (Daisy, CLI, gateway, cron) and blocks if it fails.
+    # The persona and the typed tools are Daisy's alone.
+    ctx.register_hook("pre_tool_call", on_pre_tool_call)
     if not ACTIVE:
         return
     ctx.register_system_prompt_section("daisy-persona", persona_section, max_chars=4000)
-    ctx.register_hook("pre_tool_call", on_pre_tool_call)
     registry.register_all(ctx)
