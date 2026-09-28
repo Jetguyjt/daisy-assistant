@@ -1,0 +1,16 @@
+{
+  "id": "1NotesText000000000000000",
+  "name": "notes.txt",
+  "mimeType": "text/plain",
+  "modifiedTime": "2026-09-10T09:30:00.000Z",
+  "size": "58",
+  "webViewLink": "https://drive.example.com/file/d/1NotesText000000000000000/view",
+  "parents": [
+    "0AFolderRoot000000"
+  ],
+  "owners": [
+    {
+      "emailAddress": "josh@example.com"
+    }
+  ]
+}

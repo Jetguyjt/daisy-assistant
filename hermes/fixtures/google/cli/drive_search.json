@@ -1,0 +1,23 @@
+[
+  {
+    "id": "1BudgetSheet00000000000000",
+    "name": "Budget 2026",
+    "mimeType": "application/vnd.google-apps.spreadsheet",
+    "modifiedTime": "2026-09-20T18:04:11.000Z",
+    "webViewLink": "https://docs.example.com/spreadsheets/d/1BudgetSheet00000000000000/edit"
+  },
+  {
+    "id": "1EssayDoc0000000000000000",
+    "name": "Common App essay draft",
+    "mimeType": "application/vnd.google-apps.document",
+    "modifiedTime": "2026-09-27T22:41:05.000Z",
+    "webViewLink": "https://docs.example.com/document/d/1EssayDoc0000000000000000/edit"
+  },
+  {
+    "id": "1ResumePdf000000000000000",
+    "name": "Resume.pdf",
+    "mimeType": "application/pdf",
+    "modifiedTime": "2026-08-02T15:00:00.000Z",
+    "webViewLink": "https://drive.example.com/file/d/1ResumePdf000000000000000/view"
+  }
+]

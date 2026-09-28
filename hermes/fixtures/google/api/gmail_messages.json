@@ -1,0 +1,39 @@
+{
+  "18c0ffee0001": {
+    "id": "18c0ffee0001",
+    "threadId": "18c0ffee0001",
+    "labelIds": ["UNREAD", "IMPORTANT", "INBOX"],
+    "payload": {
+      "headers": [
+        {"name": "From", "value": "Dad <dad@example.com>"},
+        {"name": "Subject", "value": "Dinner Sunday?"},
+        {"name": "Message-ID", "value": "<CAdad0001@mail.example.com>"},
+        {"name": "References", "value": "<CAearlier0001@mail.example.com>"}
+      ]
+    }
+  },
+  "18c0ffee0002": {
+    "id": "18c0ffee0002",
+    "threadId": "18c0ffee0002",
+    "labelIds": ["UNREAD", "INBOX"],
+    "payload": {
+      "headers": [
+        {"name": "From", "value": "\"Ms. Rivera\" <rivera@school.example.com>"},
+        {"name": "Reply-To", "value": "English Office <office@school.example.com>"},
+        {"name": "Subject", "value": "AP Lit essay feedback"},
+        {"name": "Message-ID", "value": "<rivera0002@school.example.com>"}
+      ]
+    }
+  },
+  "18c0ffee0003": {
+    "id": "18c0ffee0003",
+    "threadId": "18c0ffee0003",
+    "labelIds": ["UNREAD", "CATEGORY_UPDATES", "INBOX"],
+    "payload": {
+      "headers": [
+        {"name": "From", "value": "Weekly Digest <news@example.com>"},
+        {"name": "Subject", "value": "Your week in review"}
+      ]
+    }
+  }
+}

@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "~/.hermes/skills/productivity/google-workspace/scripts/google_api.py", line 1225, in <module>
+    main()
+  File "~/.hermes/skills/productivity/google-workspace/scripts/google_api.py", line 1221, in main
+    args.func(args)
+  File "~/.hermes/skills/productivity/google-workspace/scripts/google_api.py", line 248, in gmail_search
+    service = build_service("gmail", "v1")
+  File "~/.hermes/skills/productivity/google-workspace/scripts/google_api.py", line 190, in get_credentials
+    creds.refresh(Request())
+google.auth.exceptions.RefreshError: ('invalid_grant: Token has been expired or revoked.', {'error': 'invalid_grant', 'error_description': 'Token has been expired or revoked.'})

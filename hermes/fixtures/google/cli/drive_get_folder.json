@@ -1,0 +1,15 @@
+{
+  "id": "1SchoolFolder000000000000",
+  "name": "School",
+  "mimeType": "application/vnd.google-apps.folder",
+  "modifiedTime": "2026-09-01T08:00:00.000Z",
+  "webViewLink": "https://drive.example.com/drive/folders/1SchoolFolder000000000000",
+  "parents": [
+    "0AFolderRoot000000"
+  ],
+  "owners": [
+    {
+      "emailAddress": "josh@example.com"
+    }
+  ]
+}

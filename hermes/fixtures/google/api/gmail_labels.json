@@ -1,0 +1,8 @@
+{
+  "labels": [
+    {"id": "INBOX", "name": "INBOX", "type": "system"},
+    {"id": "UNREAD", "name": "UNREAD", "type": "system"},
+    {"id": "Label_12", "name": "School", "type": "user"},
+    {"id": "Label_13", "name": "College/Essays", "type": "user"}
+  ]
+}
