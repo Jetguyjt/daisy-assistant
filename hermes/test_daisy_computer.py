@@ -139,6 +139,8 @@ def hook_ids():
 
 def result(tool, args):
     out = registry.handler_for(tool)(args)
+    if not isinstance(out, str):
+        return out
     try:
         return json.loads(out)
     except ValueError:
@@ -480,20 +482,22 @@ check("a reply Daisy can't read still reaches the model", look({"app": "Mail"}) 
 check("but there's nothing to act on", hook({"action": "key", "app": "Mail", "keys": "return"})["action"] == "block")
 
 
-# Screenshots: taken only when asked, and never dumped into the reply as base64.
-fake.next["capture"] = picture()
-shot = look({"app": "Mail", "mode": "som"})
-check("a screenshot reply keeps its summary and file", "#1 AXButton 'Send'" in shot["summary"] and shot["screenshot_path"].endswith(".png"))
-check("but not the picture as text", "iVBOR" not in json.dumps(shot) and "vision_analyze" in shot["note"])
-check("the numbers on a screenshot still name elements on the card",
-      card_parts({"action": "click", "app": "Mail", "element": 1})[0] == "Click the “Send” button in Mail")
-real_handler_for = registry.handler_for
-registry.handler_for = lambda tool: (lambda args, **_: tool.run(args or {}))
+# Screenshots: taken only when asked. The registry hands Hermes's picture envelope to the model as an image.
 computer._IMAGES = None
 fake.next["capture"] = picture()
 envelope = registry.handler_for(look_tool)({"app": "Mail", "mode": "som"})
-check("once the registry passes pictures through, the model gets the screenshot",
+check("the model gets the screenshot as a picture",
       isinstance(envelope, dict) and envelope.get("_multimodal") is True and "iVBOR" in json.dumps(envelope))
+check("the numbers on a screenshot still name elements on the card",
+      card_parts({"action": "click", "app": "Mail", "element": 1})[0] == "Click the “Send” button in Mail")
+# A registry that could only send text would get the summary and the file instead, never base64 as text.
+real_handler_for = registry.handler_for
+registry.handler_for = lambda tool: (lambda args, **_: (lambda out: out if isinstance(out, str) else json.dumps(out))(tool.run(args or {})))
+computer._IMAGES = None
+fake.next["capture"] = picture()
+shot = look({"app": "Mail", "mode": "som"})
+check("without pictures a screenshot reply keeps its summary and file", "#1 AXButton 'Send'" in shot["summary"] and shot["screenshot_path"].endswith(".png"))
+check("but not the picture as text", "iVBOR" not in json.dumps(shot) and "vision_analyze" in shot["note"])
 registry.handler_for = real_handler_for
 computer._IMAGES = None
 fake.next["capture"] = picture(mode="vision")

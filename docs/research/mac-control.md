@@ -30,10 +30,11 @@ The goal: "search Google for…", "check my email" → go to Chrome, use the Gma
 - **`computer_use` is already on this Mac** (`~/.local/bin/cua-driver`, `/Applications/CuaDriver.app`). Hermes's version is an MCP client to `cua-driver mcp`.
 - **How it drives apps:** in the background through private macOS APIs, so an OS update can break it. It reads the screen as screenshots with numbered elements, or as the accessibility tree.
 - **Built-in safety:** it hard-blocks logout/shutdown keys and dangerous typed text (`tools/computer_use/tool.py:36-62`).
-- **Permissions:** Accessibility and Screen Recording for CuaDriver, not for Daisy.
+- **Permissions:** Accessibility and Screen Recording for CuaDriver, not for Daisy. Grant them with `hermes computer-use permissions grant` (the dialog is attributed to CuaDriver, `com.trycua.driver`); check with `hermes computer-use permissions status` or `hermes computer-use doctor`.
 - **Model:** it works with any model; OpenAI's computer-use model isn't needed.
 - **To use it from Daisy:** wrap the built-in handler in a plugin tool, which keeps the hard-blocks. Adding `cua-driver mcp` as a raw MCP server would skip them.
-- **Not checked:** how its approval prompt behaves over ACP.
+- **Approvals over ACP:** the handler asks through `set_approval_callback`, which only `cli.py` registers. `hermes-acp` never does (it only sets the terminal callback), and with no callback `_request_approval` returns allow (`tool.py:284`). So over ACP the built-in clicks and types with no prompt at all. Daisy's `computer_act` is risk `ui`, so the guard's card is the only yes, and it only runs the exact call that was carded, on the same look. `computer_look` only reaches `capture`, `list_apps` and `list_windows`, which never ask.
+- **In Daisy:** `computer_look` (accessibility tree by default, screenshots when asked) and `computer_act` (click, type, keys, scroll, drag, set_value, focus_app) in `hermes/daisy/tools/computer.py`. The handler has no launch or quit action; `focus_app` with `raise_window` brings an app forward. Input always goes to the window of the latest look, so each Daisy session keeps its own target.
 
 ## Plan
 
@@ -55,7 +56,8 @@ The goal: "search Google for…", "check my email" → go to Chrome, use the Gma
 `hermes/daisy/__init__.py` `classify()` only flags tool names with send/delete/pay-type words. These would pass without a card:
 
 - chrome-devtools `click` / `fill` / `fill_form` / `press_key` / `evaluate_script` on mail, payment or account pages
-- `computer_use` `type` and `key(return)` in Chrome or Mail
+- `computer_use` `type` and `key(return)` in Chrome or Mail (now a card per `computer_act`)
+- `cua-driver call ...` from the terminal ran with no card and skipped the hard-blocks (now refused, pointing at `computer_act`)
 - `chrome_open` with a `javascript:` URL
 
 Each needs a rule and a line in `test_daisy_guard.py`.
@@ -81,4 +83,4 @@ Each needs a rule and a line in `test_daisy_guard.py`.
 
 - How often the Chrome consent prompt shows up in practice
 - Whether Chrome AppleScript works live on this Mac
-- `computer_use` approvals over ACP
+- `computer_look` / `computer_act` live: permissions, real captures, real clicks, and how many cards a real task needs (the guard allows 5 a minute per session)

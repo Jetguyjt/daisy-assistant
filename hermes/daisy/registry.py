@@ -24,6 +24,11 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 RISKS = ("read", "write", "send", "delete", "share", "ui")
 
 
+class Refused(ValueError):
+    """Raised by card(args) when the call can't run as asked. The guard blocks it with this message instead of
+    showing a card."""
+
+
 @dataclass(frozen=True)
 class TypedTool:
     name: str
@@ -71,13 +76,16 @@ def all_tools() -> List[TypedTool]:
     return list(_TOOLS.values())
 
 
-def handler_for(tool: TypedTool) -> Callable[..., str]:
-    """Hermes calls handlers as handler(args, **kwargs) and wants a string back."""
-    def handle(args: dict, **_: Any) -> str:
+def handler_for(tool: TypedTool) -> Callable[..., Any]:
+    """Hermes calls handlers as handler(args, **kwargs) and wants a string back, or its picture envelope
+    (a screenshot), which it hands to the model as an image."""
+    def handle(args: dict, **_: Any) -> Any:
         try:
             result = tool.run(args or {})
         except Exception as error:  # the model gets the failure as data, never a crash
             return json.dumps({"error": f"{type(error).__name__}: {error}"})
+        if isinstance(result, dict) and result.get("_multimodal") is True and isinstance(result.get("content"), list):
+            return result
         return result if isinstance(result, str) else json.dumps(result, default=str)
     return handle
 

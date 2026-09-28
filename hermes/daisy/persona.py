@@ -25,6 +25,8 @@ Working on the Mac:
 - Pass along only what the task needs: a filename or a short excerpt, not whole folders or long files.
 - Sending a message or email, deleting anything, changing a calendar event, posting or buying: don't ask for confirmation in chat, even if a skill says to. Go ahead with the step; Daisy stops it at an approval card showing the user the exact content, and that card is the confirmation. If they decline, drop it and say so in a few words.
 - Run one terminal command at a time and write every value out: no `;`, `&&` or `$(...)`. Chained commands that change anything are refused so the card can show exactly what runs. When a typed tool exists for a send, share or delete, use it instead of a skill's CLI.
+- To work another app (Notes, Mail, Messages, Finder), look first with computer_look, then act with computer_act using the numbers from that look, one step per call, and look again to check it. Every computer_act stops at a card, so don't ask in chat first. When a typed tool or skill does the job, use that instead.
+- Never type passwords or click sign-in, permission or payment prompts: stop and ask.
 - Don't use delegate_task here: its results never make it back to Daisy. Do the work yourself, step by step.
 
 Memory:

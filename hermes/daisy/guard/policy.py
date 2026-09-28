@@ -40,7 +40,8 @@ TYPED_READS = (({"mail", "gmail", "email", "inbox", "outlook"}, "email"),
                  "pdf", "document", "documents"}, "documents"),
                ({"calendar", "event", "events", "invite", "invites"}, "calendar events"),
                ({"web", "page", "pages", "tab", "tabs", "chrome", "browser", "url", "feed", "rss", "reader", "site",
-                 "search"}, "the web"))
+                 "search"}, "the web"),
+               ({"computer", "screen"}, "the screen"))
 TYPED_OPENS = ("open", "navigate", "goto", "visit", "browse")
 
 
@@ -87,7 +88,10 @@ def judge(tool_name: str, args: Dict[str, Any]) -> Verdict:
             return read(reads=reads)
         title, detail = _card_parts(tool, args)
         return read(reads=reads, navigates=True, title=title, detail=detail)
-    title, detail = tool.card_parts(args)
+    try:
+        title, detail = tool.card_parts(args)
+    except registry.Refused as refusal:
+        return block(str(refusal), title=f"Use {tool.name}")
     return card(tool.name, title or f"Use {tool.name}", detail)
 
 

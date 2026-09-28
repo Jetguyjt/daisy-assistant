@@ -86,5 +86,13 @@ for bad in [dict(risk="explode"), dict(name="Bad Name"), dict(parameters={"type"
     except ValueError:
         pass
 
+picture = registry.add(registry.TypedTool(
+    name="fake_picture", description="", parameters={"type": "object"}, risk="read",
+    card=lambda a: "Look", run=lambda a: {"_multimodal": True, "content": [], "text_summary": "a window"}))
+check("a picture envelope reaches Hermes as is", registry.handler_for(picture)({}) == {"_multimodal": True, "content": [], "text_summary": "a window"})
+plain = registry.add(registry.TypedTool(
+    name="fake_plain", description="", parameters={"type": "object"}, risk="read", card=lambda a: "Look", run=lambda a: {"a": 1}))
+check("any other dict is sent as JSON", registry.handler_for(plain)({}) == '{"a": 1}')
+
 print("registry checks:", "ok" if failures == 0 else f"{failures} failed")
 sys.exit(1 if failures else 0)

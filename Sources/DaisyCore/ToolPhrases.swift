@@ -33,6 +33,7 @@ public enum ToolPhrases {
         case "chrome_open":
             guard let site = site(input) else { return ("Opening a page", nil) }
             return (input?["reuse"]?.boolValue == true ? "Switching to \(site)" : "Opening \(site)", nil)
+        case "computer_look", "computer_act": return (computer(head, input: input), nil)
         default:
             if head.hasPrefix("patch") { return ("Editing a file", file) }
             if head.hasPrefix("memory") { return ("Updating memory", nil) }
@@ -47,6 +48,31 @@ public enum ToolPhrases {
                 let words = title.replacingOccurrences(of: "_", with: " ")
                 return (words.isEmpty ? "Working" : words.prefix(1).uppercased() + words.dropFirst(), nil)
             }
+        }
+    }
+
+    /// Daisy's computer tools in plain words, from the call's arguments: "Looking at Mail", "Typing in
+    /// Notes". Never the text being typed.
+    private static func computer(_ tool: String, input: JSONValue?) -> String {
+        let app = (input?["app"]?.stringValue ?? "").trimmingCharacters(in: .whitespaces)
+        let action = input?["action"]?.stringValue ?? ""
+        let place = app.isEmpty ? "" : " in \(app)"
+        if tool == "computer_look" {
+            switch action {
+            case "list_apps": return "Checking open apps"
+            case "list_windows": return "Checking open windows"
+            default: return app.isEmpty ? "Looking at the screen" : "Looking at \(app)"
+            }
+        }
+        switch action {
+        case "": return "Using an app"
+        case "type": return "Typing" + place
+        case "key": return "Pressing a key" + place
+        case "scroll": return "Scrolling" + place
+        case "drag": return "Dragging" + place
+        case "set_value": return "Changing a setting" + place
+        case "focus_app": return app.isEmpty ? "Switching apps" : "Switching to \(app)"
+        default: return "Clicking" + place
         }
     }
 

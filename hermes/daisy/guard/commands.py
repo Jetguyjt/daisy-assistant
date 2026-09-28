@@ -1296,6 +1296,23 @@ def _open(command: Cmd) -> Verdict:
     return allow()
 
 
+# cua-driver drives other apps straight through macOS and skips computer_use's hard-blocks (log out,
+# empty trash...). Its own status is fine to read; everything else goes through computer_act.
+CUA_DRIVER_READS = {"manifest", "doctor", "status", "check-update", "help"}
+
+
+@rule("cua-driver")
+def _cua_driver(command: Cmd) -> Verdict:
+    words = [word.lower() for word in command.positional()]
+    if not command.args or command.has("--version", "-V", "--help", "-h") or (words and words[0] in CUA_DRIVER_READS) \
+            or words[:2] == ["permissions", "status"]:
+        return read()
+    tool = _typed_instead(("computer_act",))
+    if tool:
+        return block(USE_TYPED.format(tool=tool), title="Control another app")
+    return card("ui", "Control another app with cua-driver", " ".join([command.name, *command.args]))
+
+
 @rule("osascript")
 def _osascript(command: Cmd) -> Verdict:
     scripts = []
@@ -1561,6 +1578,8 @@ def _gws(command: Cmd) -> Verdict:
 
 
 SCRIPT_RULES: Dict[str, Callable[[Cmd], Verdict]] = {"google_api.py": _google_api, "gws_bridge.py": _gws}
+# ~/.local/bin/cua-driver and the one inside CuaDriver.app get the same rule as the bare name.
+SCRIPT_RULES["cua-driver"] = _cua_driver
 RULES["google_api.py"] = _google_api
 
 

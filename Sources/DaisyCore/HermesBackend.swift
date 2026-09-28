@@ -521,7 +521,11 @@ public actor HermesBackend: AgentBackend, JobBackend {
                 let id = update["toolCallId"]?.stringValue ?? UUID().uuidString
                 let toolKind = update["kind"]?.stringValue
                 var label = turn.tools[id] ?? (title: "Working", detail: nil)
-                if let raw = update["title"]?.stringValue { label = ToolPhrases.describe(title: raw, kind: toolKind, input: update["rawInput"]) }
+                // Plugin tools are titled with their bare name and only the start carries their arguments, so a
+                // later update without them keeps the start's phrase ("Switching to Gmail", not "Switching tabs").
+                if let raw = update["title"]?.stringValue, update["rawInput"] != nil || turn.tools[id] == nil || raw.contains(":") {
+                    label = ToolPhrases.describe(title: raw, kind: toolKind, input: update["rawInput"])
+                }
                 turns[session]?.tools[id] = label
                 let state = Self.state(update["status"]?.stringValue) ?? (kind == "tool_call" ? .running : nil)
                 if let state { turn.sink.yield(.event(.tool(AgentToolActivity(id: id, title: label.title, detail: label.detail, kind: toolKind, state: state)))) }

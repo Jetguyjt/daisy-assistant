@@ -60,6 +60,8 @@ Notes: [orchestrator.md](research/orchestrator.md)
 - [ ] `daisy-chrome` skill: reuse an open tab before opening a new one ("check my email" → Gmail tab)
   - `hermes/skills/daisy-chrome`, installed by `scripts/hermes.d/30-chrome.sh`; "check my email" is one `chrome_open(..., reuse=true)` so it never stops at a card
 - [ ] `computer_use` into ACP sessions through a plugin tool (keeps Hermes's hard-blocks); check how its approvals behave over ACP
+  - built (tests): `computer_look` / `computer_act`; over ACP the built-in approves everything (no callback), so the guard's card is the only yes. The shell route (`cua-driver call`) is refused now
+  - not seen live: CuaDriver permissions, real captures and clicks
 - [ ] Try `chrome-devtools-mcp --autoConnect` in `mcp_servers` and count the Chrome consent prompts
   - `scripts/hermes.d/31-chrome-devtools.sh` adds it only with `DAISY_CHROME_DEVTOOLS=1`; not tried
 - [x] Auto-connect the old Chrome adapter at launch for the local fallback, or retire it
