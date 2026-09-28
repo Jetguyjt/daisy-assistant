@@ -10,6 +10,9 @@ public protocol AgentBackend: AnyObject, Sendable {
     /// Runs one turn. Events arrive in order; the stream finishes with the turn and throws
     /// `AgentFailure` when it can't complete. Cancelling the consuming task cancels the turn.
     func send(_ prompt: AgentPrompt) -> AsyncThrowingStream<AgentEvent, Error>
+    /// The same turn as `send`, plus what `send` leaves out (the agent's plan). Backends without
+    /// extras get this from `send`.
+    func stream(_ prompt: AgentPrompt) -> AsyncThrowingStream<AgentUpdate, Error>
     /// Stops the turn in progress, if any.
     func cancel() async
     /// Answers a pending approval. `optionID` nil means no.
@@ -27,6 +30,38 @@ public protocol AgentBackend: AnyObject, Sendable {
 
 public extension AgentBackend {
     func send(_ text: String) -> AsyncThrowingStream<AgentEvent, Error> { send(AgentPrompt(text: text)) }
+
+    func stream(_ prompt: AgentPrompt) -> AsyncThrowingStream<AgentUpdate, Error> {
+        let events = send(prompt)
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    for try await event in events { continuation.yield(.event(event)) }
+                    continuation.finish()
+                } catch { continuation.finish(throwing: error) }
+            }
+            continuation.onTermination = { termination in
+                if case .cancelled = termination { task.cancel() }
+            }
+        }
+    }
+}
+
+/// A backend that can run background jobs, each in a session of its own next to the conversation.
+public protocol JobBackend: AnyObject, Sendable {
+    /// Opens a session for one job and returns its id. The session is marked as a job before
+    /// anything runs in it. Throws `AgentFailure` when the agent isn't ready or already runs as
+    /// many jobs as it allows.
+    func openWorker() async throws -> String
+    /// Runs one prompt in a job's session. Only that session's events come through. Cancelling
+    /// the stream stops the turn.
+    func run(worker session: String, prompt: AgentPrompt) -> AsyncThrowingStream<AgentUpdate, Error>
+    /// Stops the job's turn, if one is running, and declines what it has waiting for approval.
+    func cancel(worker session: String) async
+    /// Ends a job: stops whatever is left, then takes the job mark off its session.
+    func closeWorker(_ session: String) async
+    /// Answers an approval from any session. `optionID` nil means no.
+    func resolve(approval id: String, optionID: String?) async
 }
 
 /// What the user sends in one turn.
@@ -128,10 +163,42 @@ public enum AgentEvent: Sendable {
     /// A tool started or changed state; the same id repeats as it progresses.
     case tool(AgentToolActivity)
     case approval(AgentApproval)
+    /// The approval was answered, or counted as no: declined, timed out, or its turn stopped.
     case approvalResolved(id: String, allowed: Bool)
     /// Structured results the local engine can show directly (file matches, review cards).
     case receipts([CapabilityReceipt])
     case finished(stopReason: String)
+}
+
+/// A turn's events plus the extras `AgentEvent` leaves out. A type of its own so existing
+/// switches over `AgentEvent` stay exhaustive.
+public enum AgentUpdate: Sendable {
+    case event(AgentEvent)
+    /// The agent's plan changed. Replaces the one before.
+    case plan(AgentPlan)
+}
+
+/// The agent's to-do list for the work in hand (Hermes's `todo` tool). Each update replaces the
+/// whole list.
+public struct AgentPlan: Sendable, Equatable {
+    public struct Entry: Sendable, Equatable, Identifiable {
+        public enum Status: String, Sendable { case pending, inProgress = "in_progress", completed }
+        /// Position in the list.
+        public let id: Int
+        public let content: String
+        public let status: Status
+        /// Hermes keeps dropped items on the list, marked done, so they don't just vanish.
+        public let cancelled: Bool
+        public init(id: Int, content: String, status: Status, cancelled: Bool = false) {
+            self.id = id; self.content = content; self.status = status; self.cancelled = cancelled
+        }
+    }
+    public var entries: [Entry]
+    public init(entries: [Entry]) { self.entries = entries }
+    /// Items actually done, not counting dropped ones.
+    public var completed: Int { entries.filter { $0.status == .completed && !$0.cancelled }.count }
+    /// What's being worked on now.
+    public var current: Entry? { entries.first { $0.status == .inProgress } }
 }
 
 /// Why a turn failed, in words fit for the screen.

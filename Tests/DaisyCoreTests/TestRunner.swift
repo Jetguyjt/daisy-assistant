@@ -270,10 +270,170 @@ import Foundation
             let before = TestLog.failures
             let suite = HermesTests()
             try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testOtherSessionsUpdatesStayOutAndTheirApprovalsAreDeclined()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testOtherSessionsUpdatesStayOutAndTheirApprovalsAreDeclined")
+        } catch { fail("testOtherSessionsUpdatesStayOutAndTheirApprovalsAreDeclined: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = HermesTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testUnansweredApprovalCountsAsNo()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testUnansweredApprovalCountsAsNo")
+        } catch { fail("testUnansweredApprovalCountsAsNo: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = HermesTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            suite.testDelegateAndTodoTitlesReadAsPlainWords()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testDelegateAndTodoTitlesReadAsPlainWords")
+        } catch { fail("testDelegateAndTodoTitlesReadAsPlainWords: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = HermesTests()
+            try suite.setUp(); defer { suite.tearDown() }
             try await suite.testResumedSessionReplaysHistoryAndUnknownOnesStartFresh()
             count += 1
             print("\(TestLog.failures == before ? "PASS" : "FAIL") testResumedSessionReplaysHistoryAndUnknownOnesStartFresh")
         } catch { fail("testResumedSessionReplaysHistoryAndUnknownOnesStartFresh: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = JobsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testTwoSessionsInterleaveAndEachGetsItsOwnUpdates()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testTwoSessionsInterleaveAndEachGetsItsOwnUpdates")
+        } catch { fail("testTwoSessionsInterleaveAndEachGetsItsOwnUpdates: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = JobsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testWorkerSessionIsMarkedBeforeItsFirstPromptAndUnmarkedAfter()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testWorkerSessionIsMarkedBeforeItsFirstPromptAndUnmarkedAfter")
+        } catch { fail("testWorkerSessionIsMarkedBeforeItsFirstPromptAndUnmarkedAfter: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = JobsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testJobSessionsStopAtTwoAndStayOutOfTheChatList()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testJobSessionsStopAtTwoAndStayOutOfTheChatList")
+        } catch { fail("testJobSessionsStopAtTwoAndStayOutOfTheChatList: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = JobsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testAlwaysAllowIsAnsweredAsAllowOnce()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testAlwaysAllowIsAnsweredAsAllowOnce")
+        } catch { fail("testAlwaysAllowIsAnsweredAsAllowOnce: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = JobsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testPlanUpdatesReachTheConversation()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testPlanUpdatesReachTheConversation")
+        } catch { fail("testPlanUpdatesReachTheConversation: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = JobsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testFinishedJobIsAnnouncedAndKept()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testFinishedJobIsAnnouncedAndKept")
+        } catch { fail("testFinishedJobIsAnnouncedAndKept: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = JobsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testThirdJobWaitsForAFreeSlot()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testThirdJobWaitsForAFreeSlot")
+        } catch { fail("testThirdJobWaitsForAFreeSlot: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = JobsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testWorkerApprovalBecomesACardTaggedWithItsJob()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testWorkerApprovalBecomesACardTaggedWithItsJob")
+        } catch { fail("testWorkerApprovalBecomesACardTaggedWithItsJob: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = JobsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testUnansweredCardIsDeclinedAndTakenDownInTime()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testUnansweredCardIsDeclinedAndTakenDownInTime")
+        } catch { fail("testUnansweredCardIsDeclinedAndTakenDownInTime: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = JobsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testBackendDeclinesAnApprovalNobodyAnswers()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testBackendDeclinesAnApprovalNobodyAnswers")
+        } catch { fail("testBackendDeclinesAnApprovalNobodyAnswers: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = JobsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testCardsComeDownWhenTheirJobEnds()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testCardsComeDownWhenTheirJobEnds")
+        } catch { fail("testCardsComeDownWhenTheirJobEnds: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = JobsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testJobPlanAndFailureShowUp()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testJobPlanAndFailureShowUp")
+        } catch { fail("testJobPlanAndFailureShowUp: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = JobsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testVoiceTurnCardFreesTheVoiceOnce()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testVoiceTurnCardFreesTheVoiceOnce")
+        } catch { fail("testVoiceTurnCardFreesTheVoiceOnce: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = JobsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testLedgerKeepsRecentHistoryAndStopsInterruptedJobs()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testLedgerKeepsRecentHistoryAndStopsInterruptedJobs")
+        } catch { fail("testLedgerKeepsRecentHistoryAndStopsInterruptedJobs: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = JobsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            suite.testRolesFileLocationFollowsHermesHome()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testRolesFileLocationFollowsHermesHome")
+        } catch { fail("testRolesFileLocationFollowsHermesHome: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = JobsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testDelegationCheckReportsEachOutcome()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testDelegationCheckReportsEachOutcome")
+        } catch { fail("testDelegationCheckReportsEachOutcome: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = JobsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            suite.testDelegationPromptCarriesTheWordButNotItsAnswer()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testDelegationPromptCarriesTheWordButNotItsAnswer")
+        } catch { fail("testDelegationPromptCarriesTheWordButNotItsAnswer: \(error)") }
         do {
             let before = TestLog.failures
             let suite = MarkdownTests()
