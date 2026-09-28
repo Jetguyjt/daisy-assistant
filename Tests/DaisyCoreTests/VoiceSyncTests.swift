@@ -59,6 +59,16 @@ final class VoiceSyncTests {
         expectEqual(feed.reveals.last, Int.max)
     }
 
+    func testTheTrimmedFinalAnswerIsNotSaidTwice() {
+        // The app hands `finish` the answer with trailing whitespace trimmed off.
+        for ending in ["\n", " ", "\n\n"] {
+            var feed = SpeechFeed()
+            let streamed = "Hello there, this is a test of the feed." + ending
+            expectEqual(feed.update(streamed), ["Hello there, this is a test of the feed."])
+            expectEqual(feed.finish(streamed.trimmingCharacters(in: .whitespacesAndNewlines)), [])
+        }
+    }
+
     func testANewReplyStartsCountingFromItsOwnText() {
         var feed = SpeechFeed()
         _ = feed.update("Let me check that for you. ")

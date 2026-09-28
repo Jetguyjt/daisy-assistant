@@ -51,9 +51,12 @@ public struct SpeechFeed: Sendable {
     }
 
     /// A reply that no longer extends what was seen (a new agent turn, or a canned final message)
-    /// starts over. What was already said stays said.
+    /// starts over. What was already said stays said. Whitespace at either end doesn't count, so the
+    /// finished answer trimmed of its last newline is still the same reply, not a new one to say again.
     private mutating func restartIfNeeded(_ text: String) {
         guard !text.hasPrefix(source) else { return }
+        let seen = source.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix(seen) else { return }
         source = ""; boundary = 0; handedOut = 0; covered = 0
     }
 

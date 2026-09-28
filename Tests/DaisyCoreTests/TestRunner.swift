@@ -1003,6 +1003,13 @@ import Foundation
         do {
             let before = TestLog.failures
             let suite = VoiceSyncTests()
+            suite.testTheTrimmedFinalAnswerIsNotSaidTwice()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testTheTrimmedFinalAnswerIsNotSaidTwice")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = VoiceSyncTests()
             suite.testANewReplyStartsCountingFromItsOwnText()
             count += 1
             print("\(TestLog.failures == before ? "PASS" : "FAIL") testANewReplyStartsCountingFromItsOwnText")
