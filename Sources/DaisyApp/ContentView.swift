@@ -324,11 +324,20 @@ struct ContentView: View {
             HStack(alignment: .bottom, spacing: 14) {
                 ComposerBar(model: model, composer: model.composer)
                 chatModeButton
-                HUDSwitch(title: "ALWAYS LISTENING", isOn: model.alwaysListening,
-                          detail: model.alwaysListening ? (model.standby ? "Say “Hey Daisy”" : "Arming mic…") : "Mic off between turns") {
-                    model.setAlwaysListening(!model.alwaysListening)
+                VStack(alignment: .trailing, spacing: 10) {
+                    // Same setting as Settings → Voice → Read answers aloud, saved right away.
+                    HUDSwitch(title: "DAISY'S VOICE", isOn: model.config.speakResponses,
+                              detail: model.config.speakResponses ? "Replies spoken aloud" : "Text only") {
+                        model.config.speakResponses.toggle()
+                        do { try model.config.save() } catch { model.notice = "Couldn't save the voice setting: \(error.localizedDescription)" }
+                    }
+                    .help("Turn Daisy's spoken replies on or off")
+                    HUDSwitch(title: "ALWAYS LISTENING", isOn: model.alwaysListening,
+                              detail: model.alwaysListening ? (model.standby ? "Say “Hey Daisy”" : "Arming mic…") : "Mic off between turns") {
+                        model.setAlwaysListening(!model.alwaysListening)
+                    }
+                    .help("Keep the mic open for “Hey Daisy” (⌘⇧L)")
                 }
-                .help("Keep the mic open for “Hey Daisy” (⌘⇧L)")
                 .frame(width: 200, alignment: .trailing)
             }
             .padding(.horizontal, 14).padding(.vertical, 10)

@@ -29,6 +29,23 @@ final class ComposerTextView: NSTextView {
     var onEscape: (() -> Void)?
     var onArrowUp: (() -> Void)?
     var onFiles: (([URL]) -> Void)?
+    /// Drawn by the view itself at the text origin, so it sits exactly where the cursor and the first
+    /// typed letter go. A SwiftUI overlay can't know the container inset and line padding.
+    var placeholder = "" { didSet { if placeholder != oldValue { needsDisplay = true } } }
+    var placeholderColor = NSColor.secondaryLabelColor
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        guard string.isEmpty, !placeholder.isEmpty, let font else { return }
+        let origin = NSPoint(x: textContainerOrigin.x + (textContainer?.lineFragmentPadding ?? 0), y: textContainerOrigin.y)
+        (placeholder as NSString).draw(at: origin, withAttributes: [.font: font, .foregroundColor: placeholderColor])
+    }
+
+    override func didChangeText() {
+        super.didChangeText()
+        // The placeholder shows only while empty, so redraw when that flips.
+        needsDisplay = true
+    }
 
     override func keyDown(with event: NSEvent) {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
@@ -80,6 +97,7 @@ struct ComposerEditor: NSViewRepresentable {
     var expanded = false
     var fontSize: CGFloat = 14
     var maxLines = 8
+    var placeholder = ""
     @Binding var height: CGFloat
     var onSubmit: () -> Void
     var onEscape: () -> Void
@@ -133,6 +151,7 @@ struct ComposerEditor: NSViewRepresentable {
         guard let text = coordinator.textView else { return }
         if text.string != state.text {
             text.string = state.text
+            text.needsDisplay = true
             text.setSelectedRange(NSRange(location: (state.text as NSString).length, length: 0))
             text.scrollToEndOfDocument(nil)
             coordinator.measure()
@@ -159,6 +178,8 @@ struct ComposerEditor: NSViewRepresentable {
             text.onArrowUp = parent.onArrowUp
             let state = parent.state
             text.onFiles = { urls in state.add(urls) }
+            text.placeholder = parent.placeholder
+            text.placeholderColor = NSColor(HUD.dim)
             if fontSize != parent.fontSize {
                 fontSize = parent.fontSize
                 let font = NSFont.systemFont(ofSize: parent.fontSize)
@@ -269,16 +290,12 @@ struct ComposerBar: View {
                 if model.phase == .listening || model.phase == .preparing {
                     ListeningStrip(audio: model.audio, preparing: model.phase == .preparing).frame(height: 34)
                 } else {
-                    ZStack(alignment: .topLeading) {
-                        ComposerEditor(state: composer, height: $height, onSubmit: model.submit, onEscape: model.interrupt,
-                                       onArrowUp: model.editLastMessage)
-                            .frame(height: height)
-                        if composer.text.isEmpty {
-                            Text(model.alwaysListening ? "Message Daisy, or say “Hey Daisy”" : "Message Daisy")
-                                .font(.system(size: 14)).foregroundStyle(HUD.dim).padding(.top, 7).allowsHitTesting(false)
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
+                    ComposerEditor(state: composer,
+                                   placeholder: model.alwaysListening ? "Message Daisy, or say “Hey Daisy”" : "Message Daisy",
+                                   height: $height, onSubmit: model.submit, onEscape: model.interrupt,
+                                   onArrowUp: model.editLastMessage)
+                        .frame(height: height)
+                        .frame(maxWidth: .infinity)
                 }
                 VStack(alignment: .trailing, spacing: 4) {
                     if height > 60 || bytes > 600 {
