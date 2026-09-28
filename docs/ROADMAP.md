@@ -17,12 +17,18 @@ Research notes:
 These gaps have to close before the tools below go live. Stress test in [orchestrator.md](research/orchestrator.md#guard-stress-test).
 
 - [ ] Card must show exactly what runs: refuse chained commands (`;` `&&` `|` `$(`), and show every recipient, Bcc and attachment untruncated
+  - guard side done: tests, and live on 2026-09-28 a chained `echo …; rm -f …` was refused (Hermes log: the terminal call returned the guard's message in 0.01s). The app's card scrolls instead of cutting off, not seen live yet
 - [ ] Typed plugin tools for risky actions (`gmail_send`, `drive_share`, `drive_delete`, `imsg_send`, `calendar_write`); block the same actions from `terminal` / `execute_code`
-- [ ] Guard loads in every Hermes process (cron, gateway), not just `DAISY_SESSION`; fails closed if it throws
-- [ ] Allowlists per role, enforced by the plugin (chat, worker read-only, cron pre-approved)
-- [ ] Taint: after reading mail/web/files, new recipients, URLs or memory writes need a card
+  - guard side done (tests): the shell route is refused and points at the typed tool once it exists, and gets a card until then. The tools come with the Google and iMessage work
+- [x] Guard loads in every Hermes process (cron, gateway), not just `DAISY_SESSION`; fails closed if it throws
+  - tests, and `hermes plugins doctor --ci` registers the hook with and without `DAISY_SESSION=1`
+- [x] Allowlists per role, enforced by the plugin (chat, worker read-only, cron pre-approved)
+  - tests; workers come from `~/.hermes/daisy/roles.json`, cron's pre-approved list from `cron-allow.json`
+- [x] Taint: after reading mail/web/files, new recipients, URLs or memory writes need a card
+  - tests
 - [ ] Approval queue: no answer = no, card removed on timeout, voice loop freed
-- [ ] Rules plus test lines for:
+  - built and tested against stand-ins; not seen live yet
+- [x] Rules plus test lines for (tests: `hermes/test_daisy_guard_bypass.py`, 102 checks red on the old guard, all green now):
   - Drive `delete` / `share` / `upload`
   - `gmail modify`
   - Docs/Sheets writes
