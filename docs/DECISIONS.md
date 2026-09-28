@@ -95,3 +95,11 @@ Hermes's `delegate_task` stays off in Daisy sessions: checked live, its backgrou
 ## 013 — Messages, Reminders and Notes as typed tools (2026-09-28)
 
 Texts go through `imsg_send` on imsg, reminders through remindctl, notes straight through osascript. Three choices on purpose. Notes doesn't use memo, the CLI Hermes's apple-notes skill wants: it pastes note text into AppleScript source, only adds or edits through an interactive editor, and edits by rewriting the whole note through Markdown. There's no tool that reads messages: imsg reads chat.db, which needs Full Disk Access, and that would open every file on the Mac to the agent's shell. There are no delete tools for reminders or notes; the shell route to those deletes stops at a delete card. Who a text goes to is never guessed: a saved nickname, one exact contact, or a number, and anything else is refused with the choices so Daisy asks.
+
+## 014 — One local signing certificate (2026-09-28)
+
+Ad hoc, every build of Daisy was a new app to macOS, because the code signature's identity was the build's hash, so the microphone prompt came back after every install (and Contacts, Automation and Reminders would have too). Daisy is now signed with a self-signed certificate, "Daisy Local Signing", made once by `scripts/make-signing-identity.sh` and kept in the login keychain for codesign. The app's identity is its bundle ID plus that certificate, which stays the same across builds, so permissions are granted once. The trade-off: anything that can use that key can sign an app macOS treats as Daisy, which is why it lives in the login keychain and nowhere else.
+
+## 015 — Always on, read-only (2026-09-28)
+
+Hermes's gateway runs as a LaunchAgent so scheduled jobs run while Daisy is closed. The two jobs Daisy adds, an overnight inbox triage and a morning repo digest, only read; the guard treats every cron run as read-only, so a job that tried to send or change something would be blocked, not carded, since nobody is there to answer. Background jobs pause at 80% of either ChatGPT usage window. A cheaper model for background runs is picked from what Hermes lists, not written into the config by name; today none is listed, so they use the default.

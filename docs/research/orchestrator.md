@@ -168,6 +168,6 @@ The always-on layer, 2026-09-28. Tests only; none of it has run live yet.
 
 - **Hermes code** (`~/.hermes/hermes-agent`): `acp_adapter/{server,session,permissions,events}.py`, `run_agent.py:1297`, `tools/async_delegation.py`, `tools/delegate_tool*.py`, `tools/approval.py`, `tools/computer_use/tool.py`, `toolsets.py`
 - **Hermes docs:** `website/docs/user-guide/features/{kanban,cron,delegation,goals,heartbeat,wake-word}.md`, `user-guide/profiles.md`
-- **Agent patterns:** [Anthropic, Building effective agents](https://www.anthropic.com/engineering/building-effective-agents); [Anthropic, multi-agent research system](https://www.anthropic.com/engineering/multi-agent-research-system) (about 15× the tokens of chat); [MAST failure taxonomy](https://arxiv.org/abs/2503.13657); [OpenAI agents guide](https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/)
+- **Agent patterns:** [MAST failure taxonomy](https://arxiv.org/abs/2503.13657); [OpenAI agents guide](https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/). Multi-agent research runs cost roughly 15× the tokens of a chat
 - **Wake word:** [Snowboy](https://github.com/Kitt-AI/snowboy); [Porcupine free tier ending](https://community.home-assistant.io/t/fyi-picovoice-confirmed-free-tier-accesskeys-will-stop-working-after-june-30-2026/1012744)
 - **macOS:** `man caffeinate`, `man pmset`, `man launchd.plist`; [SMAppService](https://developer.apple.com/documentation/servicemanagement/smappservice)

@@ -27,7 +27,7 @@ From his own posts and the Azaris docs:
   - drafts for anything outgoing
   - Telegram, iMessage, Slack and Discord, plus voice
   - "1,000+ tools"
-  - bring-your-own ChatGPT, OpenAI or Claude model
+  - bring-your-own model (ChatGPT, OpenAI and others)
 
 ## What it's built on
 
