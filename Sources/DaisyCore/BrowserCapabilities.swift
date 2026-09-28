@@ -1,5 +1,9 @@
 import Foundation
 
+// The old "Connect Chrome" adapter (chrome-devtools-mcp), which only feeds the on-device fallback.
+// Retired on 2026-09-28 (docs/research/mac-control.md, "Decision"): Hermes reaches Chrome through
+// hermes/daisy/tools/chrome.py now. This file goes when the Connections page and its AppModel wiring do.
+
 public protocol BrowserTransport: Sendable {
     func call(_ name: String, arguments: [String: JSONValue]) async throws -> JSONValue
 }

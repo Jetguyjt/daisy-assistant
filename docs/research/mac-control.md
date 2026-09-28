@@ -61,6 +61,14 @@ The goal: "search Google for…", "check my email" → go to Chrome, use the Gma
 
 Each needs a rule and a line in `test_daisy_guard.py`.
 
+## Decision
+
+2026-09-28, while building the AppleScript tools:
+
+- **Retire the old Chrome adapter; don't auto-connect it.** Auto-connecting would mean Chrome's debugging prompt and its "controlled by automated software" bar every time Daisy starts, remote debugging left switched on, and a Node process next to a Chrome that already eats my RAM. All of that for the on-device fallback, which I barely use. Hermes gets `chrome_tabs`, `chrome_focus` and `chrome_open` instead, for one Automation prompt, once. The fallback loses its browser tools; if I ever want them back, it can call the same AppleScript. Taking the adapter out touches the Connections page, AppModel, `daisy-check --browser-metadata`, `setup-browser.sh` and the README, so it's its own change after the tools land, and `BrowserCapabilities.swift` goes with it.
+- **"Check my email" is one call:** `chrome_open("https://mail.google.com/", reuse=true)`. The guard counts `chrome_tabs` as reading the web, so an open after listing tabs stops at a card.
+- **New tabs open with `open -b com.google.Chrome <url>`**, like a link from another app. It needs no Automation permission and starts Chrome when it's closed. AppleScript is only for reading tabs and switching.
+
 ## Effort
 
 | Piece | Estimate |
