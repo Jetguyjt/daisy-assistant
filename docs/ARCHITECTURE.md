@@ -81,12 +81,34 @@ Personal memory belongs to Hermes, so it survives model changes. Hermes keeps `~
 Use Hermes, not Daisy code:
 
 - procedures and workflows go in a Hermes skill (`~/.hermes/skills/<category>/<name>/SKILL.md`)
-- deterministic code, credentials or APIs go in an MCP server in Hermes's `config.yaml` (`mcp_servers`), or a Hermes plugin
-- anything that sends, deletes or changes data outside the Mac also needs a guard rule in `hermes/daisy` and a test line in `hermes/test_daisy_guard.py`
+- read-only integrations can be an MCP server in Hermes's `config.yaml` (`mcp_servers`)
+- anything that sends, shares, deletes, writes outside the Mac or drives another app's UI is a **typed tool** in the `hermes/daisy` plugin (below), never a shell command
 
-Daisy picks tools up with no changes. New tools only need a phrase in `HermesBackend.describeTool` when the default ("Working", or the tool name) reads badly.
+### Typed tools
+
+`hermes/daisy/registry.py` is the contract. A typed tool declares:
+
+- `name` (snake_case) and `parameters` (JSON schema)
+- `risk`: `read`, `write`, `send`, `delete`, `share` or `ui`
+- `card(args)`: the approval text in full. First line is the title ("Send an email to Dad"); the rest is the exact content, every recipient, Cc, Bcc and attachment, never cut short
+- `run(args)`: does the work and returns data
+
+A new family is one file in `hermes/daisy/tools/` that calls `registry.add(TypedTool(...))` at import. The tools package imports every file in it, so nothing else changes. Typed tools register into the `hermes-acp` toolset, which is what Daisy's sessions get.
+
+The guard (`hermes/daisy/guard/`) decides from that metadata alone: `read` runs, anything else stops at a card, and every approval is for that one call only. It never parses a typed tool's arguments. Untyped routes (`terminal`, `execute_code`, MCP tools) still go through the command rules in `guard/classify.py`.
+
+### Hermes settings
+
+Each feature that needs a Hermes setting adds a fragment, `scripts/hermes.d/NN-name.sh`. `scripts/setup-hermes.sh` installs the plugin and then sources every fragment in order. Fragments are idempotent and change settings with `config_set <key> <value>`, which only writes when the value differs and backs up `config.yaml` once per run. See `scripts/hermes.d/README.md`.
+
+### Phrases
+
+What the HUD says while a tool runs comes from `Sources/DaisyCore/ToolPhrases.swift` ("Searching your files", "Reading resume.pdf"). Add a phrase there when the default ("Working", or the tool name) reads badly.
 
 ## Tests
+
+- `python3 scripts/gen-tests.py` rewrites `Tests/DaisyCoreTests/TestRunner.swift` from every `*Tests.swift` file, so a new test file needs no registration by hand.
+- `for t in hermes/test_*.py; do python3 "$t"; done` runs the plugin checks (guard rules and the typed-tool contract).
 
 - `swift run daisy-tests` runs the Hermes bridge against a scripted stand-in for `hermes-acp` that sends the same ACP messages the installed Hermes does:
   - streamed math answer

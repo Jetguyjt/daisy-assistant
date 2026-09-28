@@ -151,7 +151,7 @@ import DaisyCore
                 }
                 try await Task.sleep(nanoseconds: 4_000_000_000)
                 session.stop()
-                readings.lock.lock(); let items = readings.items; readings.lock.unlock()
+                let items = readings.lock.withLock { readings.items }
                 var endpointer = SpeechEndpointer(settings: playback == nil ? .standard : .bargeIn)
                 var events: [String] = []
                 var t = 0.0

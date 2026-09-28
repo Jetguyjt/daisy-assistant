@@ -7,12 +7,17 @@ from pathlib import Path
 
 
 def load(active: bool):
+    """Loads hermes/daisy as a package, the way Hermes does, with DAISY_SESSION set or not."""
     if active:
         os.environ["DAISY_SESSION"] = "1"
     else:
         os.environ.pop("DAISY_SESSION", None)
-    spec = importlib.util.spec_from_file_location("daisy_plugin", Path(__file__).parent / "daisy" / "__init__.py")
+    for name in [n for n in sys.modules if n == "daisy_plugin" or n.startswith("daisy_plugin.")]:
+        del sys.modules[name]
+    folder = Path(__file__).parent / "daisy"
+    spec = importlib.util.spec_from_file_location("daisy_plugin", folder / "__init__.py", submodule_search_locations=[str(folder)])
     module = importlib.util.module_from_spec(spec)
+    sys.modules["daisy_plugin"] = module
     spec.loader.exec_module(module)
     return module
 
@@ -26,6 +31,9 @@ class Recorder:
 
     def register_hook(self, name, callback):
         self.calls.append(("hook", name, callback))
+
+    def register_tool(self, name, toolset, schema, handler, **kwargs):
+        self.calls.append(("tool", name, toolset))
 
 
 failures = 0

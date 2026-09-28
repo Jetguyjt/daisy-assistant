@@ -115,7 +115,8 @@ bash scripts/serve-model.sh            # diagnostic standalone server
 swift run daisy-check qwen3.5:4b       # actual local inference and synthetic speech round trip
 swift run daisy-check --runtime       # quit Daisy/external server first; owned startup/shutdown twice
 swift run daisy-check --hermes "What is 37 × 18?" "Find my resume."  # real Hermes over ACP; approvals always declined
-python3 hermes/test_daisy_guard.py    # what the approval guard stops and lets through
+for t in hermes/test_*.py; do python3 "$t"; done  # approval guard rules and the typed-tool contract
+python3 scripts/gen-tests.py          # after adding a *Tests.swift file
 swift run daisy-check --browser-metadata # real MCP handshake only; no browser/account access
 swift run daisy-check --spoken answer.md  # print what the voice would say for a Markdown answer
 swift run daisy-check --endpoint clip.wav  # replay a WAV through the silence endpointer
