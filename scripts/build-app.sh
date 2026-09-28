@@ -4,7 +4,9 @@ REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_DIR"
 BUILD_MODE="${1:-release}"
 case "$BUILD_MODE" in release|debug) ;; *) echo "Use release or debug"; exit 1;; esac
-swift build -c "$BUILD_MODE"
+# Only what the bundle needs: the test runner uses @testable imports, which a release build refuses.
+swift build -c "$BUILD_MODE" --product Daisy
+swift build -c "$BUILD_MODE" --product daisy-check
 STAGING_DIR="$(mktemp -d "${TMPDIR:-/tmp}/daisy-build.XXXXXX")"
 APP_DIR="$STAGING_DIR/Daisy.app"
 mkdir -p "$REPO_DIR/dist"
