@@ -50,7 +50,7 @@ This installs Ollama, whisper.cpp and Python 3.11 through Homebrew, downloads Qw
 | Voice | Mic → Silero voice activity → wake word or Talk → Apple's on-device recognizer (whisper.cpp as the fallback) → agent → Kokoro, starting on the first finished sentence while the answer is still streaming |
 | Approvals | Sends, deletes, calendar changes and posts wait on an amber card with the exact content (Hermes plugin in `hermes/daisy`); dangerous commands and file edits use Hermes's own prompts |
 | HUD | Reactor-style core that follows the mic and the voice, live tool activity, link and mic status, always-listening switch; respects Reduce Motion and pauses when hidden |
-| Memory | SQLite + FTS5; explicit save, edit, delete, source, revision; retrieved locally |
+| Memory | Hermes's `USER.md` / `MEMORY.md`; a Learned feed in the Memory tab lists what Hermes saved on its own, with Undo and Edit. The old SQLite memory moves into Hermes once and stays for the on-device fallback |
 | Files | One chosen folder; recursive filename matching; newest first; click to open/reveal; optional bounded UTF-8 content reading |
 | Tasks/projects | Persistent local title, project, due date, status and notes; UI editing and model-prepared review cards |
 | Document/code drafts | Prepare a new text file; review full content and Apply; no overwrites or code execution |
@@ -59,7 +59,10 @@ This installs Ollama, whisper.cpp and Python 3.11 through Homebrew, downloads Qw
 | Utilities | Validated arithmetic and date/time with timezone support |
 | Capability system | Dynamic schemas, per-capability permissions, multi-step execution, deduplication, cancellation, verified result cards |
 | Permissions | Folder selection/revocation, individual capability toggles, content reading off by default, microphone on first use |
-| Calendar, Contacts, Messages | **Not wired yet.** Hermes's `imessage` and `google-workspace` skills are installed but need `imsg` and a Google sign-in; see [integration plan](docs/INTEGRATIONS.md) |
+| Gmail, Calendar, Drive | Typed tools over Hermes's `google-workspace` skill: "check my email" reads headers and snippets, and every send, share, delete or calendar change waits on a card. Needs your own Google sign-in first (steps in [google.md](docs/research/google.md)) |
+| Other Mac apps | `computer_look` reads a window; every click, key or bit of typing through `computer_act` waits on a card that says exactly what it will do. Needs Accessibility and Screen Recording for CuaDriver |
+| Contacts | Looks people up by name or a nickname you've confirmed once ("Bubba" means Robert); the first lookup asks for Contacts access |
+| Messages | **Not wired yet.** `imsg` is installed; see [integration plan](docs/INTEGRATIONS.md) |
 | Wake word | "Hey Daisy", heard in Apple's streaming transcript (or by a trained openWakeWord model once there is one, see [wake word](docs/wake-word.md)); on/off switch on the main screen (⌘⇧L) |
 | Proactive suggestions, fine-tuning | **Not implemented** |
 
@@ -67,7 +70,7 @@ Search does not inspect document contents, determine which resume is substantive
 
 The model chooses from the enabled capabilities and can combine them, such as finding a text file, reading it, and summarizing it. Enable **Read text files** in Capabilities first. This reader accepts only references obtained from that request's scoped search, limits files to 64 KB, and returns at most 1,200 characters. It does not parse PDF/Word files. `/find budget` remains a direct search without inference.
 
-General questions, writing, explanations, brainstorming, and planning do not require a special integration. Real data or actions in another app require an installed adapter and the appropriate access. Full Gmail/Drive APIs, Google Docs canvas editing, arbitrary app control, form input, shell execution and sending messages are not implemented.
+General questions, writing, explanations, brainstorming, and planning do not require a special integration. Real data or actions in another app require an installed adapter and the appropriate access. Anything that sends, shares, deletes, changes a calendar or drives another app goes through a typed tool and its approval card; none of it has been run against the real accounts and apps yet.
 
 The agent is bounded to eight model rounds and ten tool calls, with strict schema validation and duplicate-call reuse. The current request is limited to 4,000 UTF-8 bytes. Complete memories/history are included only while they fit the context budget. Only result cards prove that an operation ran; model prose can still be inaccurate. Tools may read data or prepare exact changes. Task saves, new files and app launches require the user to Apply a review card. Other effectful adapters remain blocked. Old cards expire when another request starts, access changes, or Stop is pressed; task revisions and exclusive file creation also prevent stale overwrites. See [capability architecture](docs/CAPABILITIES.md).
 
