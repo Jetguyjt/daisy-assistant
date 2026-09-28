@@ -521,7 +521,7 @@ public actor HermesBackend: AgentBackend, JobBackend {
                 let id = update["toolCallId"]?.stringValue ?? UUID().uuidString
                 let toolKind = update["kind"]?.stringValue
                 var label = turn.tools[id] ?? (title: "Working", detail: nil)
-                if let raw = update["title"]?.stringValue { label = ToolPhrases.describe(title: raw, kind: toolKind) }
+                if let raw = update["title"]?.stringValue { label = ToolPhrases.describe(title: raw, kind: toolKind, input: update["rawInput"]) }
                 turns[session]?.tools[id] = label
                 let state = Self.state(update["status"]?.stringValue) ?? (kind == "tool_call" ? .running : nil)
                 if let state { turn.sink.yield(.event(.tool(AgentToolActivity(id: id, title: label.title, detail: label.detail, kind: toolKind, state: state)))) }
