@@ -246,7 +246,7 @@ struct ContentView: View {
 
     /// What Daisy is saying right now, or the last thing she said, under the core.
     private var caption: String? {
-        if !model.liveText.isEmpty { return model.liveText }
+        if !model.liveText.isEmpty { let shown = model.shownText; return shown.isEmpty ? nil : shown }
         guard let last = model.messages.last, last.role == "assistant", !last.text.isEmpty else { return nil }
         return last.text
     }
@@ -269,7 +269,7 @@ struct ContentView: View {
                             .transition(.opacity.combined(with: .offset(y: 8)))
                     }
                     if !model.liveText.isEmpty || [.thinking, .searching, .working, .responding, .awaitingApproval].contains(model.phase) {
-                        LiveReply(text: model.liveText, step: model.currentStep ?? model.phase.rawValue).id("live")
+                        LiveReply(text: model.shownText, step: model.currentStep ?? model.phase.rawValue).id("live")
                     }
                     ApprovalQueueList(queue: model.approvalQueue)
                     if setupShowing { SetupPanel(model: model) }
@@ -281,7 +281,7 @@ struct ContentView: View {
             .modifier(BottomTracker(atBottom: $atBottom))
             // Follow new text only while already at the bottom, so reading back isn't yanked away.
             .onChange(of: model.messages.count) { if atBottom { withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo("bottom", anchor: .bottom) } } }
-            .onChange(of: model.liveText) { if atBottom { proxy.scrollTo("bottom", anchor: .bottom) } }
+            .onChange(of: model.shownText) { if atBottom { proxy.scrollTo("bottom", anchor: .bottom) } }
             // A new card always comes into view: it's waiting on an answer.
             .onReceive(model.approvalQueue.$items.map(\.count).removeDuplicates()) { _ in
                 withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo("bottom", anchor: .bottom) }

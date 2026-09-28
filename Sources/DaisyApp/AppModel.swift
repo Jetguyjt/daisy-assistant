@@ -68,6 +68,13 @@ struct ConversationItem: Identifiable {
     @Published var standby = false
     /// The answer as it streams in, before it becomes a message.
     @Published var liveText = ""
+    /// While Daisy reads the reply out, how much of `liveText` is on screen: the words show up as
+    /// she says them. nil shows all of it (voice off, parked, or done).
+    @Published private(set) var voiceReveal: Int?
+    /// The part of the reply to show right now.
+    var shownText: String { voiceReveal.map { String(liveText.prefix($0)) } ?? liveText }
+    /// A finished reply still being read out; it joins the transcript when the voice is done.
+    private var pendingReply: ConversationItem?
     /// Steps taken during the current (or last) turn.
     @Published var activity: [ActivityItem] = []
     @Published var lastReply: ReplyTiming?
@@ -177,13 +184,6 @@ struct ConversationItem: Identifiable {
             store = try MemoryStore(url: Configuration.dataDirectory.appendingPathComponent("memory.sqlite"))
             taskStore = try TaskStore(url: Configuration.dataDirectory.appendingPathComponent("tasks.json"))
         } catch { notice = "Setup needs attention: \(error.localizedDescription)" }
-        // Jarvis spoke as George, and every save wrote that default into config.json. Daisy's voice
-        // is Heart, so a saved George switches once; choosing George again later sticks.
-        var voiceSwitched = false
-        if !UserDefaults.standard.bool(forKey: "adoptedHeartVoice") {
-            UserDefaults.standard.set(true, forKey: "adoptedHeartVoice")
-            if config.naturalVoice == "bm_george" { config.naturalVoice = NaturalSpeech.defaultVoice; try? config.save(); voiceSwitched = true }
-        }
         // Folder access is tied to the app that granted it, so a bookmark made by the old Jarvis app
         // (or one that has gone bad) can't be resolved. Drop it and ask for the folder again.
         var folderLost = false
@@ -204,8 +204,6 @@ struct ConversationItem: Identifiable {
                 + (folderLost ? " Choose your search folder again in Setup." : "")
         } else if folderLost, notice == nil {
             notice = "Choose your search folder again in Setup; macOS no longer recognizes the old one."
-        } else if voiceSwitched, notice == nil {
-            notice = "Daisy speaks with the Heart voice now. Pick another in Setup → Voice."
         }
         if listeningMode != .wakeWord { quietMode = listeningMode }
         audio.speechWorker = speechWorker
@@ -344,7 +342,7 @@ struct ConversationItem: Identifiable {
     private func park(_ line: String) {
         guard voiceTurn else { return }
         voiceTurn = false
-        endVoice()
+        endVoice(); voiceReveal = nil
         let token = generation
         Task {
             try? await audio.speak(line, voice: config.naturalVoice ?? NaturalSpeech.defaultVoice, speed: config.speechRate ?? 1) { }
@@ -445,6 +443,7 @@ struct ConversationItem: Identifiable {
         if messages.count > 100 { messages.removeFirst(messages.count - 100) }
         phase = .thinking
         activity = []; liveText = ""; approvalQueue.withdraw(from: .conversation); decisions = []; plan = nil; feed = SpeechFeed()
+        voiceReveal = config.speakResponses && NaturalSpeech.isInstalled ? 0 : nil
         let started = Date()
         let backend = self.backend
         let direct = text.hasPrefix("/find ")
@@ -499,18 +498,24 @@ struct ConversationItem: Identifiable {
                 let total = Date().timeIntervalSince(started)
                 lastReply = ReplyTiming(firstText: firstText, total: total)
                 let detail = direct ? "Direct search" : String(format: "%@ · %.1fs", linkLabel, total)
-                messages.append(ConversationItem(role: "assistant", text: answer.isEmpty ? "Done." : answer, files: report,
-                                                 detail: detail, receipts: receipts, decisions: decisions))
-                liveText = ""
+                let reply = ConversationItem(role: "assistant", text: answer.isEmpty ? "Done." : answer, files: report,
+                                             detail: detail, receipts: receipts, decisions: decisions)
+                if config.speakResponses { say(feed.finish(liveText), token: token) }
+                if voiceReveal != nil, voicePlayback != nil {
+                    // The words keep pace with the voice, so the reply joins the transcript once it's been said.
+                    pendingReply = reply
+                } else {
+                    messages.append(reply); liveText = ""; voiceReveal = nil
+                }
                 if !usesHermes { await reloadMemories(); await reloadTasks() }
-                if config.speakResponses { say(feed.finish(answer), token: token) }
                 try await finishVoice(token: token)
+                settleReply()
                 if generation == token { finishTurn() }
             } catch is CancellationError {
-                if generation == token { phase = .idle }
+                if generation == token { settleReply(); phase = .idle }
             } catch {
                 guard generation == token else { return }
-                endVoice()
+                endVoice(); settleReply()
                 if (error as? URLError)?.code == .cancelled { phase = .idle; return }
                 switch error as? AgentFailure {
                 case .setup(let issue): agentLink = .needsSetup(issue); connected = false
@@ -560,8 +565,14 @@ struct ConversationItem: Identifiable {
             let voice = config.naturalVoice ?? NaturalSpeech.defaultVoice, speed = config.speechRate ?? 1
             voicePlayback = Task { [weak self] in
                 guard let self else { return }
-                try await self.audio.speak(stream, voice: voice, speed: speed) {
-                    if self.generation == token { self.phase = .speaking }
+                do {
+                    try await self.audio.speak(stream, voice: voice, speed: speed, onReady: {
+                        if self.generation == token { self.phase = .speaking }
+                    }, onPlaying: { [weak self] index in self?.reveal(index, token: token) })
+                } catch {
+                    // No voice after all: show the words.
+                    if self.generation == token { self.voiceReveal = nil }
+                    throw error
                 }
             }
         }
@@ -582,6 +593,18 @@ struct ConversationItem: Identifiable {
     private func endVoice() {
         voiceChunks?.finish(); voiceChunks = nil
         voicePlayback?.cancel(); voicePlayback = nil
+    }
+
+    /// A spoken chunk started playing: the words it covers go on screen.
+    private func reveal(_ index: Int, token: UUID) {
+        guard generation == token, let shown = voiceReveal, index < feed.reveals.count else { return }
+        voiceReveal = max(shown, feed.reveals[index])
+    }
+
+    /// The finished reply goes in the transcript (after its voice), and every word shows.
+    private func settleReply() {
+        if let reply = pendingReply { messages.append(reply); pendingReply = nil; liveText = "" }
+        voiceReveal = nil
     }
 
     private func updateProgress(_ step: String, token: UUID) {
@@ -835,11 +858,14 @@ struct ConversationItem: Identifiable {
         standbyWork?.cancel(); standbyWork = nil
         wake.reset(); wakeTurn = false
         endVoice(); approvalQueue.withdraw(from: .conversation)
-        // Whatever was already written stays in the transcript, marked as cut off.
-        if !liveText.isEmpty {
+        // Whatever was already written stays in the transcript, marked as cut off. A finished reply
+        // whose voice was cut short goes in whole.
+        if pendingReply != nil { settleReply() }
+        else if !liveText.isEmpty {
             messages.append(ConversationItem(role: "assistant", text: liveText, detail: "Stopped", decisions: decisions))
             liveText = ""
         }
+        voiceReveal = nil
         for index in activity.indices where activity[index].state == .running { activity[index].state = .failed; activity[index].finished = Date() }
         audio.stop(); holdRequested = false; phase = .idle; currentStep = nil
         if clearNotice { notice = nil }

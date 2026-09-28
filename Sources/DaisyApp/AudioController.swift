@@ -13,8 +13,6 @@ import DaisyCore
     @Published private(set) var engineRunning = false
     /// True when Apple voice processing accepted the input device; barge-in relies on it.
     private(set) var echoCancellation = false
-    /// Power in dBFS and duration of each 16 kHz chunk, delivered on the main actor.
-    var onChunk: ((Float, TimeInterval) -> Void)?
     /// Each whole chunk (samples, power, Silero's speech probability), on the main actor. The wake
     /// listener needs the samples; the endpointers need the probability.
     var onAudio: ((Chunk) -> Void)?
@@ -109,7 +107,6 @@ import DaisyCore
             elapsed = Double(capture?.count ?? 0) / Self.sampleRate
             level = Self.meter(chunk.power)
         }
-        onChunk?(chunk.power, chunk.duration)
         onAudio?(chunk)
     }
     /// Starts an utterance, seeded with up to `seconds` of audio already heard (the wake phrase
@@ -156,7 +153,9 @@ import DaisyCore
     }
     /// Same, for chunks that arrive while the answer is still being written. Returns once the
     /// stream has finished and the last chunk has played.
-    func speak(_ chunks: AsyncStream<String>, voice: String, speed: Double = 1, onReady: (() -> Void)? = nil) async throws {
+    /// `onPlaying` gets each sentence chunk's position in the stream as it starts playing, on the main actor.
+    func speak(_ chunks: AsyncStream<String>, voice: String, speed: Double = 1, onReady: (() -> Void)? = nil,
+               onPlaying: (@MainActor (Int) -> Void)? = nil) async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("daisy-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         defer { try? FileManager.default.removeItem(at: folder) }
@@ -177,10 +176,11 @@ import DaisyCore
             }
             continuation.onTermination = { _ in producer.cancel() }
         }
-        if let session, session.engine.isRunning { try await playThroughEngine(files, session: session, onReady: onReady) }
-        else { try await playWithFallback(files, onReady: onReady) }
+        if let session, session.engine.isRunning { try await playThroughEngine(files, session: session, onReady: onReady, onPlaying: onPlaying) }
+        else { try await playWithFallback(files, onReady: onReady, onPlaying: onPlaying) }
     }
-    private func playThroughEngine(_ files: AsyncThrowingStream<URL, Error>, session: MicrophoneSession, onReady: (() -> Void)?) async throws {
+    private func playThroughEngine(_ files: AsyncThrowingStream<URL, Error>, session: MicrophoneSession, onReady: (() -> Void)?,
+                                   onPlaying: (@MainActor (Int) -> Void)?) async throws {
         let engine = session.engine
         let player = session.player
         let bridge = self.bridge
@@ -188,6 +188,7 @@ import DaisyCore
         defer { player.removeTap(onBus: 0); player.stop(); gate = nil; level = 0 }
         var connected = false
         var last: PlaybackGate?
+        var position = 0
         for try await url in files {
             try Task.checkCancellation()
             let file = try AVAudioFile(forReading: url)
@@ -200,6 +201,12 @@ import DaisyCore
             self.gate = gate
             player.scheduleFile(file, at: nil, completionCallbackType: .dataPlayedBack) { _ in gate.finish() }
             if !player.isPlaying { player.play(); onReady?() }
+            // A chunk starts when the one before it has been heard, or now if that already happened.
+            if let onPlaying {
+                let index = position
+                if let previous = last { previous.whenFinished { Task { @MainActor in onPlaying(index) } } } else { onPlaying(index) }
+            }
+            position += 1
             last = gate
         }
         guard let last else { return }
@@ -211,13 +218,15 @@ import DaisyCore
         }, onCancel: { player.stop(); last.cancel() })
         try Task.checkCancellation()
     }
-    private func playWithFallback(_ files: AsyncThrowingStream<URL, Error>, onReady: (() -> Void)?) async throws {
-        var first = true
+    private func playWithFallback(_ files: AsyncThrowingStream<URL, Error>, onReady: (() -> Void)?,
+                                  onPlaying: (@MainActor (Int) -> Void)?) async throws {
+        var position = 0
         for try await url in files {
             let playback = try AVAudioPlayer(contentsOf: url)
             playback.isMeteringEnabled = true; fallback = playback
             guard playback.play() else { throw DaisyError.message("Audio playback could not start.") }
-            if first { onReady?(); first = false }
+            if position == 0 { onReady?() }
+            onPlaying?(position); position += 1
             defer { playback.stop(); if fallback === playback { fallback = nil; level = 0 } }
             while playback.isPlaying {
                 try Task.checkCancellation()
@@ -256,15 +265,27 @@ private final class PlaybackGate: @unchecked Sendable {
         self.continuation = continuation
         lock.unlock()
     }
+    private var finished: [() -> Void] = []
     func finish() { settle(nil) }
     func cancel() { settle(CancellationError()) }
+    /// Runs `action` once this chunk has played to the end, straight away if it already has. Never
+    /// runs for a cancelled chunk.
+    func whenFinished(_ action: @escaping () -> Void) {
+        lock.lock()
+        guard let outcome else { finished.append(action); lock.unlock(); return }
+        lock.unlock()
+        if outcome == nil { action() }
+    }
     private func settle(_ error: Error?) {
         lock.lock()
         guard outcome == nil else { lock.unlock(); return }
         outcome = .some(error)
         let waiting = continuation; continuation = nil
+        let actions = error == nil ? finished : []
+        finished = []
         lock.unlock()
         if let error { waiting?.resume(throwing: error) } else { waiting?.resume() }
+        for action in actions { action() }
     }
 }
 
