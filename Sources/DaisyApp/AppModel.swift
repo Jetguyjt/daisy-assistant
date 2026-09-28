@@ -154,16 +154,27 @@ struct ConversationItem: Identifiable {
             config = try Configuration.load()
             store = try MemoryStore(url: Configuration.dataDirectory.appendingPathComponent("memory.sqlite"))
             taskStore = try TaskStore(url: Configuration.dataDirectory.appendingPathComponent("tasks.json"))
-            if let data = try? Data(contentsOf: bookmarkURL) {
+        } catch { notice = "Setup needs attention: \(error.localizedDescription)" }
+        // Folder access is tied to the app that granted it, so a bookmark made by the old Jarvis app
+        // (or one that has gone bad) can't be resolved. Drop it and ask for the folder again.
+        var folderLost = false
+        if let data = try? Data(contentsOf: bookmarkURL) {
+            do {
                 var stale = false
                 let folder = try URL(resolvingBookmarkData: data, options: [.withSecurityScope], relativeTo: nil, bookmarkDataIsStale: &stale)
                 _ = folder.startAccessingSecurityScopedResource()
                 selectedFolder = folder
                 if stale { try saveBookmark(folder) }
+            } catch {
+                try? FileManager.default.removeItem(at: bookmarkURL)
+                folderLost = true
             }
-        } catch { notice = "Setup needs attention: \(error.localizedDescription)" }
+        }
         if firstDaisyLaunch, notice == nil {
             notice = "Jarvis is now Daisy. macOS treats it as a new app, so allow the microphone again when asked (and Automation for Chrome later)."
+                + (folderLost ? " Choose your search folder again in Setup." : "")
+        } else if folderLost, notice == nil {
+            notice = "Choose your search folder again in Setup; macOS no longer recognizes the old one."
         }
         if listeningMode != .wakeWord { quietMode = listeningMode }
         audio.speechWorker = speechWorker
