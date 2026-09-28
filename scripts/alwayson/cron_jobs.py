@@ -19,15 +19,20 @@ Jobs are found by name in $HERMES_HOME/cron/jobs.json (read only here; every cha
 prompt and the model pin back when they drift from the repo, and leaves the schedule alone once a job
 exists, since that's mine to change (`hermes cron edit <id> --schedule ...`). Output stays local:
 $HERMES_HOME/cron/output/<job id>/<time>.md, which Daisy's JOBS tab reads.
+
+`hermes cron` exits 0 even when it refused (hermes_cli/main.py doesn't pass cron's return code on), so
+every change is checked in jobs.json afterwards.
 """
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
 
 FIELDS = ("name", "schedule", "reasoning", "script")
+_ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
 
 def read_template(path):
@@ -77,15 +82,15 @@ def named(home, name):
 
 
 def run(hermes, *args):
+    """Runs hermes; returns what it said went wrong, or ""."""
     done = subprocess.run([hermes, *args], stdin=subprocess.DEVNULL, capture_output=True, text=True,
                           encoding="utf-8", errors="replace", check=False)
-    output = "\n".join(part.strip() for part in (done.stdout, done.stderr) if part and part.strip())
-    return done.returncode == 0, output
-
-
-def last_line(text):
-    lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
-    return lines[-1] if lines else "no output"
+    lines = [_ANSI.sub("", line).strip() for part in (done.stdout, done.stderr) for line in (part or "").splitlines()]
+    lines = [line for line in lines if line]
+    failure = next((line for line in lines if line.startswith(("Failed to", "Job not found", "Unknown cron"))), "")
+    if failure or done.returncode == 0:
+        return failure
+    return lines[-1] if lines else f"hermes exited with {done.returncode}"
 
 
 def add(args):
@@ -105,12 +110,12 @@ def add(args):
                 command += ["--reasoning-effort", fields["reasoning"]]
             if args.model:
                 command += ["--model", args.model] + (["--provider", args.provider] if args.provider else [])
-            ok, output = run(args.hermes, *command, fields["schedule"], prompt)
-            if ok:
+            why = run(args.hermes, *command, fields["schedule"], prompt)
+            if named(args.home, name):
                 print(f"  added cron job '{name}' ({fields['schedule']})")
             else:
                 failed = True
-                print(f"  cron: couldn't add '{name}': {last_line(output)}")
+                print(f"  cron: couldn't add '{name}': {why or 'Hermes did not save it'}")
             continue
         job = existing[0]
         changes = []
@@ -120,12 +125,14 @@ def add(args):
             changes += ["--model", args.model] + (["--provider", args.provider] if args.provider else [])
         if not changes:
             continue
-        ok, output = run(args.hermes, "cron", "edit", str(job.get("id")), *changes)
-        if ok:
+        why = run(args.hermes, "cron", "edit", str(job.get("id")), *changes)
+        after = [found for found in named(args.home, name) if found.get("id") == job.get("id")]
+        if after and str(after[0].get("prompt") or "").strip() == prompt \
+                and (not args.model or after[0].get("model") == args.model):
             print(f"  updated cron job '{name}'")
         else:
             failed = True
-            print(f"  cron: couldn't update '{name}': {last_line(output)}")
+            print(f"  cron: couldn't update '{name}': {why or 'Hermes did not save the change'}")
     return 1 if failed else 0
 
 
@@ -133,12 +140,12 @@ def remove(args):
     failed = False
     for path, fields, prompt in templates(args.templates):
         for job in named(args.home, fields["name"]):
-            ok, output = run(args.hermes, "cron", "remove", str(job.get("id")))
-            if ok:
+            why = run(args.hermes, "cron", "remove", str(job.get("id")))
+            if not any(found.get("id") == job.get("id") for found in jobs(args.home)):
                 print(f"  removed cron job '{fields['name']}'")
             else:
                 failed = True
-                print(f"  cron: couldn't remove '{fields['name']}': {last_line(output)}")
+                print(f"  cron: couldn't remove '{fields['name']}': {why or 'it is still there'}")
     return 1 if failed else 0
 
 

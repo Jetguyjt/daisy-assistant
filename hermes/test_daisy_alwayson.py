@@ -365,6 +365,8 @@ code, lines = pick_cli(json.dumps({"provider": "openai-codex", "current": "gpt-5
 check("no pick prints two empty lines and why", code == 0 and lines[0] == "" and lines[1] == "" and "already" in lines[2])
 code, lines = pick_cli("not json")
 check("a broken list is no pick", code == 0 and lines[0] == "" and "couldn't be read" in lines[2])
+code, lines = pick_cli("Hermes says hello\n" + json.dumps({"provider": "openai-codex", "current": "gpt-5.5", "models": HERMES_CODEX}))
+check("pick skips anything Hermes printed first", code == 0 and lines[0] == "gpt-5.4-mini")
 
 # `models.py list` against a stand-in for Hermes's modules.
 fake = ROOT / "fake-hermes-modules"
@@ -424,6 +426,10 @@ elif args[:2] == ["cron", "create"]:
     while rest and rest[0].startswith("--"):
         flags[rest[0]] = rest[1]; rest = rest[2:]
     schedule, prompt = rest
+    # Hermes refuses with a message and still exits 0 (main.py drops cron's return code).
+    if os.environ.get("STUB_REFUSE") and os.environ["STUB_REFUSE"] in flags["--name"].lower():
+        print("\\x1b[31mFailed to create job: Blocked: prompt matches threat pattern 'prompt_injection'.\\x1b[0m")
+        sys.exit(0)
     jobs.append({{"id": uuid.uuid4().hex[:12], "name": flags["--name"], "prompt": prompt.strip(), "schedule_display": schedule,
                  "model": flags.get("--model"), "provider": flags.get("--provider"), "script": flags.get("--script"),
                  "deliver": flags.get("--deliver"), "reasoning_effort": flags.get("--reasoning-effort")}})
@@ -596,6 +602,14 @@ done = cron_setup.run(DAISY_CRON="0")
 check("cron off: both jobs removed", cron_setup.jobs() == [] and done.stdout.count("removed cron job") == 2)
 done = cron_setup.run(DAISY_CRON="0")
 check("cron off again: nothing to remove", cron_setup.writes() == [])
+
+refused = Setup("refused")
+done = refused.run(DAISY_CRON="1", STUB_REFUSE="inbox")
+check("a job Hermes refuses is reported, not counted as added",
+      "couldn't add 'Daisy inbox triage': Failed to create job: Blocked" in done.stdout
+      and "added cron job 'Daisy inbox triage'" not in done.stdout)
+check("the other job still goes in", [job["name"] for job in refused.jobs()] == ["Daisy repo digest"])
+check("setup carries on after a refusal", done.returncode == 0 and "not every job went in" in done.stdout)
 
 unpinned = Setup("unpinned")
 unpinned.listing(["gpt-5.6-sol", "gpt-5.5"])

@@ -80,8 +80,10 @@ def main(argv):
         print(json.dumps(listing()))
         return 0
     if command == "pick":
+        # The last JSON line, in case Hermes printed something of its own first.
+        lines = [line.strip() for line in sys.stdin.read().splitlines() if line.strip().startswith("{")]
         try:
-            data = json.loads(sys.stdin.read() or "{}")
+            data = json.loads(lines[-1]) if lines else None
         except ValueError:
             data = None
         if not isinstance(data, dict):
