@@ -519,6 +519,83 @@ import Foundation
         } catch { fail("testFailedMoveKeepsUsingTheOldFolder: \(error)") }
         do {
             let before = TestLog.failures
+            let suite = SpeechNumbersTests()
+            suite.testDecimalsAndWholeNumbers()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testDecimalsAndWholeNumbers")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = SpeechNumbersTests()
+            suite.testYearsDecadesAndOrdinals()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testYearsDecadesAndOrdinals")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = SpeechNumbersTests()
+            suite.testMoney()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testMoney")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = SpeechNumbersTests()
+            suite.testPercentagesRangesAndMultipliers()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testPercentagesRangesAndMultipliers")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = SpeechNumbersTests()
+            suite.testTimes()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testTimes")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = SpeechNumbersTests()
+            suite.testDates()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testDates")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = SpeechNumbersTests()
+            suite.testUnitsFractionsAndSymbols()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testUnitsFractionsAndSymbols")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = SpeechNumbersTests()
+            suite.testAbbreviations()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testAbbreviations")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = SpeechNumbersTests()
+            suite.testAbbreviationsThatEndASentenceKeepTheirPeriod()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testAbbreviationsThatEndASentenceKeepTheirPeriod")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = SpeechNumbersTests()
+            suite.testHostsFilesEmailsAndPhoneNumbers()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testHostsFilesEmailsAndPhoneNumbers")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = SpeechNumbersTests()
+            suite.testLeavesModelNamesAndCodesAlone()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testLeavesModelNamesAndCodesAlone")
+        }
+        do {
+            let before = TestLog.failures
             let suite = SpeechTests()
             suite.testSpokenStripsInlineMarkdown()
             count += 1
@@ -555,6 +632,27 @@ import Foundation
         do {
             let before = TestLog.failures
             let suite = SpeechTests()
+            suite.testSpokenDoesntDoubleThePeriodInsideQuotesOrBrackets()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testSpokenDoesntDoubleThePeriodInsideQuotesOrBrackets")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = SpeechTests()
+            suite.testSentencesDontSplitInsideNumbersOrAbbreviations()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testSentencesDontSplitInsideNumbersOrAbbreviations")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = SpeechTests()
+            suite.testSentencesMergeShortFragments()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testSentencesMergeShortFragments")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = SpeechTests()
             suite.testFeedStartsEarlyAndMatchesOneShot()
             count += 1
             print("\(TestLog.failures == before ? "PASS" : "FAIL") testFeedStartsEarlyAndMatchesOneShot")
@@ -565,6 +663,20 @@ import Foundation
             suite.testFeedHoldsListMarkersAndShortFragments()
             count += 1
             print("\(TestLog.failures == before ? "PASS" : "FAIL") testFeedHoldsListMarkersAndShortFragments")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = SpeechTests()
+            suite.testFeedWaitsOutAbbreviationsAndDecimals()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testFeedWaitsOutAbbreviationsAndDecimals")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = SpeechTests()
+            suite.testFeedHoldsShortFollowUpsUntilFlushed()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testFeedHoldsShortFollowUpsUntilFlushed")
         }
         do {
             let before = TestLog.failures
@@ -580,6 +692,55 @@ import Foundation
             count += 1
             print("\(TestLog.failures == before ? "PASS" : "FAIL") testFeedRespectsTheSpokenLimit")
         }
+        do {
+            let before = TestLog.failures
+            let suite = SpeechTests()
+            suite.testStreamedAnswersSayTheSameAsOneShot()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testStreamedAnswersSayTheSameAsOneShot")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = VoiceBlendTests()
+            suite.testDefaultVoiceAndTheCatalog()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testDefaultVoiceAndTheCatalog")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = VoiceBlendTests()
+            try suite.testBlendsReadLikeSynthesizePy()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testBlendsReadLikeSynthesizePy")
+        } catch { fail("testBlendsReadLikeSynthesizePy: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = VoiceBlendTests()
+            suite.testBadBlendsSayWhatIsWrong()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testBadBlendsSayWhatIsWrong")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = VoiceBlendTests()
+            suite.testShortNames()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testShortNames")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = VoiceBlendTests()
+            await suite.testSynthesisChecksTheVoiceBeforeAnythingRuns()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testSynthesisChecksTheVoiceBeforeAnythingRuns")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = VoiceBlendTests()
+            try await suite.testWorkerPassesTheVoiceSettingAndArgumentsThrough()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testWorkerPassesTheVoiceSettingAndArgumentsThrough")
+        } catch { fail("testWorkerPassesTheVoiceSettingAndArgumentsThrough: \(error)") }
         do {
             let before = TestLog.failures
             let suite = VoiceTests()
