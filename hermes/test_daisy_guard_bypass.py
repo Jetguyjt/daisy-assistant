@@ -5,6 +5,7 @@ Run: python3 hermes/test_daisy_guard_bypass.py"""
 import importlib.util
 import itertools
 import json
+import logging
 import os
 import sys
 import tempfile
@@ -16,6 +17,8 @@ os.environ["HERMES_HOME"] = str(HOME)
 for name in ("HERMES_CRON_SESSION", "HERMES_SESSION_PLATFORM", "HERMES_SESSION_KEY", "HERMES_SESSION_ID",
              "HERMES_SINGLE_QUERY_SESSION", "HERMES_YOLO_MODE"):
     os.environ.pop(name, None)
+logging.getLogger("daisy.guard").addHandler(logging.NullHandler())
+logging.getLogger("daisy.guard").propagate = False
 
 
 def load(active: bool):

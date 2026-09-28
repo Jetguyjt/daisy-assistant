@@ -1,31 +1,158 @@
-"""What needs a yes. Typed tools are judged by the risk they declare (see registry.py); everything
-else goes through the command rules in classify.py. Per-role allowlists (roles.py) and taint
-tracking (taint.py) plug in here."""
+"""What needs a yes, for one tool call:
+
+1. Typed tools are judged by the risk they declare (registry.py) and nothing else: read runs, anything
+   else stops at a card built from the tool's own card(args). Everything else goes through classify.py.
+2. Taint (taint.py): after the turn read untrusted content, memory writes and new sites need a card.
+3. The caller's role (roles.py): workers only read; cron only reads plus pre-approved actions.
+4. A card needs someone to answer it. Where nobody can (yolo, one-shot runs, webhooks) it's blocked,
+   and so is a burst of cards in a row.
+5. Every card gets its own rule key, so "allow for this session" or "always" can never be reused.
+
+Any error in here blocks the call: Hermes would otherwise run the tool as if the guard had said yes."""
 
 from __future__ import annotations
 
+import logging
+import os
+import threading
+import time
 import uuid
-from typing import Any, Dict, Optional
+from collections import OrderedDict, deque
+from typing import Any, Deque, Dict, Optional
 
 from .. import registry
-from .classify import classify
+from . import roles, taint, targets
+from .classify import JAVASCRIPT, classify
+from .verdict import Verdict, block, card, read
+
+log = logging.getLogger("daisy.guard")
+
+MAX_CARDS = 5
+CARD_WINDOW_SECONDS = 60.0
+UNATTENDED_PLATFORMS = ("webhook", "msgraph_webhook", "api_server")
+FAILED = "Daisy's guard hit an error, so this was blocked: {error}"
+NOBODY = "Blocked by Daisy's guard: {what} needs a yes, but {why}."
+TOO_MANY = "Blocked by Daisy's guard: too many approvals in a row, ask the user first before trying more."
+# What a typed read tool brings into the turn, going by the words in its name.
+TYPED_READS = (({"mail", "gmail", "email", "inbox", "outlook"}, "email"),
+               ({"imsg", "message", "messages", "sms", "chat", "chats", "imessage"}, "messages"),
+               ({"doc", "docs", "drive", "sheet", "sheets", "slide", "slides", "file", "files", "note", "notes",
+                 "pdf", "document", "documents"}, "documents"),
+               ({"calendar", "event", "events", "invite", "invites"}, "calendar events"),
+               ({"web", "page", "pages", "tab", "tabs", "chrome", "browser", "url", "feed", "rss", "reader", "site",
+                 "search"}, "the web"))
+TYPED_OPENS = ("open", "navigate", "goto", "visit", "browse")
 
 
-def decide(tool_name: str, args: Dict[str, Any]) -> Optional[Dict[str, str]]:
+def on_pre_tool_call(tool_name: str = "", args: Any = None, **hook: Any) -> Optional[Dict[str, str]]:
+    """Hermes's pre_tool_call hook. Returns None (go ahead), an approve directive (show a card) or a
+    block directive. Never raises."""
+    try:
+        return decide(tool_name or "", args if isinstance(args, dict) else {}, **hook)
+    except Exception as error:  # fail closed: an error must never let the call through
+        log.warning("guard error on %s: %s", tool_name, error, exc_info=True)
+        return {"action": "block", "message": FAILED.format(error=f"{type(error).__name__}: {error}")}
+
+
+def decide(tool_name: str, args: Dict[str, Any], task_id: str = "", session_id: str = "", turn_id: str = "",
+           **_: Any) -> Optional[Dict[str, str]]:
+    task_id, session_id, turn_id = str(task_id or ""), str(session_id or ""), str(turn_id or "")
+    session = task_id or session_id or roles.session_env("HERMES_SESSION_KEY") or "default"
+    role = roles.role_for(task_id, session_id)
+    verdict = judge(tool_name, args)
+    turn = taint.turn_key(session, turn_id)
+    verdict = taint.review(turn, verdict)
+    verdict = roles.enforce(role, tool_name, args, verdict, task_id)
+    if verdict.decision == "card":
+        why = nobody_to_ask()
+        if why:
+            verdict = block(NOBODY.format(what=verdict.title or tool_name, why=why), title=verdict.title)
+        elif not _cards.take(session):
+            verdict = block(TOO_MANY, title=verdict.title)
+    taint.record(turn, verdict)
+    return directive(verdict)
+
+
+def judge(tool_name: str, args: Dict[str, Any]) -> Verdict:
     tool = registry.get(tool_name)
-    if tool is not None:
-        if tool.risk == "read":
-            return None
-        title, detail = tool.card_parts(args)
-        message = f"{title} — {detail}" if detail else title
-        # A fresh rule key per call, so an approval can never be reused for a different call.
-        return {"action": "approve", "message": message, "rule_key": f"daisy.{tool.name}.{uuid.uuid4().hex}"}
-    found = classify(tool_name, args)
-    if not found:
+    if tool is None:
+        return classify(tool_name, args)
+    words = set(tool_name.lower().split("_"))
+    opens = bool(words & set(TYPED_OPENS))
+    if targets.script_urls(args, everywhere=opens):
+        return block(JAVASCRIPT, title="Open a javascript: link", hard=True)
+    if tool.risk == "read":
+        reads = next((label for names, label in TYPED_READS if words & names), "")
+        if not opens:
+            return read(reads=reads)
+        title, detail = _card_parts(tool, args)
+        return read(reads=reads, navigates=True, title=title, detail=detail)
+    title, detail = tool.card_parts(args)
+    return card(tool.name, title or f"Use {tool.name}", detail)
+
+
+def _card_parts(tool, args: Dict[str, Any]):
+    try:
+        return tool.card_parts(args)
+    except Exception:
+        return f"Use {tool.name}", ""
+
+
+def directive(verdict: Verdict) -> Optional[Dict[str, str]]:
+    if verdict.decision == "allow":
         return None
-    rule_key, description = found
-    return {"action": "approve", "message": description, "rule_key": rule_key}
+    if verdict.decision == "block":
+        return {"action": "block", "message": verdict.message or f"Blocked by Daisy's guard: {verdict.title}."}
+    title = " ".join((verdict.title or "Approve this step").split()).replace(" — ", " - ")
+    message = f"{title} — {verdict.detail}" if verdict.detail else title
+    # A fresh rule key per call, so an approval can never be reused for a different call.
+    return {"action": "approve", "message": message,
+            "rule_key": f"daisy.{verdict.rule or 'action'}.{uuid.uuid4().hex}"}
 
 
-def on_pre_tool_call(tool_name: str = "", args: Any = None, **_: Any) -> Optional[Dict[str, str]]:
-    return decide(tool_name or "", args if isinstance(args, dict) else {})
+def nobody_to_ask() -> str:
+    """Why a card can't reach a person right now, or "" when it can."""
+    if _yolo():
+        return "approvals are switched off (yolo), and Daisy never lets this through without a yes"
+    if roles.session_env("HERMES_SINGLE_QUERY_SESSION").strip().lower() in roles.TRUE:
+        return "this is a one-shot run with nobody there to approve it"
+    platform = roles.session_env("HERMES_SESSION_PLATFORM").strip().lower()
+    if platform in UNATTENDED_PLATFORMS:
+        return f"this session runs on {platform}, where nobody can approve it"
+    return ""
+
+
+def _yolo() -> bool:
+    try:
+        from tools.approval import _yolo_active
+    except Exception:
+        return os.environ.get("HERMES_YOLO_MODE", "").strip().lower() in roles.TRUE
+    try:
+        return bool(_yolo_active())
+    except Exception:
+        return True
+
+
+class _CardLimit:
+    """At most MAX_CARDS cards per session in CARD_WINDOW_SECONDS."""
+
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.sessions: "OrderedDict[str, Deque[float]]" = OrderedDict()
+
+    def take(self, session: str) -> bool:
+        now = time.monotonic()
+        with self.lock:
+            stamps = self.sessions.pop(session, None) or deque()
+            while stamps and now - stamps[0] > CARD_WINDOW_SECONDS:
+                stamps.popleft()
+            allowed = len(stamps) < MAX_CARDS
+            if allowed:
+                stamps.append(now)
+            self.sessions[session] = stamps
+            while len(self.sessions) > 256:
+                self.sessions.popitem(last=False)
+            return allowed
+
+
+_cards = _CardLimit()
