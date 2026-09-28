@@ -137,6 +137,46 @@ final class HermesTests {
         else { fail("expected an install step") }
     }
 
+    func testOtherSessionsUpdatesStayOutAndTheirApprovalsAreDeclined() async throws {
+        let hermes = backend()
+        let turn = try await run(hermes, "STRAY") { _ in "allow_once" }
+        // The stand-in sends a chunk and an approval request for a session Daisy isn't running.
+        expectEqual(turn.text, "declined elsewhere")
+        expectTrue(turn.approvals.isEmpty)
+        await hermes.shutdown()
+    }
+
+    func testUnansweredApprovalCountsAsNo() async throws {
+        let hermes = HermesBackend(settings: .init(executable: agent, workingDirectory: root,
+                                                   sessionFile: root.appendingPathComponent("session"), approvalWindow: 0.3))
+        var asked: [AgentApproval] = []
+        var settled: [String: Bool] = [:]
+        var text = ""
+        for try await event in hermes.send("Text Dad that I'll be home at 6.") {
+            switch event {
+            case .approval(let approval): asked.append(approval)
+            case .approvalResolved(let id, let allowed): settled[id] = allowed
+            case .text(let delta): text += delta
+            default: break
+            }
+        }
+        expectEqual(asked.count, 1)
+        expectEqual(settled, [asked.first?.id ?? "": false])
+        expectEqual(text, "Not sent.")
+        await hermes.shutdown()
+    }
+
+    func testDelegateAndTodoTitlesReadAsPlainWords() {
+        // The titles Hermes 0.21 gives these tools (acp_adapter/tools.py).
+        expectEqual(ToolPhrases.describe(title: "delegate: Summarize the repo changes", kind: "execute").title, "Handing off a subtask")
+        expectEqual(ToolPhrases.describe(title: "delegate batch (2 tasks)", kind: "execute").title, "Handing off a subtask")
+        expectEqual(ToolPhrases.describe(title: "delegate task", kind: "execute").title, "Handing off a subtask")
+        expectEqual(ToolPhrases.describe(title: "todo (3 items)", kind: "other").title, "Planning")
+        expectEqual(ToolPhrases.describe(title: "skill view (google-workspace)", kind: "read").title, "Checking skills")
+        expectEqual(ToolPhrases.describe(title: "patch (replace): /tmp/notes.md", kind: "edit").title, "Editing a file")
+        expectEqual(ToolPhrases.describe(title: "patch (replace): /tmp/notes.md", kind: "edit").detail, "notes.md")
+    }
+
     func testResumedSessionReplaysHistoryAndUnknownOnesStartFresh() async throws {
         try Data("s-known".utf8).write(to: root.appendingPathComponent("session"))
         let resumed = backend(["FAKE_KNOWN_SESSION": "s-known"])
@@ -224,6 +264,16 @@ final class HermesTests {
                 chunk(sid, "Working on it")
                 following = json.loads(next(lines))
                 reason = "cancelled" if following.get("method") == "session/cancel" else "end_turn"
+            elif text == "STRAY":
+                chunk("s-elsewhere", "leaked ")
+                send({"jsonrpc": "2.0", "id": 7, "method": "session/request_permission", "params": {"sessionId": "s-elsewhere",
+                      "toolCall": {"toolCallId": "perm-check-7", "title": "x", "kind": "execute", "status": "pending",
+                                   "rawInput": {"command": "rm -rf ~/Documents", "description": "delete"}},
+                      "options": [{"optionId": "allow_once", "name": "Allow once", "kind": "allow_once"},
+                                  {"optionId": "deny", "name": "Deny", "kind": "reject_once"}]}})
+                answer = json.loads(next(lines))
+                outcome = answer.get("result", {}).get("outcome", {})
+                chunk(sid, "declined elsewhere" if outcome.get("outcome") == "cancelled" else "allowed elsewhere")
             else:
                 chunk(sid, "ok")
             send({"jsonrpc": "2.0", "id": mid, "result": {"stopReason": reason}})

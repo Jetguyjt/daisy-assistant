@@ -7,7 +7,8 @@ public enum ToolPhrases {
     /// Plain words for the HUD: "Searching the web", "Reading resume.pdf". Commands stay hidden.
     public static func describe(title: String, kind: String?) -> (title: String, detail: String?) {
         let parts = title.split(separator: ":", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
-        let head = parts.first?.lowercased() ?? ""
+        // Hermes adds counts in brackets to some titles: "todo (3 items)", "delegate batch (2 tasks)".
+        let head = (parts.first?.lowercased() ?? "").replacingOccurrences(of: "\\s*\\([^)]*\\)$", with: "", options: .regularExpression)
         let rest = parts.count > 1 ? parts[1] : ""
         let file: String? = rest.isEmpty ? nil : URL(fileURLWithPath: rest).lastPathComponent
         switch head {
@@ -21,7 +22,7 @@ public enum ToolPhrases {
         case "session_search", "session search": return ("Searching past conversations", nil)
         case "skill_view", "skills_list", "skill view", "skills list": return ("Checking skills", nil)
         case "skill_manage": return ("Updating a skill", nil)
-        case "delegate_task": return ("Handing off a subtask", nil)
+        case "delegate_task", "delegate", "delegate task", "delegate batch": return ("Handing off a subtask", nil)
         case "execute_code": return ("Running code", nil)
         case "todo", "todo_list": return ("Planning", nil)
         case "vision_analyze": return ("Looking at an image", nil)
