@@ -1,0 +1,120 @@
+{
+  "projects" : [
+    {
+      "color" : "blue",
+      "due" : "2026-11-01",
+      "folder" : "/Users/jordan/Documents/College",
+      "id" : "5D1C2B3A-4E5F-4A6B-8C7D-9E0F1A2B3C4D",
+      "links" : [
+        {
+          "fileId" : "1AbCdEfGhIjKlMnOpQrStUv",
+          "id" : "6E2D3C4B-5F6A-4B7C-9D8E-0F1A2B3C4D5E",
+          "kind" : "google_doc",
+          "title" : "Essay tracker",
+          "url" : "https://docs.google.com/document/d/1AbCdEfGhIjKlMnOpQrStUv/edit"
+        }
+      ],
+      "name" : "College Applications",
+      "notes" : "Early action first.",
+      "revision" : 3,
+      "status" : "active",
+      "updatedAt" : "2026-09-28T19:00:00.000Z"
+    },
+    {
+      "color" : "gray",
+      "due" : "",
+      "folder" : "",
+      "id" : "7F3E4D5C-6A7B-4C8D-8E9F-1A2B3C4D5E6F",
+      "links" : [
+        {
+          "id" : "8A4F5E6D-7B8C-4D9E-8F0A-2B3C4D5E6F70",
+          "kind" : "url",
+          "title" : "Robotics site",
+          "url" : "https://robotics.example.org/season"
+        }
+      ],
+      "name" : "Robotics",
+      "notes" : "",
+      "revision" : 1,
+      "status" : "archived",
+      "updatedAt" : "2026-09-20T08:30:00.250Z"
+    }
+  ],
+  "tasks" : [
+    {
+      "due" : "",
+      "id" : "1F0E2D3C-4B5A-4968-8776-A5B4C3D2E1F0",
+      "notes" : "",
+      "order" : 1,
+      "project" : "College Applications",
+      "revision" : 1,
+      "status" : "todo",
+      "title" : "Harvard",
+      "updatedAt" : "2026-09-28T19:04:05.123Z"
+    },
+    {
+      "due" : "2026-11-01",
+      "id" : "2A1B0C9D-8E7F-4061-9253-B4C5D6E7F809",
+      "links" : [
+        {
+          "calendarId" : "jordan.example@gmail.com",
+          "eventId" : "abc123def456",
+          "id" : "9B5A6F7E-8C9D-4E0F-9A1B-3C4D5E6F7081",
+          "kind" : "calendar_event",
+          "start" : "2026-11-01T16:00:00-04:00",
+          "title" : "Interview with the alumni rep",
+          "url" : "https://calendar.google.com/calendar/event?eid=YWJjMTIzZGVmNDU2IGpvcmRhbi5leGFtcGxlQGdtYWlsLmNvbQ"
+        },
+        {
+          "id" : "AC6B7F8E-9D0E-4F1A-8B2C-4D5E6F708192",
+          "kind" : "gmail",
+          "messageId" : "18c2a3b4d5e6f7a8",
+          "threadId" : "18c2a3b4d5e6f7a0",
+          "title" : "Essay feedback from Ms. Lee",
+          "url" : "https://mail.google.com/mail/u/0/#all/18c2a3b4d5e6f7a0"
+        },
+        {
+          "bookmark" : "Ym9va21hcms=",
+          "id" : "BD7C8F9E-0E1F-4A2B-9C3D-5E6F708192A3",
+          "kind" : "file",
+          "path" : "/Users/jordan/Documents/College/Why Harvard.pdf",
+          "title" : "Why Harvard.pdf"
+        }
+      ],
+      "notes" : "150 words.",
+      "order" : 2,
+      "parent" : "1F0E2D3C-4B5A-4968-8776-A5B4C3D2E1F0",
+      "project" : "College Applications",
+      "revision" : 2,
+      "status" : "needs_review",
+      "title" : "Why Harvard",
+      "updatedAt" : "2026-09-28T19:05:00.000Z"
+    },
+    {
+      "due" : "",
+      "id" : "3B2C1D0E-9F8A-4172-8364-C5D6E7F8091A",
+      "links" : [
+        {
+          "id" : "CE8D9FA0-1F2A-4B3C-8D4E-6F708192A3B4",
+          "kind" : "note",
+          "noteId" : "x-coredata://00000000-0000-4000-8000-00000000AAAA/ICNote/p101",
+          "title" : "Arm notes"
+        },
+        {
+          "id" : "DF9EA0B1-2A3B-4C4D-9E5F-708192A3B4C5",
+          "kind" : "reminder",
+          "reminderId" : "AAAAAAAA-0000-4000-8000-000000000001",
+          "title" : "Order new servos"
+        }
+      ],
+      "notes" : "",
+      "order" : 3,
+      "project" : "Robotics",
+      "revision" : 4,
+      "status" : "dropped",
+      "title" : "Robot arm writeup",
+      "updatedAt" : "2026-09-27T08:00:00.500Z"
+    }
+  ],
+  "version" : 2
+}

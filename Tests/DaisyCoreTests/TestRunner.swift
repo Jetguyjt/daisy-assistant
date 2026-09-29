@@ -969,6 +969,70 @@ import Foundation
         }
         do {
             let before = TestLog.failures
+            let suite = ProjectTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testOldFilesBecomeProjectsWithoutAWrite()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testOldFilesBecomeProjectsWithoutAWrite")
+        } catch { fail("testOldFilesBecomeProjectsWithoutAWrite: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = ProjectTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testTheAppsFileReadsAndWritesTheSame()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testTheAppsFileReadsAndWritesTheSame")
+        } catch { fail("testTheAppsFileReadsAndWritesTheSame: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = ProjectTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testRenamingMovesItsTasksInTheSameWrite()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testRenamingMovesItsTasksInTheSameWrite")
+        } catch { fail("testRenamingMovesItsTasksInTheSameWrite: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = ProjectTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testDeletingAProjectKeepsOrDeletesItsTasks()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testDeletingAProjectKeepsOrDeletesItsTasks")
+        } catch { fail("testDeletingAProjectKeepsOrDeletesItsTasks: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = ProjectTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testProjectsWithNoTasksAndArchivedOnes()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testProjectsWithNoTasksAndArchivedOnes")
+        } catch { fail("testProjectsWithNoTasksAndArchivedOnes: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = ProjectTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testANameNoTaskUsesIsDroppedUnlessSaved()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testANameNoTaskUsesIsDroppedUnlessSaved")
+        } catch { fail("testANameNoTaskUsesIsDroppedUnlessSaved: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = ProjectTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testRoundTripWithThePlugin()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testRoundTripWithThePlugin")
+        } catch { fail("testRoundTripWithThePlugin: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = ProjectTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testTwoWritersKeepEachOthersProjects()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testTwoWritersKeepEachOthersProjects")
+        } catch { fail("testTwoWritersKeepEachOthersProjects: \(error)") }
+        do {
+            let before = TestLog.failures
             let suite = RecallTests()
             try suite.setUp(); defer { suite.tearDown() }
             suite.testVerdicts()
@@ -1330,6 +1394,46 @@ import Foundation
             count += 1
             print("\(TestLog.failures == before ? "PASS" : "FAIL") testStreamedAnswersSayTheSameAsOneShot")
         }
+        do {
+            let before = TestLog.failures
+            let suite = TaskLinkTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testPastesPickTheirKindLikeThePlugin()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testPastesPickTheirKindLikeThePlugin")
+        } catch { fail("testPastesPickTheirKindLikeThePlugin: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = TaskLinkTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testLinksMadeFromIdsMatchThePlugin()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testLinksMadeFromIdsMatchThePlugin")
+        } catch { fail("testLinksMadeFromIdsMatchThePlugin: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = TaskLinkTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testBookmarksFindAMovedFile()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testBookmarksFindAMovedFile")
+        } catch { fail("testBookmarksFindAMovedFile: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = TaskLinkTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testLinksAreCheckedAndReadLeniently()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testLinksAreCheckedAndReadLeniently")
+        } catch { fail("testLinksAreCheckedAndReadLeniently: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = TaskLinkTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testTasksKeepTheirLinks()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testTasksKeepTheirLinks")
+        } catch { fail("testTasksKeepTheirLinks: \(error)") }
         do {
             let before = TestLog.failures
             let suite = TaskStatusTests()

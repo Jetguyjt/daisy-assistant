@@ -36,8 +36,12 @@ public struct TaskNode: Identifiable, Sendable, Equatable {
 /// The top-level tasks of one project ("" for none), with the project's open count.
 public struct TaskGroup: Identifiable, Sendable, Equatable {
     public let project: String
+    /// The project itself; nil for the tasks with none.
+    public let details: Project?
     public var nodes: [TaskNode]
     public let open: Int
+    /// Every task in it, whatever the filter hides.
+    public let total: Int
     public var id: String { project.lowercased() }
 }
 
@@ -71,8 +75,14 @@ public enum TaskTree {
     }
 
     /// Projects, each with its tasks nested. A task shows when the filter keeps it and it matches the
-    /// search (or something above it does), and its parents show with it for context.
-    public static func groups(_ items: [WorkItem], filter: TaskFilter = .all, query: String = "") -> [TaskGroup] {
+    /// search (or something above it does), and its parents show with it for context. With no search, all
+    /// open or everything, projects show even when they have nothing to show (open shows the active and
+    /// paused ones). Archived projects and their tasks only show with `archived`. `projects` defaults to
+    /// the ones the tasks name.
+    public static func groups(_ items: [WorkItem], projects: [Project]? = nil, filter: TaskFilter = .all, query: String = "",
+                              archived: Bool = true) -> [TaskGroup] {
+        var byKey: [String: Project] = [:]
+        for project in projects ?? TaskDocument(tasks: items).projects where byKey[project.key] == nil { byKey[project.key] = project }
         let parentOf = parents(items)
         let children = childMap(items, parentOf)
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -92,23 +102,39 @@ public enum TaskTree {
             let node = matches || !kids.isEmpty ? TaskNode(item: item, children: kids, matches: matches, subtasks: total, finished: finished) : nil
             return (node, total, finished)
         }
-        var projects: [String: (name: String, roots: [WorkItem])] = [:]
+        var roots: [String: [WorkItem]] = [:]
         for item in sorted(items) where parentOf[item.id] == nil {
-            let name = item.project.trimmingCharacters(in: .whitespacesAndNewlines)
-            projects[name.lowercased(), default: (name, [])].roots.append(item)
+            let key = Project.key(item.project)
+            if !key.isEmpty, byKey[key] == nil { byKey[key] = .named(item.project) }
+            roots[key, default: []].append(item)
         }
-        let groups = projects.values.compactMap { entry -> TaskGroup? in
-            var open = 0
-            let nodes = entry.roots.compactMap { root -> TaskNode? in
-                open += ([root] + descendants(root.id, children)).filter(\.status.isOpen).count
+        let plain = needle.isEmpty && (filter == .open || filter == .all)
+        let entries: [(key: String, project: Project?)] = byKey.map { ($0.key, $0.value) } + [("", nil)]
+        let groups = entries.compactMap { key, project -> TaskGroup? in
+            if project?.status == .archived, !archived { return nil }
+            var open = 0, total = 0
+            let nodes = (roots[key] ?? []).compactMap { root -> TaskNode? in
+                let family = [root] + descendants(root.id, children)
+                open += family.filter(\.status.isOpen).count
+                total += family.count
                 return build(root, aboveMatched: false).node
             }
-            return nodes.isEmpty ? nil : TaskGroup(project: entry.name, nodes: nodes, open: open)
+            let showsEmpty = plain && project.map { filter == .all ? true : $0.status == .active || $0.status == .paused } == true
+            guard !nodes.isEmpty || showsEmpty else { return nil }
+            return TaskGroup(project: project?.name ?? "", details: project, nodes: nodes, open: open, total: total)
         }
+        // Projects by name, then the tasks with none, then archived projects.
+        func rank(_ group: TaskGroup) -> Int { group.details == nil ? 1 : group.details?.status == .archived ? 2 : 0 }
         return groups.sorted {
-            if $0.project.isEmpty != $1.project.isEmpty { return $1.project.isEmpty }
+            if rank($0) != rank($1) { return rank($0) < rank($1) }
             return $0.project.localizedStandardCompare($1.project) == .orderedAscending
         }
+    }
+
+    /// The tasks in archived projects, which the Tasks tab leaves out until they're shown.
+    public static func archived(_ items: [WorkItem], projects: [Project]) -> Set<UUID> {
+        let keys = Set(projects.filter { $0.status == .archived }.map(\.key))
+        return keys.isEmpty ? [] : Set(items.filter { keys.contains(Project.key($0.project)) }.map(\.id))
     }
 
     /// Every task, parents before their subtasks, with how deep each sits.

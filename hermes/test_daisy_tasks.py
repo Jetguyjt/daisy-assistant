@@ -66,8 +66,18 @@ def checked(tool, args):
     return run(tool, args)
 
 
-def stored():
+def document():
     return json.loads(TASKS.read_text())
+
+
+def stored():
+    data = document()
+    return data["tasks"] if isinstance(data, dict) else data
+
+
+def projects_stored():
+    data = document()
+    return data.get("projects", []) if isinstance(data, dict) else []
 
 
 def fresh(content=None):
@@ -157,7 +167,8 @@ check("checking writes nothing", not TASKS.exists())
 result = run(adding, essays)
 check("added all six", len(result["added"]) == 6 and result["open"] == 6)
 saved = stored()
-check("the file is a list, 0600", isinstance(saved, list) and (TASKS.stat().st_mode & 0o777) == 0o600)
+check("the file has the tasks and their projects, 0600", document()["version"] == 2 and isinstance(saved, list)
+      and [p["name"] for p in projects_stored()] == ["College Applications"] and (TASKS.stat().st_mode & 0o777) == 0o600)
 check("the lock file is 0600", (Path(str(TASKS) + ".lock").stat().st_mode & 0o777) == 0o600)
 by_title = {item["title"]: item for item in saved}
 check("subtasks point at their parent", by_title["Why Harvard"]["parent"] == by_title["Harvard"]["id"]
