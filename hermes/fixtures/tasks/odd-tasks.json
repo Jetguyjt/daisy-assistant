@@ -1,0 +1,10 @@
+[
+  {"id": "c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f", "title": "Scholarship essay", "status": "almost there", "notes": "Word limit 500."},
+  {"id": "school-list", "title": "Finalize the school list", "project": "College Applications", "status": "needs to get started", "revision": 2, "order": 1},
+  {"id": "reach-schools", "title": "Reach schools", "parent": "school-list", "status": "Needs review", "revision": 1, "order": 2},
+  {"title": "Ask for a rec letter", "project": "College Applications", "status": "waiting on Ms. Lee", "order": 3, "updatedAt": "2026-09-28T19:04:05.123Z"},
+  {"id": "D4E5F6A7-B8C9-4D0E-9F1A-2B3C4D5E6F70", "title": "Loop A", "parent": "E5F6A7B8-C9D0-4E1F-8A2B-3C4D5E6F7081", "status": "todo"},
+  {"id": "E5F6A7B8-C9D0-4E1F-8A2B-3C4D5E6F7081", "title": "Loop B", "parent": "D4E5F6A7-B8C9-4D0E-9F1A-2B3C4D5E6F70", "status": "todo"},
+  {"id": "F6A7B8C9-D0E1-4F2A-9B3C-4D5E6F708192", "title": "Lost subtask", "parent": "00000000-0000-4000-8000-000000000000", "status": "blocked", "due": "2026-10-20"},
+  {"id": 42, "title": "Number id", "status": "idea", "revision": 1}
+]

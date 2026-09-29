@@ -1332,6 +1332,173 @@ import Foundation
         }
         do {
             let before = TestLog.failures
+            let suite = TaskStatusTests()
+            try suite.testStatusTextReadsLikeThePlugin()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testStatusTextReadsLikeThePlugin")
+        } catch { fail("testStatusTextReadsLikeThePlugin: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = TaskStatusTests()
+            suite.testNamesOpenAndFinished()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testNamesOpenAndFinished")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = TaskStatusTests()
+            try suite.testStatusDecodesFromAnyText()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testStatusDecodesFromAnyText")
+        } catch { fail("testStatusDecodesFromAnyText: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = TaskStatusTests()
+            suite.testChipColorsStayApartInEveryAccent()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testChipColorsStayApartInEveryAccent")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = TaskStoreTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testOldFilesDecodeWithoutLosingATask()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testOldFilesDecodeWithoutLosingATask")
+        } catch { fail("testOldFilesDecodeWithoutLosingATask: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = TaskStoreTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testOddFileReadsLikeThePlugin()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testOddFileReadsLikeThePlugin")
+        } catch { fail("testOddFileReadsLikeThePlugin: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = TaskStoreTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testPluginWrittenFileReads()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testPluginWrittenFileReads")
+        } catch { fail("testPluginWrittenFileReads: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = TaskStoreTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testAppWritesTheSharedFormat()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testAppWritesTheSharedFormat")
+        } catch { fail("testAppWritesTheSharedFormat: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = TaskStoreTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testCustomStatusIsKeptInNotesAndSavedAsALabel()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testCustomStatusIsKeptInNotesAndSavedAsALabel")
+        } catch { fail("testCustomStatusIsKeptInNotesAndSavedAsALabel: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = TaskStoreTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testSubtasksNestSaveAndDeleteTogether()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testSubtasksNestSaveAndDeleteTogether")
+        } catch { fail("testSubtasksNestSaveAndDeleteTogether: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = TaskStoreTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testTwoWritersKeepEachOthersChanges()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testTwoWritersKeepEachOthersChanges")
+        } catch { fail("testTwoWritersKeepEachOthersChanges: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = TaskStoreTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testWaitsForTheLockAndReadsAgainInsideIt()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testWaitsForTheLockAndReadsAgainInsideIt")
+        } catch { fail("testWaitsForTheLockAndReadsAgainInsideIt: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = TaskStoreTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testABusyLockFailsWithoutWriting()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testABusyLockFailsWithoutWriting")
+        } catch { fail("testABusyLockFailsWithoutWriting: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = TaskStoreTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testWritesArePrivateAndLeaveNothingBehind()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testWritesArePrivateAndLeaveNothingBehind")
+        } catch { fail("testWritesArePrivateAndLeaveNothingBehind: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = TaskStoreTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testAnUnreadableFileIsNeverWrittenOver()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testAnUnreadableFileIsNeverWrittenOver")
+        } catch { fail("testAnUnreadableFileIsNeverWrittenOver: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = TaskStoreTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testWatchingSeesAnotherWriter()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testWatchingSeesAnotherWriter")
+        } catch { fail("testWatchingSeesAnotherWriter: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = TaskStoreTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testOnDeviceToolsKnowStatusesAndParents()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testOnDeviceToolsKnowStatusesAndParents")
+        } catch { fail("testOnDeviceToolsKnowStatusesAndParents: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = TaskTreeTests()
+            suite.testGroupsByProjectAndNestsSubtasks()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testGroupsByProjectAndNestsSubtasks")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = TaskTreeTests()
+            suite.testFiltersKeepParentsForContext()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testFiltersKeepParentsForContext")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = TaskTreeTests()
+            suite.testSearchShowsWhatsUnderAMatch()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testSearchShowsWhatsUnderAMatch")
+        }
+        do {
+            let before = TestLog.failures
+            let suite = TaskTreeTests()
+            try suite.testLoopsAndMissingParentsShowAtTheTop()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testLoopsAndMissingParentsShowAtTheTop")
+        } catch { fail("testLoopsAndMissingParentsShowAtTheTop: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = TaskTreeTests()
+            suite.testHeaderCounts()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testHeaderCounts")
+        }
+        do {
+            let before = TestLog.failures
             let suite = ThemeTests()
             suite.testDefaultIsCream()
             count += 1

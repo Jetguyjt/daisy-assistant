@@ -1,0 +1,36 @@
+[
+  {
+    "due" : "",
+    "id" : "1F0E2D3C-4B5A-4968-8776-A5B4C3D2E1F0",
+    "notes" : "",
+    "order" : 1,
+    "project" : "College Applications",
+    "revision" : 1,
+    "status" : "todo",
+    "title" : "Harvard",
+    "updatedAt" : "2026-09-28T19:04:05.123Z"
+  },
+  {
+    "due" : "2026-11-01",
+    "id" : "2A1B0C9D-8E7F-4061-9253-B4C5D6E7F809",
+    "notes" : "150 words.\nAbout a hobby.",
+    "order" : 2,
+    "parent" : "1F0E2D3C-4B5A-4968-8776-A5B4C3D2E1F0",
+    "project" : "College Applications",
+    "revision" : 2,
+    "status" : "needs_review",
+    "title" : "Why Harvard",
+    "updatedAt" : "2026-09-28T19:05:00.000Z"
+  },
+  {
+    "due" : "",
+    "id" : "3B2C1D0E-9F8A-4172-8364-C5D6E7F8091A",
+    "notes" : "",
+    "order" : 3,
+    "project" : "",
+    "revision" : 4,
+    "status" : "dropped",
+    "title" : "Old idea",
+    "updatedAt" : "2026-09-27T08:00:00.500Z"
+  }
+]

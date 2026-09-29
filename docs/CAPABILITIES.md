@@ -18,7 +18,7 @@ Only registered code runs. There is no model-generated shell, arbitrary path rea
 | --- | --- | --- |
 | Files | `search_files`, `read_text_file` | Chosen root; search and reading have separate permissions. Reading defaults off. |
 | Memory | `search_memories` | Explicit local notes/preferences only. Model cannot save or change them. |
-| Tasks | `list_tasks`, `prepare_task` | Local persistent projects, dates, status and notes; review to save. |
+| Tasks | `list_tasks`, `prepare_task` | Local persistent projects, subtasks, dates, status and notes; review to save. |
 | Drafts | `prepare_file` | New file in selected folder; exact-content review, no overwrite. |
 | Mac apps | `find_apps`, `prepare_open_app` | Discover installed apps and review launch; no app UI control. |
 | Utilities | `calculate`, `current_time` | Arithmetic parser and system date/time; no shell or account data. |
@@ -48,6 +48,20 @@ Voice uses explicit Record/Finish controls. A common-mode timer keeps the level 
 
 `preparesChanges` capabilities produce a `ReviewedAction` with an exact display preview and trusted Swift commit closure. Model-facing receipts say prepared/unsaved and never include that closure. Only the UI Apply button calls it. Task revisions reject stale updates; exclusive file creation rejects overwrites. A new request, Stop or permission change expires unapplied cards. Existing `changesData` and `communicatesExternally` capabilities still fail closed; this is not general autonomous mutation.
 
-`TaskStore` persists local projects/tasks with status, dates and notes. `DraftCapabilityProvider` prepares new documents or source files in the selected root. `MacCapabilityProvider` discovers installed apps and prepares launches, without claiming arbitrary application control. These providers use the same registry and receipt pathway.
+`TaskStore` persists local projects/tasks with status, dates and notes (see Tasks below). `DraftCapabilityProvider` prepares new documents or source files in the selected root. `MacCapabilityProvider` discovers installed apps and prepares launches, without claiming arbitrary application control. These providers use the same registry and receipt pathway.
 
 The loop now allows eight model rounds and ten calls, up to 240 seconds, with a 28,000-byte messages-plus-schema guard and 16,384-token local context. Real model accuracy and latency remain separate from deterministic permission tests. Page excerpts are bounded and may require offset calls; large workflows may hit the limit.
+
+## Tasks
+
+The Tasks tab and Hermes share one file: `tasks.json` in Daisy's data folder (`~/Library/Application Support/Daisy`). The app passes its path to hermes-acp as `$DAISY_TASKS_FILE`. Before this, Hermes put the user's tasks in its own `todo_list`, a scratch plan for one chat that never reached the tab.
+
+Statuses are fixed ids with names: `idea` Idea, `todo` To do, `in_progress` In progress, `needs_review` Needs review (drafted, waiting on feedback or a read-through), `waiting` Waiting (on someone else), `blocked` Blocked, `submitted` Submitted, `done` Done, `dropped` Dropped. Submitted, done and dropped count as finished; everything else is open. Any other status text (an old `planned`, a hand edit, "needs to get started") is read by its words, and text with no known words becomes To do with the text kept in the notes. `TaskStatus.read` (Swift) and `read_status` (Python) follow the same cases in `hermes/fixtures/tasks/status-cases.json`, and both test against it.
+
+A task can sit under another (`parent`), so a project holds schools and each school its essays. A parent that's missing or loops back makes the task top-level. `order` keeps a list in the order it was given.
+
+Two writers, one file. The app (`TaskStore`) and the plugin (`hermes/daisy/tools/tasks.py`) both take an exclusive `flock` on `tasks.json.lock`, read the file again inside the lock, change only their own tasks, and swap the file in with a rename (0600). Each change bumps that task's `revision`, and the app refuses to save an edit made against an older revision, so it never writes over something Daisy just changed. A file that can't be read is never written over. The Tasks tab watches the folder (and polls every two seconds) while it's open, and reloads.
+
+Hermes's tools: `tasks_list` reads (by status, project, parent or text). `tasks_add` adds one task or a whole nested list in one call, with parents by id or by title. `tasks_update` changes status, title, due date, notes, project or parent, for several tasks at once; an ambiguous title is refused with the choices. These two change only Daisy's own records, so they run without a card, like a memory save, unless the turn already read outside content (then the card shows every task and change); background jobs and cron can't use them. `tasks_remove` always shows a card that names every task it removes, subtasks included. Each tool only does what its check saw: if the list changed in between, nothing happens and the model is told to look again.
+
+`scripts/import-hermes-todos.py` moves a list Hermes already kept in `todo_list` (from a saved result or read-only from `state.db`) into `tasks.json`: the status comes from the text after " — " when it reads as one, nesting stays, a top-level item with subtasks becomes their project, and tasks already there are skipped. `--dry-run` shows what it would add.

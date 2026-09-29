@@ -1,0 +1,5 @@
+[
+  {"id": "6F1C2B8E-3D4A-4E55-9A0B-1C2D3E4F5A61", "title": "Outline the physics lab report", "project": "School", "due": "2026-10-05", "status": "planned", "notes": "", "revision": 1, "updatedAt": 780000000.25},
+  {"id": "0B9D7A12-5E6F-4A71-8B2C-3D4E5F6A7B82", "title": "Practice essay draft", "project": "College essays", "due": "", "status": "in_progress", "notes": "First paragraph is rough.", "revision": 3, "updatedAt": 780100000},
+  {"id": "A1B2C3D4-E5F6-4789-9ABC-DEF012345603", "title": "Sign up for the SAT", "project": "", "due": "2026-09-01", "status": "done", "notes": "", "revision": 2, "updatedAt": 779000000.75}
+]
