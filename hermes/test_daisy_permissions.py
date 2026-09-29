@@ -191,6 +191,8 @@ check("a command that isn't a script", (reason_for("terminal", {"command": "npm 
 check("an edit that reaches people", (reason_for("fake_edit", {**EDIT, "guests": ["a@example.com"]}) or ("",))[0] == "people")
 check("a Send button", (reason_for("fake_click", {"app": "Pages", "label": "Send"}) or ("",))[0] == "ui")
 check("an MCP delete", (reason_for("mcp__notion__delete_page", {"page": "x"}) or ("",))[0] == "delete")
+check("driving the browser directly", (reason_for("browser_click", {"ref": "e1"}) or ("",))[0] == "browser")
+check("running code", (reason_for("execute_code", {"code": "import os\nos.system('make')"}) or ("",))[0] == "code")
 check("why_not is empty for what a grant can cover",
       grants.why_not("fake_edit", EDIT, policy.card("fake_edit", "Edit Essay")) == ("", ""))
 check("titles are kept short", len(json.loads(asks.line("fake_edit", {}, policy.card("fake_edit", "x" * 500), "s"))["title"])

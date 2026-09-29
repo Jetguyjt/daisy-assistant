@@ -388,6 +388,8 @@ def _why(tool_name: str, args: Dict[str, Any], verdict: Verdict) -> str:
         return _WHY_BY_RULE[rule]
     if verdict.persists:
         return "memory"
+    if rule == "ui":
+        return "browser"
     if tool_name.startswith("mcp_"):
         found = set(_mcp_parts(tool_name)[1])
         for code, names in (("send", SEND_WORDS), ("share", SHARE_WORDS), ("delete", DELETE_WORDS),
@@ -397,9 +399,7 @@ def _why(tool_name: str, args: Dict[str, Any], verdict: Verdict) -> str:
         return "mcp"
     if tool_name in TERMINAL_TOOLS:
         return "install" if (verdict.title or "").lower().startswith("install") else "command"
-    if tool_name == "execute_code":
-        return "code"
-    return "browser" if rule == "ui" else "other"
+    return "code" if tool_name == "execute_code" else "other"
 
 
 def _reaches_people(args: Dict[str, Any]) -> bool:
