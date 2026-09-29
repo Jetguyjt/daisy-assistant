@@ -4,8 +4,8 @@ import Foundation
 
 /// A standing permission: the user said Daisy can do a kind of step without asking, for this request or
 /// from now on. The Daisy guard plugin decides what one covers and enforces it
-/// (hermes/daisy/guard/grants.py); the app lists them in Setup, turns them off, and adds the
-/// request-only ones "Yes to all like this" gives.
+/// (hermes/daisy/guard/grants.py); the app lists them under Tools → Permissions, turns them on and off
+/// there, and adds the request-only ones "Yes to all like this" gives.
 public struct StandingGrant: Identifiable, Equatable, Sendable {
     public let id: String
     /// What the user said, in their words, or the card it came from.
@@ -20,6 +20,15 @@ public struct StandingGrant: Identifiable, Equatable, Sendable {
     public let expires: Date?
     /// Given with "Yes to all like this" on a card, rather than asked for by Daisy.
     public let fromCard: Bool
+    /// Who gave it: "daisy" (her approval_grant card), "card" ("Yes to all like this") or "settings" (a
+    /// Permissions switch). "" in files from before this was written down.
+    public let by: String
+    /// Its scope as the guard reads it: tool names, the one app for clicking and typing, and scripts (a
+    /// file or a folder) with the hashes they're held to.
+    public let tools: [String]
+    public let app: String
+    public let scripts: [String]
+    public let pins: [String: String]
 
     public init?(json: JSONValue) {
         guard let id = json["id"]?.stringValue, !id.isEmpty,
@@ -32,7 +41,16 @@ public struct StandingGrant: Identifiable, Equatable, Sendable {
         turn = json["turn"]?.stringValue
         given = Date(timeIntervalSince1970: json["given"]?.numberValue ?? 0)
         expires = json["expires"]?.numberValue.map(Date.init(timeIntervalSince1970:))
-        fromCard = json["by"]?.stringValue == "card"
+        by = json["by"]?.stringValue ?? ""
+        fromCard = by == "card"
+        tools = (json["tools"]?.arrayValue ?? []).compactMap(\.stringValue)
+        app = json["app"]?.stringValue ?? ""
+        scripts = (json["scripts"]?.arrayValue ?? []).compactMap(\.stringValue)
+        var pins: [String: String] = [:]
+        if case .object(let fields)? = json["pins"] {
+            for (path, digest) in fields { if let digest = digest.stringValue { pins[path] = digest } }
+        }
+        self.pins = pins
     }
 
     /// Forever ones until they're turned off; request ones until their request ends (the app takes
@@ -79,6 +97,8 @@ public struct GrantsFile: Sendable {
     public var url: URL { folder.appendingPathComponent("grants.json") }
     public var offersURL: URL { folder.appendingPathComponent("grant-offers.json") }
     public var logURL: URL { folder.appendingPathComponent("grants.jsonl") }
+    /// Every card the guard showed in a Daisy chat (hermes/daisy/guard/asks.py).
+    public var asksURL: URL { folder.appendingPathComponent("asks.jsonl") }
     var lockURL: URL { folder.appendingPathComponent(".grants.lock") }
     let lockWait: TimeInterval
 
@@ -96,6 +116,19 @@ public struct GrantsFile: Sendable {
 
     public func add(_ grant: JSONValue) throws {
         try change { entries in entries.append(grant) }
+    }
+
+    /// Puts a grant back when nothing with its id is on file. False when it was already there.
+    @discardableResult
+    public func restore(_ grant: JSONValue) throws -> Bool {
+        guard let id = grant["id"]?.stringValue, !id.isEmpty else { return false }
+        var added = false
+        try change { entries in
+            guard !entries.contains(where: { $0["id"]?.stringValue == id }) else { return }
+            entries.append(grant)
+            added = true
+        }
+        return added
     }
 
     /// Takes one grant out. False when it wasn't there.
@@ -145,7 +178,7 @@ public struct GrantsFile: Sendable {
         if case .object(let scope) = offer.grant {
             for key in ["tools", "app", "scripts", "pins", "covers"] { fields[key] = scope[key] }
         }
-        fields["id"] = .string("g-" + UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(12).lowercased())
+        fields["id"] = .string(Self.newID())
         fields["what"] = .string("Yes to all like this: " + title)
         fields["duration"] = "request"
         fields["session"] = .string(offer.session)
@@ -171,6 +204,11 @@ public struct GrantsFile: Sendable {
         }
     }
 
+    /// "g-" and 12 hex characters, like the guard's.
+    static func newID() -> String {
+        "g-" + UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(12).lowercased()
+    }
+
     // MARK: The file
 
     private func entries() -> [JSONValue] {
@@ -180,7 +218,7 @@ public struct GrantsFile: Sendable {
     }
 
     /// Reads, changes and writes grants.json under the shared lock. Request grants past their backstop
-    /// are dropped on the way.
+    /// are dropped on the way. Nothing to change, nothing is written.
     func change(_ edit: (inout [JSONValue]) throws -> Void) throws {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         let lock = open(lockURL.path, O_RDWR | O_CREAT, 0o600)
@@ -195,11 +233,13 @@ public struct GrantsFile: Sendable {
         }
         defer { flock(lock, LOCK_UN) }
         let now = Date().timeIntervalSince1970
-        var current = entries().filter { entry in
+        let before = entries()
+        var current = before.filter { entry in
             entry["duration"]?.stringValue == "forever"
                 || (entry["duration"]?.stringValue == "request" && (entry["expires"]?.numberValue ?? 0) > now)
         }
         try edit(&current)
+        guard current != before else { return }
         let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys, .prettyPrinted]
         let data = try encoder.encode(JSONValue.object(["version": .number(Double(Self.version)), "grants": .array(current)]))
         try write(data)
@@ -227,8 +267,9 @@ public struct GrantsFile: Sendable {
     }
 }
 
-/// The app's side of standing permissions: the live list for Setup, Revoke, "Yes to all like this" on
-/// a conversation card, taking request grants off when their request ends, and what ran under one.
+/// The app's side of standing permissions: the live list, Revoke, "Yes to all like this" on a
+/// conversation card, taking request grants off when their request ends, and what ran under one. The
+/// Permissions list (PermissionStore) reads the same files.
 @MainActor public final class GrantStore: ObservableObject {
     /// Live grants, newest first.
     @Published public private(set) var grants: [StandingGrant] = []
@@ -247,6 +288,7 @@ public struct GrantsFile: Sendable {
     }
 
     public func revoke(_ id: String) {
+        PermissionStore.forget(id)
         attempt("turn that off") { _ = try file.revoke(id) }
     }
 
