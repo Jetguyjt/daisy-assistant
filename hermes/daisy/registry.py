@@ -5,7 +5,8 @@ shell command. Each tool declares:
 
 - name: snake_case, unique ("gmail_send")
 - description and parameters: what the model sees (JSON schema, type "object")
-- risk: "read" | "write" | "send" | "delete" | "share" | "ui"
+- risk: "read" | "own" | "write" | "send" | "delete" | "share" | "ui". "own" changes Daisy's own records
+  (the task list): it runs without a card, like a memory save, unless the turn has read outside content
 - card(args): the full approval text, never truncated. The first line is the title ("Send an email
   to Dad"); everything after it is the exact content: every recipient, Cc, Bcc, attachment, body.
 - run(args): does the work and returns something JSON-able (or a string)
@@ -21,7 +22,7 @@ import json
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-RISKS = ("read", "write", "send", "delete", "share", "ui")
+RISKS = ("read", "own", "write", "send", "delete", "share", "ui")
 
 
 class Refused(ValueError):

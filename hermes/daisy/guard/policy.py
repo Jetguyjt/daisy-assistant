@@ -23,7 +23,7 @@ from typing import Any, Deque, Dict, Optional
 from .. import registry
 from . import roles, taint, targets
 from .classify import JAVASCRIPT, classify
-from .verdict import Verdict, block, card, read
+from .verdict import Verdict, allow, block, card, read
 
 log = logging.getLogger("daisy.guard")
 
@@ -96,6 +96,10 @@ def judge(tool_name: str, args: Dict[str, Any]) -> Verdict:
         title, detail = tool.card_parts(args)
     except registry.Refused as refusal:
         return block(str(refusal), title=f"Use {tool.name}")
+    if tool.risk == "own":
+        # Daisy's own records (the task list): runs like a memory save, carded once the turn has
+        # read outside content, and never from a background job or cron.
+        return allow(rule=tool.name, title=title or f"Use {tool.name}", detail=detail, persists=True)
     return card(tool.name, title or f"Use {tool.name}", detail)
 
 
