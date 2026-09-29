@@ -79,7 +79,8 @@ public struct Project: Identifiable, Codable, Sendable, Equatable {
                            bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]))
     }
 
-    public func validate() throws {
+    /// Checks it can be saved. Links in `kept` (the ones already saved) aren't checked again.
+    public func validate(keeping kept: [TaskLink] = []) throws {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, name.count <= Self.nameLimit, notes.count <= Self.notesLimit, folder.count <= Self.folderLimit else {
             throw DaisyError.message("Use a project name up to \(Self.nameLimit) characters, and notes up to 8,000.")
@@ -88,7 +89,7 @@ public struct Project: Identifiable, Codable, Sendable, Equatable {
         guard folder.isEmpty || folder.hasPrefix("/") else { throw DaisyError.message("The folder needs its full path.") }
         if !due.isEmpty { guard WorkItem.isDate(due) else { throw DaisyError.message("Use a real due date in YYYY-MM-DD form, or leave it blank.") } }
         guard links.count <= TaskLink.perItem else { throw DaisyError.message("A project can have up to \(TaskLink.perItem) links.") }
-        try links.forEach { try $0.validate() }
+        for link in links where !kept.contains(link) { try link.validate() }
     }
 
     // Reading never drops a project for an odd field: a color or status that isn't known gets a default,

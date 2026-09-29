@@ -20,7 +20,9 @@ public struct WorkItem: Identifiable, Codable, Sendable, Equatable {
         self.id = id; self.title = title; self.project = project; self.parent = parent; self.due = due; self.status = status
         self.notes = notes; self.links = links; self.revision = revision; self.order = order; updatedAt = Date()
     }
-    public func validate() throws {
+    /// Checks it can be saved. Links in `kept` (the ones already saved) aren't checked again, so an odd link
+    /// from a hand edit doesn't stop a status change.
+    public func validate(keeping kept: [TaskLink] = []) throws {
         guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, title.count <= 180,
               project.count <= 100, notes.count <= 8000 else {
             throw DaisyError.message("Use a title up to 180 characters, project up to 100, and notes up to 8,000.")
@@ -30,7 +32,7 @@ public struct WorkItem: Identifiable, Codable, Sendable, Equatable {
             guard Self.isDate(due) else { throw DaisyError.message("Use a real due date in YYYY-MM-DD form, or leave it blank.") }
         }
         guard links.count <= TaskLink.perItem else { throw DaisyError.message("A task can have up to \(TaskLink.perItem) links.") }
-        try links.forEach { try $0.validate() }
+        for link in links where !kept.contains(link) { try link.validate() }
     }
     /// A real day in YYYY-MM-DD form.
     public static func isDate(_ text: String) -> Bool {
@@ -147,12 +149,13 @@ public actor TaskStore {
     /// Saves a task. A project name that matches a project in any case takes its spelling; a new name
     /// makes a new project.
     @discardableResult public func save(_ item: WorkItem, expectedRevision: Int) throws -> WorkItem {
-        try Task.checkCancellation(); try item.validate()
+        try Task.checkCancellation(); try item.validate(keeping: item.links)
         let saved = try change { document in
             let index = document.tasks.firstIndex { $0.id == item.id }
             guard (index.map { document.tasks[$0].revision } ?? 0) == expectedRevision else {
                 throw DaisyError.message("This task changed after the draft was prepared (Daisy may have just updated it). It's been reloaded; review it and try again.")
             }
+            try item.validate(keeping: index.map { document.tasks[$0].links } ?? [])
             guard index != nil || expectedRevision == 0, document.tasks.count < 10_000 || index != nil else { throw DaisyError.message("Task limit reached or task no longer exists.") }
             if let parent = item.parent {
                 guard document.tasks.contains(where: { $0.id == parent }) else { throw DaisyError.message("The task this goes under no longer exists.") }
@@ -188,12 +191,13 @@ public actor TaskStore {
         try Task.checkCancellation()
         var project = project
         project.name = Project.squashed(project.name)
-        try project.validate()
+        try project.validate(keeping: project.links)
         let saved = try change { document in
             let index = document.projects.firstIndex { $0.id == project.id }
             guard (index.map { document.projects[$0].revision } ?? 0) == expectedRevision, index != nil || expectedRevision == 0 else {
                 throw DaisyError.message("This project changed after you opened it (Daisy may have just updated it). It's been reloaded; try again.")
             }
+            try project.validate(keeping: index.map { document.projects[$0].links } ?? [])
             if let other = document.projects.first(where: { $0.key == project.key && $0.id != project.id }) {
                 throw DaisyError.message("There's already a project called “\(other.name)”.")
             }

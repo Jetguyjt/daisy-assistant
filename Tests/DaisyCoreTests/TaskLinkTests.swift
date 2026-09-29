@@ -136,4 +136,17 @@ final class TaskLinkTests {
         var bad = saved; bad.links.append(TaskLink(kind: .url, url: "ftp://example.com"))
         do { _ = try await store.save(bad, expectedRevision: saved.revision); fail("Saved a link that isn't a web link") } catch { }
     }
+
+    func testAnOddSavedLinkDoesntBlockEdits() async throws {
+        let url = root.appendingPathComponent("tasks.json")
+        try Data(#"[{"id": "B7E1C0A2-0000-4000-8000-000000000001", "title": "Essay", "revision": 1, "order": 1, "links": [{"kind": "file", "title": "Lost"}]}]"#.utf8).write(to: url)
+        let store = try TaskStore(url: url)
+        var essay = try unwrap(await store.all().first)
+        expectEqual(essay.links.count, 1)
+        essay.status = .done
+        let saved = try await store.save(essay, expectedRevision: essay.revision)
+        expectEqual(saved.status, .done); expectEqual(saved.links.count, 1)
+        var more = saved; more.links.append(TaskLink(kind: .file, path: "relative.txt"))
+        do { _ = try await store.save(more, expectedRevision: saved.revision); fail("Saved a new file link with no full path") } catch { }
+    }
 }

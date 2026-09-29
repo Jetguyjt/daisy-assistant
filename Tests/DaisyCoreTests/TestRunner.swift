@@ -1436,6 +1436,14 @@ import Foundation
         } catch { fail("testTasksKeepTheirLinks: \(error)") }
         do {
             let before = TestLog.failures
+            let suite = TaskLinkTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testAnOddSavedLinkDoesntBlockEdits()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testAnOddSavedLinkDoesntBlockEdits")
+        } catch { fail("testAnOddSavedLinkDoesntBlockEdits: \(error)") }
+        do {
+            let before = TestLog.failures
             let suite = TaskStatusTests()
             try suite.testStatusTextReadsLikeThePlugin()
             count += 1
