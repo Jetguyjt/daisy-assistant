@@ -18,7 +18,12 @@ Where: only in a chat session of a Daisy process, and only where someone could h
 
 How long: "request" covers one Hermes session (the ACP session id, which Hermes passes as task_id and
 keeps through compression) and one turn (turn_id, new with every user message), 3 hours at most.
-"forever" covers every chat session until the user turns it off in Setup.
+"forever" covers every chat session until the user turns it off in the app (Tools → Permissions).
+
+Who: approval_grant after its card ("by": "daisy"), "Yes to all like this" on a card ("card"), or a
+switch in the app's Permissions list ("settings"), which writes a forever grant for exactly one scope.
+Whoever wrote it, a grant only ever covers a call call_scope says a grant can cover, so a grant on file
+for a send, share or delete (written by hand, say) covers nothing.
 
 Files in $HERMES_HOME/daisy/, which the guard never lets the assistant write, all 0600:
 - grants.json: {"version": 1, "grants": [...]}, written here and by the Daisy app, each change under an
@@ -26,6 +31,8 @@ Files in $HERMES_HOME/daisy/, which the guard never lets the assistant write, al
 - grants.jsonl: one line per call that ran under a grant, for the app's transcript. Capped.
 - grant-offers.json: grantable cards from the last few minutes, keyed by a hash of the card's text, so
   the app offers "Yes to all like this" on exactly those.
+- asks.jsonl (asks.py): every card shown in a Daisy chat, its scope and whether a grant could cover it,
+  which the app's Permissions list is built from.
 
 approval_grant (tools/grants.py) asks for one. The guard cards it and holds the grant it describes as
 pending; the tool's run(), which Hermes only calls once that card was approved, turns on exactly that
@@ -275,6 +282,13 @@ class Call:
     app: str = ""       # ui tools: the app, lower case
     script: str = ""    # scripts: the script's real path
 
+    @property
+    def key(self) -> str:
+        """One string per scope, for the asks log: "docs_write", "computer_act@pages", "script:/x/fix.py"."""
+        if self.script:
+            return f"script:{self.script}"
+        return f"{self.tool}@{self.app}" if self.app else self.tool
+
 
 def call_scope(tool_name: str, args: Dict[str, Any], verdict: Verdict) -> Optional[Call]:
     """What a grant would have to cover for this carded call to run, or None when no grant can."""
@@ -300,7 +314,7 @@ def covers(grant: Dict[str, Any], call: Call) -> bool:
     if call.script:
         return _script_pinned(grant, call.script)
     tools = grant.get("tools")
-    if not isinstance(tools, list) or call.tool not in tools or call.tool == TOOL:
+    if not isinstance(tools, list) or call.tool not in tools or not grantable(call.tool):
         return False
     if call.app:
         return _app_name(grant.get("app")) == call.app
@@ -321,6 +335,71 @@ def covering(role: str, session: str, turn: str, tool_name: str, args: Dict[str,
         if _live(grant, session, turn, now) and covers(grant, call):
             return grant
     return None
+
+
+# Why a card can't be covered: one line each, for the app's Permissions list.
+WHY = {
+    "send": "Sends always ask",
+    "share": "Shares always ask",
+    "delete": "Deletes always ask",
+    "people": "Anything that emails, invites or notifies people always asks",
+    "install": "Installs always ask",
+    "command": "Commands always ask. Only a script you name can be allowed",
+    "code": "Running code always asks",
+    "ui": "Clicks on send, delete or share buttons, Return, shortcuts and line breaks always ask",
+    "ui-app": "Clicking and typing can only be allowed in one named app",
+    "terminal": "Clicking and typing in a terminal or in Daisy always asks",
+    "browser": "Driving the browser or an app directly always asks",
+    "calendar": "Calendar changes outside Daisy's calendar tool always ask",
+    "settings": "Changes to Hermes settings always ask",
+    "memory": "Changes to memory, skills and scheduled jobs always ask",
+    "open": "New sites after reading outside content always ask",
+    "mcp": "Only tool-server tools that just edit can be allowed",
+    "other": "This always asks",
+}
+_WHY_BY_RULE = {"send": "send", "send-email": "send", "send-message": "send", "share": "share", "delete": "delete",
+                "calendar": "calendar", "settings": "settings", "open": "open", "memory": "memory", "skill": "memory"}
+TERMINAL_TOOLS = ("terminal", "process", "process_manage")
+
+
+def why_not(tool_name: str, args: Dict[str, Any], verdict: Verdict) -> Tuple[str, str]:
+    """For a carded call no grant can cover: a short code ("send") and the line the app shows ("Sends
+    always ask"). ("", "") when a grant could cover it."""
+    code = _why(tool_name, args if isinstance(args, dict) else {}, verdict)
+    return code, WHY.get(code, "")
+
+
+def _why(tool_name: str, args: Dict[str, Any], verdict: Verdict) -> str:
+    if call_scope(tool_name, args, verdict) is not None:
+        return ""
+    rule = verdict.rule or ""
+    tool = registry.get(tool_name)
+    if tool is not None and tool.risk in ("send", "share", "delete"):
+        return tool.risk
+    if tool is not None and tool.risk in GRANTABLE_RISKS and rule == tool.name:
+        if _reaches_people(args):
+            return "people"
+        if tool.risk == "ui":
+            app = _app(args)
+            if not app:
+                return "ui-app"
+            return "terminal" if any(name in app for name in TERMINALS) or "daisy" in app else "ui"
+    if rule in _WHY_BY_RULE:
+        return _WHY_BY_RULE[rule]
+    if verdict.persists:
+        return "memory"
+    if tool_name.startswith("mcp_"):
+        found = set(_mcp_parts(tool_name)[1])
+        for code, names in (("send", SEND_WORDS), ("share", SHARE_WORDS), ("delete", DELETE_WORDS),
+                            ("calendar", CALENDAR_WORDS)):
+            if found & names:
+                return code
+        return "mcp"
+    if tool_name in TERMINAL_TOOLS:
+        return "install" if (verdict.title or "").lower().startswith("install") else "command"
+    if tool_name == "execute_code":
+        return "code"
+    return "browser" if rule == "ui" else "other"
 
 
 def _reaches_people(args: Dict[str, Any]) -> bool:
@@ -575,6 +654,15 @@ def _check_tool(name: str) -> None:
                                "something), so it keeps its card.")
     raise registry.Refused(f"There's no tool named {name} that a grant can cover. Grants cover tools that edit or "
                            "add things (docs_write, notes_append...), and scripts.")
+
+
+def grantable(name: str) -> bool:
+    """A tool a grant can name at all. Checked again for every call, whatever grants.json says."""
+    try:
+        _check_tool(name)
+    except registry.Refused:
+        return False
+    return True
 
 
 def _scripts(value: str) -> Tuple[List[str], Dict[str, str]]:

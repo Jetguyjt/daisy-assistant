@@ -9,6 +9,8 @@
 5. Every card gets its own rule key, so "allow for this session" or "always" can never be reused.
 6. A card the user already said yes to ahead of time runs without one (grants.py): only in chat, only
    where someone could have answered it, only for what the grant names, and each one is logged.
+7. Every card that does show in a Daisy chat is noted in asks.jsonl (asks.py), for the app's
+   Permissions list. Noting it can't change the decision.
 
 Any error in here blocks the call: Hermes would otherwise run the tool as if the guard had said yes."""
 
@@ -23,7 +25,7 @@ from collections import OrderedDict, deque
 from typing import Any, Deque, Dict, Optional
 
 from .. import registry
-from . import grants, roles, taint, targets
+from . import asks, grants, roles, taint, targets
 from .classify import JAVASCRIPT, classify
 from .verdict import Verdict, allow, block, card, read
 
@@ -96,6 +98,7 @@ def decide(tool_name: str, args: Dict[str, Any], task_id: str = "", session_id: 
         grants.hold(args, session, turn[1], proposal)
     elif carded:
         _offer(tool_name, args, verdict, session, turn[1], result["message"])
+        asks.note(role, tool_name, args, verdict, session, turn[1])
     return result
 
 
