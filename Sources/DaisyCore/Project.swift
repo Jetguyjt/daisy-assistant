@@ -66,7 +66,8 @@ public struct Project: Identifiable, Codable, Sendable, Equatable {
     /// How names match: spaces squashed, case ignored. "" is no project.
     public var key: String { Self.key(name) }
     public static func key(_ name: String) -> String { squashed(name).lowercased() }
-    static func squashed(_ text: String) -> String { text.split(whereSeparator: \.isWhitespace).joined(separator: " ") }
+    /// A name as it's saved: spaces squashed, trimmed.
+    public static func squashed(_ text: String) -> String { text.split(whereSeparator: \.isWhitespace).joined(separator: " ") }
 
     static func digest(_ name: String) -> [UInt8] { Array(SHA256.hash(data: Data(("daisy-project:" + key(name)).utf8))) }
     /// The id a project made from a task's name gets, the same the plugin makes.

@@ -40,6 +40,8 @@
     {"text": "https://www.commonapp.org/apply/essay-prompts", "kind": "url", "title": "commonapp.org",
      "url": "https://www.commonapp.org/apply/essay-prompts"},
     {"text": "example.com/page", "kind": "url", "title": "example.com", "url": "https://example.com/page"},
+    {"text": "www.example.com", "kind": "url", "title": "example.com", "url": "https://www.example.com"},
+    {"text": "essay.docx", "none": true},
     {"text": "HTTPS://Example.com/A", "kind": "url", "title": "example.com", "url": "HTTPS://Example.com/A"},
     {"text": "x-coredata://00000000-0000-4000-8000-00000000AAAA/ICNote/p101", "kind": "note", "title": "Note",
      "noteId": "x-coredata://00000000-0000-4000-8000-00000000AAAA/ICNote/p101"},

@@ -320,8 +320,11 @@ def detect_link(text: Any) -> Optional[Dict[str, Any]]:
         return _made("note", noteId=t) if _NOTE_ID.match(t) else None
     web = t
     if "://" not in lower:
+        # A site without https:// ("docs.google.com/document/d/…", "www.example.com"), but not a bare file
+        # name like "essay.docx".
         host = t.split("/", 1)[0]
-        if "." not in host or not re.fullmatch(r"[A-Za-z0-9.-]+(:[0-9]+)?", host):
+        if ("." not in host or not ("/" in t or lower.startswith("www."))
+                or not re.fullmatch(r"[A-Za-z0-9.-]+(:[0-9]+)?", host)):
             return None
         web = "https://" + t
     if not is_web(web):

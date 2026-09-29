@@ -700,6 +700,8 @@ check("import works", real.returncode == 0 and "Added 20 tasks" in real.stdout)
 imported = tasks.load(target)
 named = {item["title"]: item for item in imported}
 check("the project root isn't a task", "College Applications" not in named and len(imported) == 20)
+check("it's a project", [p["name"] for p in tasks.load_projects(target)] == ["College Applications"]
+      and [p["name"] for p in json.loads(target.read_text())["projects"]] == ["College Applications"])
 check("its subtree gets the project", all(named[t]["project"] == "College Applications" for t in
                                           ("Northfield University", "Northfield 1 Leadership", "Personal statement", "Activities list")))
 check("schools are top-level in the project", named["Harbor State"]["parent"] is None and named["Ridgemont"]["parent"] is None)

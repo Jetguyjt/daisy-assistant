@@ -84,8 +84,11 @@ public struct TaskLink: Identifiable, Codable, Sendable, Equatable, Hashable {
         if lower.hasPrefix("x-coredata://") { return isNoteID(t) ? TaskLink(kind: .note, noteID: t) : nil }
         var web = t
         if !lower.contains("://") {
+            // A site without https:// ("docs.google.com/document/d/…", "www.example.com"), but not a bare
+            // file name like "essay.docx".
             let host = String(t.split(separator: "/", maxSplits: 1, omittingEmptySubsequences: false).first ?? "")
-            guard host.contains("."), matches(host, #"^[A-Za-z0-9.-]+(:[0-9]+)?$"#) else { return nil }
+            guard host.contains("."), t.contains("/") || lower.hasPrefix("www."),
+                  matches(host, #"^[A-Za-z0-9.-]+(:[0-9]+)?$"#) else { return nil }
             web = "https://" + t
         }
         guard isWeb(web), var host = URLComponents(string: web)?.host?.lowercased(), !host.isEmpty else { return nil }
