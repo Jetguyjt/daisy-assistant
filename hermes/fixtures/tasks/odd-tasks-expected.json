@@ -1,0 +1,93 @@
+{
+  "about": "How odd-tasks.json reads: the app (WorkItem) and the plugin (tasks.view) must both read it exactly like this.",
+  "tasks": [
+    {
+      "id": "C3D4E5F6-A7B8-4C9D-8E0F-1A2B3C4D5E6F",
+      "title": "Scholarship essay",
+      "project": "",
+      "parent": null,
+      "due": "",
+      "status": "todo",
+      "notes": "Word limit 500.\n\nStatus: almost there",
+      "revision": 0,
+      "order": 0
+    },
+    {
+      "id": "5889073B-27DB-5E8C-B26D-1FFA513015B2",
+      "title": "Finalize the school list",
+      "project": "College Applications",
+      "parent": null,
+      "due": "",
+      "status": "todo",
+      "notes": "",
+      "revision": 2,
+      "order": 1
+    },
+    {
+      "id": "FAE3400B-40B0-53F8-9854-5AB9C14F3F16",
+      "title": "Reach schools",
+      "project": "",
+      "parent": "5889073B-27DB-5E8C-B26D-1FFA513015B2",
+      "due": "",
+      "status": "needs_review",
+      "notes": "",
+      "revision": 1,
+      "order": 2
+    },
+    {
+      "id": "4235D390-5599-55E5-9A3D-E577158E88FA",
+      "title": "Ask for a rec letter",
+      "project": "College Applications",
+      "parent": null,
+      "due": "",
+      "status": "waiting",
+      "notes": "",
+      "revision": 0,
+      "order": 3
+    },
+    {
+      "id": "D4E5F6A7-B8C9-4D0E-9F1A-2B3C4D5E6F70",
+      "title": "Loop A",
+      "project": "",
+      "parent": "E5F6A7B8-C9D0-4E1F-8A2B-3C4D5E6F7081",
+      "due": "",
+      "status": "todo",
+      "notes": "",
+      "revision": 0,
+      "order": 0
+    },
+    {
+      "id": "E5F6A7B8-C9D0-4E1F-8A2B-3C4D5E6F7081",
+      "title": "Loop B",
+      "project": "",
+      "parent": "D4E5F6A7-B8C9-4D0E-9F1A-2B3C4D5E6F70",
+      "due": "",
+      "status": "todo",
+      "notes": "",
+      "revision": 0,
+      "order": 0
+    },
+    {
+      "id": "F6A7B8C9-D0E1-4F2A-9B3C-4D5E6F708192",
+      "title": "Lost subtask",
+      "project": "",
+      "parent": "00000000-0000-4000-8000-000000000000",
+      "due": "2026-10-20",
+      "status": "blocked",
+      "notes": "",
+      "revision": 0,
+      "order": 0
+    },
+    {
+      "id": "4A99F178-B603-5698-A0A8-4099A424E618",
+      "title": "Number id",
+      "project": "",
+      "parent": null,
+      "due": "",
+      "status": "idea",
+      "notes": "",
+      "revision": 1,
+      "order": 0
+    }
+  ]
+}
