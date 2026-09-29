@@ -14,7 +14,7 @@ struct ApprovalQueueList: View {
 }
 
 /// A step the agent won't take without a yes, with who asked and how long is left before it
-/// counts as no. Only "once" is offered.
+/// counts as no. Only "once" is offered, plus "Yes to all like this" where a grant can cover it.
 struct QueuedApprovalCard: View {
     let queue: ApprovalQueue
     let item: ApprovalQueue.Item
@@ -53,6 +53,13 @@ struct QueuedApprovalCard: View {
                 Button("Cancel") { queue.answer(item.id, allow: false) }.buttonStyle(HUDButtonStyle(kind: .ghost))
                 if item.allowOnce != nil {
                     Button(verb) { queue.answer(item.id, allow: true) }.buttonStyle(HUDButtonStyle(kind: .critical))
+                    if item.offer != nil {
+                        // Only on cards the guard said a grant can cover, never a send, share or delete.
+                        Button("Yes to all like this") { queue.answerAll(item.id) }
+                            .buttonStyle(HUDButtonStyle(kind: .ghost))
+                            .help("Allows this, and steps like it without a card until this request is done. "
+                                  + "Sends, shares and deletes still ask.")
+                    }
                 } else {
                     Text("This request can't be allowed just once, so it can only be declined here.")
                         .font(.system(size: 11)).foregroundStyle(HUD.dim)

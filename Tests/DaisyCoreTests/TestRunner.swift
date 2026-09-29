@@ -432,6 +432,62 @@ import Foundation
         } catch { fail("testCapabilityGateAndContextBudget: \(error)") }
         do {
             let before = TestLog.failures
+            let suite = GrantsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testFileReadWriteAndRevoke()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testFileReadWriteAndRevoke")
+        } catch { fail("testFileReadWriteAndRevoke: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = GrantsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testRequestsEndPerSessionOrAll()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testRequestsEndPerSessionOrAll")
+        } catch { fail("testRequestsEndPerSessionOrAll: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = GrantsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testWritesWaitForTheGuardsLock()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testWritesWaitForTheGuardsLock")
+        } catch { fail("testWritesWaitForTheGuardsLock: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = GrantsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testOffersMatchTheCardsExactText()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testOffersMatchTheCardsExactText")
+        } catch { fail("testOffersMatchTheCardsExactText: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = GrantsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try await suite.testYesToAllGrantsTheRestOfTheRequest()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testYesToAllGrantsTheRestOfTheRequest")
+        } catch { fail("testYesToAllGrantsTheRestOfTheRequest: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = GrantsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testNoGrantStoreNoButton()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testNoGrantStoreNoButton")
+        } catch { fail("testNoGrantStoreNoButton: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = GrantsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testWhatRanUnderAGrant()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testWhatRanUnderAGrant")
+        } catch { fail("testWhatRanUnderAGrant: \(error)") }
+        do {
+            let before = TestLog.failures
             let suite = HermesTests()
             try suite.setUp(); defer { suite.tearDown() }
             try await suite.testBasicReasoningStreamsThroughHermes()
