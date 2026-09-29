@@ -240,6 +240,12 @@ final class PermissionsTests {
         store.reload()
         expectEqual(stored().count, 0)
         expectEqual(again.rows(.allowed).count, 0)
+        // Nor when it's turned off anywhere else in the app.
+        again.turnOn(try unwrap(again.rows(.often).first))
+        let other = try unwrap(again.rows(.allowed).first?.grantID)
+        GrantStore(file: file).revoke(other)
+        again.reload()
+        expectEqual(stored().count, 0)
     }
 
     @MainActor

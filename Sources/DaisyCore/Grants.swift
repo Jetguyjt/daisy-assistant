@@ -288,6 +288,7 @@ public struct GrantsFile: Sendable {
     }
 
     public func revoke(_ id: String) {
+        PermissionStore.forget(id)
         attempt("turn that off") { _ = try file.revoke(id) }
     }
 

@@ -70,6 +70,9 @@ import Foundation
     @discardableResult
     public func set(_ row: PermissionRow, on: Bool) -> Bool { on ? turnOn(row) : turnOff(row) }
 
+    /// A grant turned off somewhere else in the app: don't put it back.
+    static func forget(_ id: String) { turnedOn[id] = nil }
+
     /// The guard undoes a forever grant that appears while one of Daisy's steps is running (sealed.py),
     /// and it can't tell this switch from a tool writing the file. So a switch turned on here in the last
     /// few minutes, and not turned off here since, is put back if it went missing.

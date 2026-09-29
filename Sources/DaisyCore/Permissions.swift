@@ -271,17 +271,15 @@ public enum PermissionLabels {
         return titles.last.flatMap { $0.isEmpty ? nil : $0 } ?? (phrase + place)
     }
 
-    /// A grant's name on the list: what the user said for one Daisy asked for, else its scope.
+    /// A grant's name on the list: the row's name for a switch, what the user said for one Daisy asked
+    /// for, and its scope when neither was written down.
     static func label(_ grant: StandingGrant, home: String) -> String {
-        if grant.by == "settings" || grant.what.isEmpty {
-            if let script = grant.scripts.first, grant.tools.isEmpty {
-                return (grant.pins[script] == nil ? "Run the scripts in " : "Run ") + shortPath(script, home: home)
-            }
-            if grant.tools.count == 1 { return label(tool: grant.tools[0], app: grant.app, home: home) }
-            if !grant.what.isEmpty { return grant.what }
-            return grant.tools.map { label(tool: $0, app: grant.app, home: home) }.joined(separator: ", ")
+        if !grant.what.isEmpty { return grant.by == "settings" || grant.fromCard ? grant.what : "“\(grant.what)”" }
+        if let script = grant.scripts.first, grant.tools.isEmpty {
+            return (grant.pins[script] == nil ? "Run the scripts in " : "Run ") + shortPath(script, home: home)
         }
-        return grant.fromCard ? grant.what : "“\(grant.what)”"
+        let names = grant.tools.map { label(tool: $0, app: grant.app, home: home) }
+        return names.isEmpty ? "A standing OK" : names.joined(separator: ", ")
     }
 
     /// Lines under a grant's name: for one Daisy asked for, everything it covers; for a switch, what
