@@ -81,6 +81,8 @@ struct ConversationItem: Identifiable {
     @Published var agentLink: AgentLink = .starting
     /// Approval cards waiting on the user, from the conversation and from background jobs.
     lazy var approvalQueue: ApprovalQueue = makeApprovalQueue()
+    /// Standing permissions: Setup's list and "Yes to all like this" on conversation cards.
+    lazy var grants = GrantStore()
     /// Background jobs, each in a Hermes session of its own.
     lazy var jobs: JobsModel = makeJobs()
     /// What Hermes learned on its own, for the Memory tab.
@@ -328,10 +330,11 @@ struct ConversationItem: Identifiable {
             guard let self else { return }
             await self.backend.resolve(approval: id, optionID: option)
         }
+        queue.grants = grants
         queue.onDecision = { [weak self] item, outcome in
             guard let self, item.source == .conversation else { return }
             switch outcome {
-            case .allowed: self.decisions.append("Approved: " + item.approval.title)
+            case .allowed: self.decisions.append((item.allowedAll ? "Approved for the rest of this request: " : "Approved: ") + item.approval.title)
             case .declined, .overflow: self.decisions.append("Declined: " + item.approval.title)
             case .expired: self.decisions.append("No answer, so declined: " + item.approval.title)
             case .withdrawn: break
@@ -541,7 +544,7 @@ struct ConversationItem: Identifiable {
                 guard generation == token else { return }
                 let report = receipts.compactMap(\.output.files).last
                 if let report { recentSearch = report }
-                currentStep = nil; settleActivity(.done); approvalQueue.withdraw(from: .conversation)
+                currentStep = nil; settleActivity(.done); approvalQueue.withdraw(from: .conversation); endGrants(since: started)
                 let answer = liveText.trimmingCharacters(in: .whitespacesAndNewlines)
                 let total = Date().timeIntervalSince(started)
                 lastReply = ReplyTiming(firstText: firstText, total: total)
@@ -571,7 +574,7 @@ struct ConversationItem: Identifiable {
                 case .offline(let reason): agentLink = .offline(reason); connected = false
                 default: if error is URLError { connected = false }
                 }
-                currentStep = nil; settleActivity(.failed); approvalQueue.withdraw(from: .conversation)
+                currentStep = nil; settleActivity(.failed); approvalQueue.withdraw(from: .conversation); endGrants(since: started)
                 if !liveText.isEmpty {
                     messages.append(ConversationItem(role: "assistant", text: liveText, detail: "Cut off", decisions: decisions))
                     liveText = ""
@@ -581,6 +584,13 @@ struct ConversationItem: Identifiable {
                 rest()
             }
         }
+    }
+
+    /// The request is over: what ran under a standing OK goes in its decisions, and its request-only grants end.
+    private func endGrants(since started: Date) {
+        guard usesHermes else { return }
+        decisions += grants.doneUnderGrant(since: started)
+        grants.endRequests()
     }
 
     /// Keeps the activity readout in step with the agent's tools.
@@ -916,7 +926,7 @@ struct ConversationItem: Identifiable {
         generation = UUID(); work?.cancel(); work = nil
         standbyWork?.cancel(); standbyWork = nil
         wake.reset(); wakeTurn = false
-        endVoice(); approvalQueue.withdraw(from: .conversation)
+        endVoice(); approvalQueue.withdraw(from: .conversation); grants.endRequests()
         // Whatever was already written stays in the transcript, marked as cut off. A finished reply
         // whose voice was cut short goes in whole.
         if pendingReply != nil { settleReply() }

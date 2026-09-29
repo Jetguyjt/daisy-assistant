@@ -747,6 +747,7 @@ private struct SettingsView: View {
                                     holdJobsNearLimit: Binding(get: { model.config.alwaysOn?.holdJobsEnabled ?? true },
                                                                set: { model.setHoldJobsNearLimit($0) }),
                                     usesHermes: model.usesHermes)
+            if model.usesHermes { GrantsSection(store: model.grants) }
             section("FILES") {
                 Toggle("Filename search in the chosen folder", isOn: $model.config.allowFileSearch).toggleStyle(.switch)
                 note(model.selectedFolder?.path ?? "No folder selected")

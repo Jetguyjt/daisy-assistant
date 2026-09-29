@@ -36,6 +36,7 @@ public enum ToolPhrases {
             guard let site = site(input) else { return ("Opening a page", nil) }
             return (input?["reuse"]?.boolValue == true ? "Switching to \(site)" : "Opening \(site)", nil)
         case "computer_look", "computer_act": return (computer(head, input: input), nil)
+        case "approval_grant": return ("Asking for a standing OK", nil)
         case "gmail_search": return ("Checking your email", nil)
         case "gmail_read": return ("Reading an email", nil)
         case "gmail_send": return ("Sending an email", nil)

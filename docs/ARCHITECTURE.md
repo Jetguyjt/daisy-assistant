@@ -96,6 +96,7 @@ Hermes asks before dangerous shell commands and before file edits in its default
 - once a turn has read mail, web pages, files or messages, a memory write or a site the turn hasn't touched yet needs a card, and the card says what was read first (`taint.py`).
 - roles (`roles.py`): background jobs only read; cron runs only read, plus actions pre-approved with fixed values in `~/.hermes/daisy/cron-allow.json`. Where nobody could answer a card (yolo, one-shot runs, webhooks) it's blocked instead.
 - more than five cards in a minute in one session are refused, `javascript:` links always are, and so are writes to the guard's own files.
+- standing permissions (`guard/grants.py`): when the user says outright that Daisy can do something without asking, `approval_grant` asks once with a card, and after that yes the steps it names run without a card, for that request (same session and turn, three hours at most) or from now on. Only edits (typed write, own and ui tools, one app for clicks), scripts held to how they were when granted, and MCP edit tools can be covered; sends, shares, deletes and anything that reaches other people keep their card, and grants never apply in jobs, cron, yolo or one-shot runs. Each step under a grant is logged in `~/.hermes/daisy/grants.jsonl`.
 - an error inside the guard blocks the call, because Hermes would otherwise run the tool.
 
 In the app:
@@ -103,6 +104,7 @@ In the app:
 - each request is an amber card with the exact content and **Cancel / Send**. Daisy only ever answers "once"; an "always" answer is sent back as "once", and every card has its own rule key, so nothing is remembered as always-allowed.
 - no answer is no. Hermes gives up after 60 seconds, so the card counts down, and at 54 seconds it's declined and taken down (the bridge declines at 57 as a backstop). Cards go as soon as their turn or job ends, and job cards say which job asked.
 - in a voice turn, a card left waiting for 3 seconds frees the voice: Daisy says "I've left that for you to approve." and, in wake-word mode, goes back to listening while the card stays up.
+- a conversation card a grant could cover also has **Yes to all like this**, which allows it and the rest like it until the request is done. Setup lists standing permissions with Revoke, and an answer's decisions say what ran without a card ("Done under your OK: …").
 
 The guard reads commands; it is not a sandbox. `hermes/test_daisy_guard.py` and `hermes/test_daisy_guard_bypass.py` list what it stops and what it lets through. Install with `bash scripts/setup-hermes.sh`. The plugin also adds the Daisy persona as a system-prompt section in Daisy sessions; `$HERMES_HOME/daisy-persona.md` replaces it without touching code.
 
@@ -129,7 +131,7 @@ Use Hermes, not Daisy code:
 `hermes/daisy/registry.py` is the contract. A typed tool declares:
 
 - `name` (snake_case) and `parameters` (JSON schema)
-- `risk`: `read`, `write`, `send`, `delete`, `share` or `ui`
+- `risk`: `read`, `own`, `write`, `send`, `delete`, `share` or `ui` (`own` is Daisy's own records, like the task list: no card unless the turn read outside content)
 - `card(args)`: the approval text in full. First line is the title ("Send an email to Dad"); the rest is the exact content, every recipient, Cc, Bcc and attachment, never cut short
 - `run(args)`: does the work and returns data
 

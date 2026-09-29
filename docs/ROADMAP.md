@@ -28,6 +28,8 @@ These gaps have to close before the tools below go live. Stress test in [orchest
   - tests; workers come from `~/.hermes/daisy/roles.json`, cron's pre-approved list from `cron-allow.json`
 - [x] Taint: after reading mail/web/files, new recipients, URLs or memory writes need a card
   - tests
+- [ ] Standing permissions: "don't ask me for each one" becomes one card (`approval_grant`), for the request or from now on; "Yes to all like this" on cards; Setup lists and revokes them
+  - tests (`hermes/test_daisy_grants.py`, `GrantsTests`); not seen live yet
 - [ ] Approval queue: no answer = no, card removed on timeout, voice loop freed
   - built and tested against stand-ins; not seen live yet
 - [x] Rules plus test lines for (tests: `hermes/test_daisy_guard_bypass.py`, 102 checks red on the old guard, all green now):
