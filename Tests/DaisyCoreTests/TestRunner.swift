@@ -941,6 +941,78 @@ import Foundation
         } catch { fail("testUnsupportedModelToolCannotExecute: \(error)") }
         do {
             let before = TestLog.failures
+            let suite = PermissionsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testRowsComeFromWhatWasAsked()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testRowsComeFromWhatWasAsked")
+        } catch { fail("testRowsComeFromWhatWasAsked: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = PermissionsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testEachKindOfScopeGetsItsOwnRowAndName()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testEachKindOfScopeGetsItsOwnRowAndName")
+        } catch { fail("testEachKindOfScopeGetsItsOwnRowAndName: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = PermissionsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            suite.testLabels()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testLabels")
+        } catch { fail("testLabels: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = PermissionsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testForeverGrantsAreOnAndCoverWhatWasAsked()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testForeverGrantsAreOnAndCoverWhatWasAsked")
+        } catch { fail("testForeverGrantsAreOnAndCoverWhatWasAsked: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = PermissionsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testSwitchOnWritesAForeverGrantAndOffRevokesIt()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testSwitchOnWritesAForeverGrantAndOffRevokesIt")
+        } catch { fail("testSwitchOnWritesAForeverGrantAndOffRevokesIt: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = PermissionsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testASwitchTheGuardTookBackIsPutBack()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testASwitchTheGuardTookBackIsPutBack")
+        } catch { fail("testASwitchTheGuardTookBackIsPutBack: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = PermissionsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testScriptSwitchesArePinnedAsTheyAreNow()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testScriptSwitchesArePinnedAsTheyAreNow")
+        } catch { fail("testScriptSwitchesArePinnedAsTheyAreNow: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = PermissionsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testNothingAlwaysAskingGetsASwitch()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testNothingAlwaysAskingGetsASwitch")
+        } catch { fail("testNothingAlwaysAskingGetsASwitch: \(error)") }
+        do {
+            let before = TestLog.failures
+            let suite = PermissionsTests()
+            try suite.setUp(); defer { suite.tearDown() }
+            try suite.testOldOrMissingFiles()
+            count += 1
+            print("\(TestLog.failures == before ? "PASS" : "FAIL") testOldOrMissingFiles")
+        } catch { fail("testOldOrMissingFiles: \(error)") }
+        do {
+            let before = TestLog.failures
             let suite = PowerTests()
             suite.testClickToTalkOnlyOnBatteryWithTheWakeWord()
             count += 1

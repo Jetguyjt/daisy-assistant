@@ -50,6 +50,12 @@ final class GrantsTests {
         expectTrue(saved.forever && !saved.fromCard && saved.isLive())
         expectEqual(saved.covers, ["Use tasks_add (tasks_add)"])
         expectEqual(saved.lasts, "From now on")
+        // Its scope, as the guard reads it.
+        expectEqual(saved.by, "daisy")
+        expectEqual(saved.tools, ["tasks_add"])
+        expectEqual(saved.app, "")
+        expectEqual(saved.scripts, [])
+        expectEqual(saved.pins, ["/tmp/x.py": "abc123"])
         let attributes = try FileManager.default.attributesOfItem(atPath: file.url.path)
         expectEqual((attributes[.posixPermissions] as? NSNumber)?.intValue, 0o600)
         let leftovers = try FileManager.default.contentsOfDirectory(atPath: folder.path).filter { $0.hasSuffix(".tmp") }
