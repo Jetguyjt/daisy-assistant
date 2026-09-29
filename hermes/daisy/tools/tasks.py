@@ -550,10 +550,12 @@ def link_from_arg(spec: Any) -> Dict[str, Any]:
             name = dict(LINK_FIELDS)[stored]
             raise Problem(f"{name} doesn't look right: {value[:200]!r}")
         link[stored] = value
+    link["title"] = _squash(spec.get("title")) or default_title(link)
+    check_link(link)
+    # Checked first, so an event or email with no id isn't saved as a link to the whole calendar or inbox.
     if not link["url"] and link["kind"] not in ("file", "note", "reminder"):
         link["url"] = built_url(link)
-    link["title"] = _squash(spec.get("title")) or default_title(link)
-    return check_link(link)
+    return link
 
 
 def links_arg(value: Any, name: str) -> List[Dict[str, Any]]:
@@ -1943,10 +1945,12 @@ def card_project_remove_text(plan: Dict[str, Any], doc: Doc) -> str:
     else:
         lines = [f"Remove {what}", "No tasks are in it."]
     for project_id, _ in plan["remove"]:
-        project = by_id[project_id]
-        if project["links"] or project["notes"] or project["folder"]:
-            lines.append(f"“{project['name']}” loses its notes, folder and {len(project['links'])} "
-                         f"link{'s' if len(project['links']) != 1 else ''}.")
+        project, count = by_id[project_id], len(by_id[project_id]["links"])
+        parts = (["notes"] if project["notes"] else []) + ([f"folder ({project['folder']})"] if project["folder"] else []) \
+            + ([f"{count} link{'s' if count != 1 else ''}"] if count else [])
+        if parts:
+            lost = parts[0] if len(parts) == 1 else ", ".join(parts[:-1]) + " and " + parts[-1]
+            lines.append(f"“{project['name']}” loses its {lost}.")
     return "\n".join(lines)
 
 

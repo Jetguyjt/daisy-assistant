@@ -390,6 +390,276 @@ ambiguous = policy.decide("tasks_update", {"changes": [{"task": "Nope", "status"
 check("a call that can't run is blocked with the reason", (ambiguous or {}).get("action") == "block"
       and "no task called “Nope”" in ambiguous["message"])
 
+# Links: the same cases the app's tests use.
+project_listing, project_adding, project_updating, project_removing = (
+    registry.get(name) for name in ("projects_list", "projects_add", "projects_update", "projects_remove"))
+link_cases = json.loads((FIXTURES / "link-cases.json").read_text())
+for case in link_cases["detect"]:
+    got = tasks.detect_link(case["text"])
+    if case.get("none"):
+        check(f"not a link: {case['text']!r}", got is None)
+    else:
+        check(f"reads {case['text']!r} as {case['kind']}", got is not None and all(
+            got.get(key, "") == value for key, value in case.items() if key != "text"))
+for case in link_cases["built"]:
+    made = tasks.blank_link(case["kind"])
+    made.update({key: value for key, value in case.items() if key not in ("kind", "url")})
+    check(f"a {case['kind']} link from ids: {case['url']}", tasks.built_url(made) == case["url"])
+home = tasks.detect_link("~/Documents/College/essay.pdf")
+check("~ is the home folder", home["kind"] == "file" and home["path"] == os.path.expanduser("~/Documents/College/essay.pdf"))
+check("a link from the model can be a plain URL",
+      tasks.link_from_arg("https://docs.google.com/document/d/1AbCdEfGhIjKlMnOpQrStUv/edit")["fileId"] == "1AbCdEfGhIjKlMnOpQrStUv")
+event = tasks.link_from_arg({"kind": "calendar_event", "event_id": "abc123def456", "calendar_id": "primary",
+                             "start": "2026-10-02T15:00:00-04:00", "title": "Harvard interview"})
+check("an event from calendar_list opens on its day", event["url"] == "https://calendar.google.com/calendar/r/day/2026/10/2"
+      and event["title"] == "Harvard interview" and event["calendarId"] == "primary")
+mail = tasks.link_from_arg({"message_id": "18c2a3b4d5e6f7a8", "title": "Feedback from Ms. Lee"})
+check("a message id alone is an email", mail["kind"] == "gmail" and mail["url"] == "https://mail.google.com/mail/u/0/#all/18c2a3b4d5e6f7a8")
+drive = tasks.link_from_arg({"file_id": "https://drive.google.com/file/d/1FileIdOnDriveForTest9/view", "title": "Resume"})
+check("a Drive link given as file_id is read for its id", drive["kind"] == "google_drive" and drive["fileId"] == "1FileIdOnDriveForTest9"
+      and drive["url"] == "https://drive.google.com/open?id=1FileIdOnDriveForTest9")
+note = tasks.link_from_arg({"kind": "note", "note_id": "x-coredata://00000000-0000-4000-8000-00000000AAAA/ICNote/p101",
+                            "title": "College Essays"})
+check("a note keeps its id and no web link", note["noteId"].endswith("/ICNote/p101") and note["url"] == "")
+for bad, words in [("javascript:alert(1)", "isn't a link"), ({"kind": "note", "note_id": "p101"}, "note_id"),
+                   ({"kind": "calendar_event", "title": "Interview"}, "event_id"),
+                   ({"kind": "rocket", "url": "https://x.example"}, "isn't a kind"),
+                   ({"title": "nothing"}, "Say what the link points at"), ({"kind": "url", "path": "/tmp/x"}, "is a file"),
+                   ({"url": "https://example.com", "title": "x" * 201}, "up to 200")]:
+    try:
+        tasks.link_from_arg(bad)
+        check(f"refused {bad}", False)
+    except tasks.Problem as problem:
+        check(f"refused {bad}: {problem}", words in str(problem))
+
+# Old files: project names on tasks read as projects, the same ones the app makes, and nothing is written.
+legacy_text = (FIXTURES / "legacy-tasks.json").read_text()
+fresh(legacy_text)
+expected_projects = json.loads((FIXTURES / "legacy-projects-expected.json").read_text())
+check("old names read as the app's projects", [{key: p[key] for key in ("id", "name", "color", "status", "revision")}
+                                               for p in tasks.load_projects()] == expected_projects["projects"])
+for named in expected_projects["named"]:
+    check(f"project made from {named['name']!r}", (tasks.derived_project_id(named["name"]), tasks.derived_color(named["name"]))
+          == (named["id"], named["color"]))
+check("listing projects", [p["name"] for p in run(project_listing, {})["projects"]] == ["College essays", "School"])
+run(listing, {"status": "all"})
+check("reading writes nothing", TASKS.read_text() == legacy_text)
+checked(adding, {"tasks": [{"title": "Chem worksheet", "project": "school"}]})
+check("a new task takes the project's spelling", titled("Chem worksheet")["project"] == "School")
+check("the first change writes the projects the names made", [(p["name"], p["id"], p["revision"]) for p in projects_stored()]
+      == [(p["name"], p["id"], 0) for p in expected_projects["projects"]])
+check("and the old tasks as they were", stored()[:3] == json.loads(legacy_text))
+
+# The app's own file, with projects and links.
+fresh((FIXTURES / "app-written-v2.json").read_text())
+doc = tasks.load_doc()
+check("the app's projects read", [(p["name"], p["status"], p["color"]) for p in doc.projects]
+      == [("College Applications", "active", "blue"), ("Robotics", "archived", "gray")])
+check("the app's links read", [link["kind"] for link in titled("Why Harvard")["links"]] == ["calendar_event", "gmail", "file"]
+      and titled("Why Harvard")["links"][2]["bookmark"] == "Ym9va21hcms=")
+listed = run(listing, {"status": "all"})
+why = next(task for task in listed["tasks"] if task["title"] == "Why Harvard")
+check("tasks_list gives what opens each link", why["links"][0]["event_id"] == "abc123def456"
+      and why["links"][0]["url"].startswith("https://calendar.google.com/") and why["links"][1]["message_id"] == "18c2a3b4d5e6f7a8"
+      and why["links"][2]["path"] == "/Users/jordan/Documents/College/Why Harvard.pdf" and why["links"][2]["exists"] is False
+      and all("bookmark" not in link for link in why["links"]))
+check("a task in an archived project says so",
+      next(task for task in listed["tasks"] if task["title"] == "Robot arm writeup")["project_status"] == "archived")
+check("projects_list leaves archived ones out", [p["name"] for p in run(project_listing, {})["projects"]] == ["College Applications"])
+everything = run(project_listing, {"status": "all"})["projects"]
+check("and shows them with all", [p["name"] for p in everything] == ["College Applications", "Robotics"]
+      and everything[0]["open"] == 2 and everything[0]["tasks"] == 2 and everything[0]["folder"] == "/Users/jordan/Documents/College"
+      and everything[0]["links"][0]["file_id"] == "1AbCdEfGhIjKlMnOpQrStUv" and everything[0]["due"] == "2026-11-01")
+check("one status", [p["name"] for p in run(project_listing, {"status": "archived"})["projects"]] == ["Robotics"])
+before = document()
+checked(updating, {"changes": [{"task": "Harvard", "status": "in_progress"}]})
+after = document()
+check("everything the change didn't touch stays as the app wrote it", after["projects"] == before["projects"]
+      and after["tasks"][1:] == before["tasks"][1:] and after["tasks"][0]["status"] == "in_progress")
+fresh('{"version": 2, "tasks": [], "projects": [], "kept": "for later"}')
+checked(adding, {"tasks": [{"title": "Anything"}]})
+check("other keys at the top stay", document()["kept"] == "for later")
+fresh('{"version": 2, "tasks": [], "projects": {"oops": 1}}')
+check("projects that aren't a list are refused", refused(adding, {"tasks": [{"title": "X"}]}, "projects that aren't a list"))
+check("and the file is left alone", TASKS.read_text() == '{"version": 2, "tasks": [], "projects": {"oops": 1}}')
+
+# Links on tasks, and a new project from a task.
+fresh()
+with_links = {"tasks": [
+    {"title": "Harvard", "project": "College Applications", "links": ["https://drive.google.com/drive/folders/1FolderIdOnDriveTest7"]},
+    {"title": "Why Harvard", "parent": "Harvard", "links": [
+        "https://docs.google.com/document/d/1AbCdEfGhIjKlMnOpQrStUv/edit",
+        "https://docs.google.com/document/d/1AbCdEfGhIjKlMnOpQrStUv/edit?usp=sharing",
+        {"kind": "calendar_event", "event_id": "abc123def456", "calendar_id": "jordan.example@gmail.com", "title": "Interview"}]},
+    {"title": "Milk", "project": "Groceries"}]}
+card = adding.card(with_links)
+check("the add card shows every link in full", "  Link: Drive file “Drive folder”: https://drive.google.com/drive/folders/1FolderIdOnDriveTest7" in card
+      and "      Link: Google Doc “Google Doc”: https://docs.google.com/document/d/1AbCdEfGhIjKlMnOpQrStUv/edit" in card
+      and "      Link: Calendar event “Interview”: https://calendar.google.com/calendar/event?eid=" in card
+      and card.count("Google Doc “Google Doc”") == 1)
+check("and the projects it makes", card.endswith("New project: College Applications\nNew project: Groceries"))
+result = run(adding, with_links)
+check("adding says which projects are new", result["new_projects"] == ["College Applications", "Groceries"])
+check("links are saved with ids", [link["kind"] for link in titled("Why Harvard")["links"]] == ["google_doc", "calendar_event"]
+      and all(tasks._UUID.match(link["id"]) for link in titled("Why Harvard")["links"]))
+check("stored links keep only what they have", stored()[1]["links"][0] == {
+    "id": stored()[1]["links"][0]["id"], "kind": "google_doc", "title": "Google Doc",
+    "url": "https://docs.google.com/document/d/1AbCdEfGhIjKlMnOpQrStUv/edit", "fileId": "1AbCdEfGhIjKlMnOpQrStUv"})
+check("the new projects are written", [(p["name"], p["color"], p["revision"]) for p in projects_stored()]
+      == [("College Applications", "yellow", 0), ("Groceries", "red", 0)])
+check("tasks_list shows the links", [link["kind"] for link in next(t for t in run(listing, {})["tasks"] if t["title"] == "Harvard")["links"]]
+      == ["google_drive"])
+email = "https://mail.google.com/mail/u/0/#inbox/18c2a3b4d5e6f7a8"
+card = updating.card({"changes": [{"task": "Harvard", "add_links": [email]}]})
+check("the update card shows the link", card == f"Update “Harvard”\n• Harvard\n    Link added: Email “Email”: {email}")
+checked(updating, {"changes": [{"task": "Harvard", "add_links": [email]}]})
+check("an email linked", [link["kind"] for link in titled("Harvard")["links"]] == ["google_drive", "gmail"]
+      and titled("Harvard")["links"][1]["threadId"] == "18c2a3b4d5e6f7a8")
+card = updating.card({"changes": [{"task": "Harvard", "add_links": [email]}]})
+check("the same link isn't added twice", "Already linked, not added again: Email" in card)
+revision = titled("Harvard")["revision"]
+checked(updating, {"changes": [{"task": "Harvard", "add_links": [email]}]})
+check("and nothing changes", titled("Harvard")["revision"] == revision)
+card = updating.card({"changes": [{"task": "Harvard", "remove_links": [email]}]})
+check("the card shows the link going", f"    Link removed: Email “Email”: {email}" in card)
+checked(updating, {"changes": [{"task": "Harvard", "remove_links": [email], "add_links": ["/Users/jordan/Documents/College/list.pdf"]}]})
+check("removed by its url, a file added", [link["kind"] for link in titled("Harvard")["links"]] == ["google_drive", "file"])
+checked(updating, {"changes": [{"task": "Harvard", "remove_links": ["drive folder"]}]})
+check("removed by its title", [link["kind"] for link in titled("Harvard")["links"]] == ["file"])
+check("a link that isn't there is refused", refused(updating, {"changes": [{"task": "Harvard", "remove_links": ["Nope"]}]}, "has no link"))
+card = updating.card({"changes": [{"task": "Milk", "project": "Shopping"}]})
+check("moving to a project that doesn't exist says it's new", "Project: “Groceries” → “Shopping” (a new project)" in card)
+checked(updating, {"changes": [{"task": "Milk", "project": "college applications"}]})
+check("a project in any case takes its spelling", titled("Milk")["project"] == "College Applications")
+check("a project stays once it's written, tasks or not", [p["name"] for p in projects_stored()] == ["College Applications", "Groceries"])
+
+# Projects: add, rename, archive, links, folder, remove.
+fresh()
+checked(adding, {"tasks": [{"title": "Harvard", "project": "College Applications"}, {"title": "Why Harvard", "parent": "Harvard"}]})
+new = {"projects": [{"name": "Robotics", "color": "orange", "due": "2026-12-01", "notes": "Build season", "folder": "~/Documents/Robotics",
+                     "links": ["https://robotics.example.org/season"]}, {"name": "college applications"}]}
+card = project_adding.card(new)
+check("the project card shows everything", card.startswith("Add a project: Robotics\n")
+      and "• Robotics — Active · Orange · due 2026-12-01" in card and "  Notes: Build season" in card
+      and "  Folder: " + os.path.expanduser("~/Documents/Robotics") in card
+      and "  Link: Web page “robotics.example.org”: https://robotics.example.org/season" in card
+      and card.endswith("Already a project, not added again: College Applications"))
+result = run(project_adding, new)
+check("added", [p["name"] for p in result["added"]] == ["Robotics"] and result["skipped"] == ["College Applications"])
+robotics = next(p for p in projects_stored() if p["name"] == "Robotics")
+check("stored in full", robotics["color"] == "orange" and robotics["revision"] == 1 and robotics["status"] == "active"
+      and robotics["folder"] == os.path.expanduser("~/Documents/Robotics") and robotics["links"][0]["kind"] == "url"
+      and tasks._UUID.match(robotics["links"][0]["id"]))
+check("a project with no tasks lists", next(p for p in run(project_listing, {})["projects"] if p["name"] == "Robotics")["tasks"] == 0)
+for bad, words in [({"name": "No project"}, "Pick another name"), ({"name": "X", "color": "plaid"}, "project colors"),
+                   ({"name": "X", "status": "someday"}, "isn't a project status"), ({"name": "X", "folder": "Documents/X"}, "full path"),
+                   ({"name": "X", "due": "tomorrow"}, "isn't a due date"), ({"name": ""}, "needs a name")]:
+    check(f"refused project {bad}", refused(project_adding, {"projects": [bad]}, words))
+college_id = tasks.derived_project_id("College Applications")
+rename = {"changes": [{"project": "College Applications", "name": "Colleges", "status": "paused", "color": "teal",
+                       "add_links": ["https://docs.google.com/document/d/1AbCdEfGhIjKlMnOpQrStUv/edit"]}]}
+card = project_updating.card(rename)
+check("the rename card says the tasks move", card.startswith("Update the project “College Applications”\n• College Applications\n")
+      and "    Name: “College Applications” → “Colleges” (its 2 tasks move with it)" in card
+      and "    Status: Active → Paused" in card and "    Color: yellow → teal" in card
+      and "    Link added: Google Doc “Google Doc”: https://docs.google.com/document/d/1AbCdEfGhIjKlMnOpQrStUv/edit" in card)
+result = run(project_updating, rename)
+check("renamed with its tasks", result["tasks_moved"] == 2 and {titled(t)["project"] for t in ("Harvard", "Why Harvard")} == {"Colleges"}
+      and titled("Harvard")["revision"] == 2)
+colleges = next(p for p in projects_stored() if p["name"] == "Colleges")
+check("same project, new name", colleges["id"] == college_id and colleges["status"] == "paused" and colleges["color"] == "teal"
+      and colleges["revision"] == 1 and len(colleges["links"]) == 1)
+check("renaming onto another project is refused", refused(project_updating, {"changes": [{"project": "Colleges", "name": "ROBOTICS"}]},
+                                                          "already a project called “Robotics”"))
+check("an unknown project is refused", refused(project_updating, {"changes": [{"project": "Band", "status": "done"}]}, "no project called"))
+check("nothing to change is refused", refused(project_updating, {"changes": [{"project": "Colleges"}]}, "Nothing to change"))
+checked(project_updating, {"changes": [{"project": colleges["id"][:8], "remove_links": ["Google Doc"], "folder": "/Users/jordan/College",
+                                        "add_note": "Early action first."}]})
+colleges = next(p for p in projects_stored() if p["name"] == "Colleges")
+check("by the start of its id: link off, folder and a note on", colleges["links"] == [] and colleges["folder"] == "/Users/jordan/College"
+      and colleges["notes"] == "Early action first.")
+card = project_updating.card({"project": "Robotics", "status": "archive", "folder": ""})
+check("archiving, and clearing the folder", "Status: Active → Archived" in card
+      and f"Folder: “{os.path.expanduser('~/Documents/Robotics')}” → none" in card)
+checked(project_updating, {"project": "Robotics", "status": "archive", "folder": ""})
+check("archived", next(p for p in projects_stored() if p["name"] == "Robotics")["status"] == "archived")
+update = {"changes": [{"project": "Colleges", "status": "done"}]}
+project_updating.card(update)
+raw_doc = document()
+next(p for p in raw_doc["projects"] if p["name"] == "Colleges")["revision"] += 1
+TASKS.write_text(json.dumps(raw_doc))
+check("a project that changed after the card isn't touched", "changed after" in run(project_updating, update)["error"]
+      and next(p for p in projects_stored() if p["name"] == "Colleges")["status"] == "paused")
+
+checked(adding, {"tasks": [{"title": "Build log", "project": "Robotics"}, {"title": "Week 1", "parent": "Build log"}]})
+check("removing a project with tasks needs a choice", refused(project_removing, {"projects": ["Robotics"]}, "Say tasks"))
+card = project_removing.card({"projects": ["Robotics"], "tasks": "keep"})
+check("the keep card lists the tasks that stay", card.startswith("Remove the project “Robotics”\nIts 2 tasks stay, with no project:\n")
+      and "• Build log — To do · Robotics" in card and "    • Week 1 — To do" in card
+      and "“Robotics” loses its notes and 1 link." in card)
+result = run(project_removing, {"projects": ["Robotics"], "tasks": "keep"})
+check("the project goes, its tasks stay", result == {"removed": ["Robotics"], "tasks_kept": 2, "tasks_deleted": 0}
+      and titled("Build log")["project"] == "" and titled("Week 1")["project"] == ""
+      and [p["name"] for p in projects_stored()] == ["Colleges"])
+checked(adding, {"tasks": [{"title": "Milk", "project": "Groceries"}, {"title": "Eggs", "project": "Groceries"},
+                           {"title": "Brown ones", "parent": "Eggs"}]})
+card = project_removing.card({"projects": ["groceries"], "tasks": "delete"})
+check("the delete card names every task", card.startswith("Remove the project “Groceries” and delete 3 tasks\nThese tasks are deleted too:\n")
+      and "• Milk — To do · Groceries" in card and "    • Brown ones — To do" in card)
+count = len(stored())
+result = run(project_removing, {"projects": ["groceries"], "tasks": "delete"})
+check("the project and its tasks go", result["tasks_deleted"] == 3 and len(stored()) == count - 3
+      and [p["name"] for p in projects_stored()] == ["Colleges"])
+checked(project_adding, {"projects": [{"name": "Band"}]})
+check("a project with nothing in it needs no choice", project_removing.card({"projects": ["Band"]})
+      == "Remove the project “Band”\nNo tasks are in it.")
+
+# The guard: adding and changing projects run like task edits; removing one always shows a card.
+turn = dict(session_id="projects-a", task_id="projects-a", turn_id="t1")
+check("projects_list runs", policy.decide("projects_list", {}, **turn) is None)
+check("projects_add runs with no card in a clean turn", policy.decide("projects_add", {"projects": [{"name": "Summer"}]}, **turn) is None)
+check("projects_update too", policy.decide("projects_update", {"changes": [{"project": "Colleges", "status": "done"}]}, **turn) is None)
+check("linking a task too", policy.decide("tasks_update", {"changes": [{"task": "Harvard", "add_links": ["https://example.com/a"]}]},
+                                          **turn) is None)
+removal = policy.decide("projects_remove", {"projects": ["Colleges"], "tasks": "keep"}, **turn)
+check("projects_remove always shows a card", (removal or {}).get("action") == "approve"
+      and "Remove the project “Colleges”" in removal["message"] and "• Harvard — " in removal["message"])
+blocked = policy.decide("projects_remove", {"projects": ["Colleges"]}, **turn)
+check("one that needs a choice is blocked with the reason", (blocked or {}).get("action") == "block" and "Say tasks" in blocked["message"])
+tainted = dict(session_id="projects-b", task_id="projects-b", turn_id="t1")
+policy.decide("gmail_search", {"query": "essay"}, **tainted)
+after_mail = policy.decide("tasks_update", {"changes": [{"task": "Harvard", "add_links": ["https://example.com/a"]}]}, **tainted)
+check("linking after reading email shows the card", (after_mail or {}).get("action") == "approve"
+      and "Link added: Web page “example.com”: https://example.com/a" in after_mail["message"])
+check("a project after reading email too", (policy.decide("projects_add", {"projects": [{"name": "Summer"}]}, **tainted) or {})
+      .get("action") == "approve")
+check("a javascript: link is blocked", (policy.decide("tasks_update", {"changes": [{"task": "Harvard", "add_links": ["javascript:alert(1)"]}]},
+                                                      **dict(turn, turn_id="t2")) or {}).get("action") == "block")
+check("cron can't add projects", (policy.decide("projects_add", {"projects": [{"name": "Summer"}]}, task_id="cron:digest:2",
+                                                session_id="cron:digest:2") or {}).get("action") == "block")
+check("background jobs can read them", policy.decide("projects_list", {}, task_id="worker-1", session_id="worker-1") is None)
+
+# Two writers adding tasks and projects at once lose nothing.
+fresh()
+errors = []
+
+
+def project_writer(n):
+    try:
+        for k in range(5):
+            checked(project_adding, {"projects": [{"name": f"Writer {n} project {k}"}]})
+    except Exception as error:  # noqa: BLE001
+        errors.append(error)
+
+
+threads = [threading.Thread(target=writer, args=(n,)) for n in range(2)]
+threads += [threading.Thread(target=project_writer, args=(n,)) for n in range(2)]
+for thread in threads:
+    thread.start()
+for thread in threads:
+    thread.join()
+check("tasks and projects from four writers all land", not errors and len(stored()) == 10 and len(projects_stored()) == 10)
+
 # The todo_list import.
 todo = json.loads((FIXTURES / "todo-result.json").read_text())
 importer_spec = importlib.util.spec_from_file_location("import_hermes_todos", SCRIPT)
