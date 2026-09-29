@@ -9,6 +9,9 @@ import Foundation
 /// - During a voice turn, a card left waiting lets go of the voice: `onPark` gets the line to say,
 ///   and the app goes back to listening while the card stays up.
 /// - A few cards at once is plenty. More than `limit` reads as a runaway, and the extras are declined.
+/// - "Yes to all like this" (`answerAll`) is offered only on a conversation card the guard said can be
+///   granted (`GrantStore.offer`): it allows this one and adds a grant for steps like it until the
+///   request is done. Sends, shares and deletes never get it.
 @MainActor public final class ApprovalQueue: ObservableObject {
     public enum Source: Hashable, Sendable {
         case conversation
@@ -22,6 +25,10 @@ import Foundation
         public let arrived: Date
         /// When it counts as no.
         public let expires: Date
+        /// What "Yes to all like this" would give; nil when it isn't offered.
+        public let offer: GrantOffer?
+        /// Answered with "Yes to all like this".
+        public internal(set) var allowedAll = false
         public var id: String { approval.id }
         /// The only yes this card can give. nil when the request doesn't offer "once".
         public var allowOnce: AgentApproval.Option? { approval.options.first { $0.kind == .allowOnce } }
@@ -45,6 +52,8 @@ import Foundation
     public var onPark: ((String) -> Void)?
     /// Every card's end, for the transcript ("Approved: Send an iMessage to Dad").
     public var onDecision: ((Item, Outcome) -> Void)?
+    /// Standing permissions, for "Yes to all like this". Without it the button never shows.
+    public var grants: GrantStore?
 
     public let window: TimeInterval
     public let parkDelay: TimeInterval
@@ -65,7 +74,9 @@ import Foundation
     public func add(_ approval: AgentApproval, from source: Source, label: String? = nil, voice: Bool = false) {
         guard !items.contains(where: { $0.id == approval.id }) else { return }
         let now = Date()
-        let item = Item(approval: approval, source: source, label: label, arrived: now, expires: now.addingTimeInterval(window))
+        let offer = source == .conversation ? grants?.offer(for: approval) : nil
+        let item = Item(approval: approval, source: source, label: label, arrived: now, expires: now.addingTimeInterval(window),
+                        offer: offer)
         guard items.count < limit else {
             send(item.id, nil)
             onDecision?(item, .overflow)
@@ -88,6 +99,16 @@ import Foundation
         let choice = yes ?? item.approval.options.first { $0.kind == .rejectOnce }
         send(id, choice?.id)
         onDecision?(item, yes != nil ? .allowed : .declined)
+    }
+
+    /// "Yes to all like this": allows this card once and adds a grant for more like it until the request
+    /// is done. Does nothing on a card without an offer or an allow-once option.
+    public func answerAll(_ id: String) {
+        guard let waiting = items.first(where: { $0.id == id }), let offer = waiting.offer, waiting.allowOnce != nil,
+              let grants, var item = take(id) else { return }
+        item.allowedAll = grants.yesToAll(offer, title: item.approval.title)
+        send(id, item.allowOnce?.id)
+        onDecision?(item, .allowed)
     }
 
     /// The backend says the request is settled: answered elsewhere, timed out, or its turn stopped.
