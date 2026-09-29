@@ -58,6 +58,10 @@ public enum ToolPhrases {
         case "reminders_add": return ("Adding a reminder", nil)
         case "reminders_complete": return ("Checking off a reminder", nil)
         case "notes_search": return ("Checking your notes", nil)
+        case "tasks_list": return ("Checking your tasks", nil)
+        case "tasks_add": return (tasks("Adding", input?["tasks"]), nil)
+        case "tasks_update": return ("Updating your tasks", nil)
+        case "tasks_remove": return (tasks("Removing", input?["tasks"]), nil)
         case "notes_read": return ("Reading a note", nil)
         case "notes_create": return ("Writing a new note", nil)
         case "notes_append": return ("Adding to a note", nil)
@@ -108,6 +112,12 @@ public enum ToolPhrases {
         let to = (input?["to"]?.stringValue ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         guard !to.isEmpty, to.count <= 40, !to.contains(where: \.isNewline) else { return "Sending a text" }
         return "Texting \(to)"
+    }
+
+    /// "Adding 12 tasks", "Adding a task"; "Adding your tasks" when the count isn't there.
+    static func tasks(_ verb: String, _ list: JSONValue?) -> String {
+        guard let count = list?.arrayValue?.count, count > 0 else { return "\(verb) your tasks" }
+        return count == 1 ? "\(verb) a task" : "\(verb) \(count) tasks"
     }
 
     /// Where a Chrome tool is headed: "Gmail" for mail.google.com, otherwise the site without www.

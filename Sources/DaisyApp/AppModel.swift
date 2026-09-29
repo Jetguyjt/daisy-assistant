@@ -193,7 +193,7 @@ struct ConversationItem: Identifiable {
         do {
             config = try Configuration.load()
             store = try MemoryStore(url: Configuration.dataDirectory.appendingPathComponent("memory.sqlite"))
-            taskStore = try TaskStore(url: Configuration.dataDirectory.appendingPathComponent("tasks.json"))
+            taskStore = try TaskStore(url: TaskStore.defaultURL)
         } catch { notice = "Setup needs attention: \(error.localizedDescription)" }
         // Folder access is tied to the app that granted it, so a bookmark made by the old Jarvis app
         // (or one that has gone bad) can't be resolved. Drop it and ask for the folder again.
@@ -229,6 +229,10 @@ struct ConversationItem: Identifiable {
             // No new memories in the old store while Hermes keeps them.
             await store?.refuseWrites(usesHermes ? MemoryStore.keptByHermes : nil)
             await reloadMemories(); await reloadTasks()
+            // Daisy adds tasks through Hermes, which writes the same file; the readout follows it.
+            if let taskStore {
+                Task { [weak self] in for await _ in taskStore.changes() { await self?.reloadTasks() } }
+            }
             // Once, the old store's memories move into Hermes's files; what doesn't fit stays and is named.
             if usesHermes, config.hermesConnected == true, let store, let moved = await learned.moveOldMemories(from: store),
                moved.worthMentioning, notice == nil { notice = moved.summary }
@@ -262,7 +266,8 @@ struct ConversationItem: Identifiable {
                 // A home-folder cwd keeps Hermes in assistant mode; a repo would switch it to coding mode.
                 workingDirectory: FileManager.default.homeDirectoryForCurrentUser,
                 sessionFile: Configuration.dataDirectory.appendingPathComponent("hermes-session"),
-                environment: ["DAISY_SESSION": "1", "DAISY_CONTACTS_BIN": Bundle.main.url(forAuxiliaryExecutable: "daisy-contacts")?.path ?? ""]))
+                environment: ["DAISY_SESSION": "1", "DAISY_CONTACTS_BIN": Bundle.main.url(forAuxiliaryExecutable: "daisy-contacts")?.path ?? "",
+                              "DAISY_TASKS_FILE": TaskStore.defaultURL.path]))
         }
         return LocalBackend { [weak self] text in
             guard let self else { throw CancellationError() }
@@ -558,7 +563,8 @@ struct ConversationItem: Identifiable {
                 } else {
                     messages.append(reply); liveText = ""; voiceReveal = nil
                 }
-                if !usesHermes { await reloadMemories(); await reloadTasks() }
+                if !usesHermes { await reloadMemories() }
+                await reloadTasks()
                 if usesHermes { learned.refresh() }
                 try await finishVoice(token: token)
                 settleReply()

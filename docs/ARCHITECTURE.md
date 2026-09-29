@@ -108,6 +108,10 @@ In the app:
 
 The guard reads commands; it is not a sandbox. `hermes/test_daisy_guard.py` and `hermes/test_daisy_guard_bypass.py` list what it stops and what it lets through. Install with `bash scripts/setup-hermes.sh`. The plugin also adds the Daisy persona as a system-prompt section in Daisy sessions; `$HERMES_HOME/daisy-persona.md` replaces it without touching code.
 
+## Tasks
+
+`tasks.json` in Daisy's data folder is shared with the Hermes plugin's tasks tools: both take an flock on `tasks.json.lock`, re-read inside it and replace the file atomically, and every task carries a revision so a stale edit is refused instead of overwriting a newer one. The Tasks tab watches the file. Details in [CAPABILITIES.md](CAPABILITIES.md#tasks).
+
 ## Memory
 
 Personal memory belongs to Hermes, so it survives model changes. Hermes keeps `~/.hermes/memories/USER.md` (about the user) and `MEMORY.md` (its notes), and its `session_search` tool finds earlier conversations. The Memory tab shows both files. Changes go through Daisy ("Remember that…", "forget…"). ChatGPT's own memory is not available through this sign-in and isn't used.

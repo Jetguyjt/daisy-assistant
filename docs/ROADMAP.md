@@ -146,6 +146,11 @@ Notes: [persona.md](research/persona.md)
 - [ ] Specialist agents on cron (inbox triage overnight, repo digests), in the spirit of lukebuildsai's setup
   - built: `DAISY_CRON=1` adds the inbox triage (5:30) and the repo digest (7:00), both read-only; folders go in `~/.hermes/daisy/repo-digest.txt`. Scheduled 2026-09-28; not run yet
 
+## Tasks
+
+- [ ] Tasks Daisy adds land in the Tasks tab
+  - built 2026-09-29: Hermes gets `tasks_list` / `tasks_add` / `tasks_update` / `tasks_remove` on Daisy's own tasks.json (no card for adds and edits, a card for removals), nine statuses, subtasks, live reload. Before this, "add a task" went into Hermes's in-chat `todo_list` and never reached the tab. My 58 college-app tasks come over once with `scripts/import-hermes-todos.py`
+
 ## Voice loop and app
 
 - [ ] Run the full voice loop live on Hermes: wake word from across the room, barge-in over speakers, follow-up

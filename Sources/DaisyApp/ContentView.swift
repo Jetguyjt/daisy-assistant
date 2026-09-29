@@ -389,7 +389,7 @@ struct ContentView: View {
                 MicReadout(audio: model.audio)
                 readout("FOLDER", model.selectedFolder?.lastPathComponent ?? "None") { model.chooseFolder() }
                 readout("MEMORY", "\(model.memories.count) saved") { model.tab = "Memory" }
-                readout("TASKS", "\(model.tasks.filter { $0.status != "done" }.count) open") { model.tab = "Tasks" }
+                readout("TASKS", "\(model.tasks.filter(\.status.isOpen).count) open") { model.tab = "Tasks" }
                 JobsReadout(jobs: model.jobs) { model.tab = "Jobs" }
                 if model.usesHermes { BudgetReadout(budget: model.budget) }
             }

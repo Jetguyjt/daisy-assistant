@@ -53,7 +53,7 @@ This installs Ollama, whisper.cpp and Python 3.11 through Homebrew, downloads Qw
 | HUD | Reactor-style core that follows the mic and the voice, live tool activity, link and mic status, always-listening switch; respects Reduce Motion and pauses when hidden |
 | Memory | Hermes's `USER.md` / `MEMORY.md`; a Learned feed in the Memory tab lists what Hermes saved on its own, with Undo and Edit. The old SQLite memory moves into Hermes once and stays for the on-device fallback |
 | Files | One chosen folder; recursive filename matching; newest first; click to open/reveal; optional bounded UTF-8 content reading |
-| Tasks/projects | Persistent local title, project, due date, status and notes; UI editing and model-prepared review cards |
+| Tasks | Your task list, shared with Hermes: projects, subtasks and nine statuses (Idea, To do, In progress, Needs review, Waiting, Blocked, Submitted, Done, Dropped). Daisy adds to it when you ask, no card needed; removing tasks always asks. The Tasks tab updates live |
 | Document/code drafts | Prepare a new text file; review full content and Apply; no overwrites or code execution |
 | Mac apps | Find installed apps and review a launch; opening does not grant UI control |
 | Chrome | Your own Chrome through Hermes: list tabs, switch to one, open pages. macOS asks once whether Daisy can control Chrome |

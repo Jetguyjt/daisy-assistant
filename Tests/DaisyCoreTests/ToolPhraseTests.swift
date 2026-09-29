@@ -35,5 +35,9 @@ final class ToolPhraseTests {
         expectEqual(ToolPhrases.describe(title: "reminders_list", kind: "other").title, "Checking your reminders")
         expectEqual(ToolPhrases.describe(title: "notes_search", kind: "other").title, "Checking your notes")
         expectEqual(ToolPhrases.describe(title: "notes_append", kind: "other").title, "Adding to a note")
+        let twelve = JSONValue.object(["tasks": .array((0..<12).map { _ in .object(["title": "Essay"]) })])
+        expectEqual(ToolPhrases.describe(title: "tasks_add", kind: "other", input: twelve).title, "Adding 12 tasks")
+        expectEqual(ToolPhrases.describe(title: "tasks_update", kind: "other").title, "Updating your tasks")
+        expectEqual(ToolPhrases.describe(title: "tasks_list", kind: "other").title, "Checking your tasks")
     }
 }
