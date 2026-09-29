@@ -140,9 +140,9 @@ private struct TaskFilterBar: View {
             + [Option(filter: .finished, count: counts.finished), Option(filter: .all, count: counts.total)]
         TaskFlow(spacing: 6) {
             ForEach(options) { option in
-                FilterChip(title: option.filter.title, count: option.count, color: option.filter.color, selected: filter == option.filter) {
-                    filter = option.filter
-                }
+                let isStatus: Bool = { if case .status = option.filter { return true }; return false }()
+                FilterChip(title: option.filter.title, count: option.count, color: option.filter.color, marked: isStatus,
+                           selected: filter == option.filter) { filter = option.filter }
             }
         }
     }
@@ -152,12 +152,15 @@ private struct FilterChip: View {
     let title: String
     let count: Int
     let color: Color
+    /// A status filter carries its chip color.
+    let marked: Bool
     let selected: Bool
     let action: () -> Void
     @State private var hovering = false
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
+                if marked { Rectangle().fill(color).frame(width: 5, height: 5) }
                 Text(title.uppercased()).tracking(1.1)
                 Text("\(count)").foregroundStyle(selected ? color : HUD.dim).monospacedDigit()
             }
@@ -266,7 +269,7 @@ private struct TaskRow: View {
             .buttonStyle(.plain)
             .help(row.collapsed ? "Show subtasks" : "Hide subtasks")
         } else {
-            Color.clear
+            Color.clear.frame(height: 20)
         }
     }
 
@@ -326,7 +329,7 @@ private struct StatusMenu: View {
                     }
                 }
                 .padding(6)
-                .frame(width: 280)
+                .frame(width: 310)
                 .background(HUD.deep)
             }
     }
