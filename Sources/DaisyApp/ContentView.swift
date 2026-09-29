@@ -826,6 +826,7 @@ private struct CapabilitiesView: View {
                 .padding(.vertical, 12)
                 .overlay(alignment: .top) { Rectangle().fill(HUD.line.opacity(0.09)).frame(height: 1) }
             }
+            if model.usesHermes { PermissionsSection(grants: model.grants) }
             if let notice = model.notice { Text(notice).font(.system(size: 11)).foregroundStyle(HUD.amber) }
         }
     }

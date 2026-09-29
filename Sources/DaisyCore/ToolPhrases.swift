@@ -60,8 +60,12 @@ public enum ToolPhrases {
         case "notes_search": return ("Checking your notes", nil)
         case "tasks_list": return ("Checking your tasks", nil)
         case "tasks_add": return (tasks("Adding", input?["tasks"]), nil)
-        case "tasks_update": return ("Updating your tasks", nil)
+        case "tasks_update": return (linking(input?["changes"]) ?? "Updating your tasks", nil)
         case "tasks_remove": return (tasks("Removing", input?["tasks"]), nil)
+        case "projects_list": return ("Checking your projects", nil)
+        case "projects_add": return (projects("Adding", input?["projects"]), nil)
+        case "projects_update": return (linking(input?["changes"]) ?? "Updating your projects", nil)
+        case "projects_remove": return ("Removing a project", nil)
         case "notes_read": return ("Reading a note", nil)
         case "notes_create": return ("Writing a new note", nil)
         case "notes_append": return ("Adding to a note", nil)
@@ -118,6 +122,26 @@ public enum ToolPhrases {
     static func tasks(_ verb: String, _ list: JSONValue?) -> String {
         guard let count = list?.arrayValue?.count, count > 0 else { return "\(verb) your tasks" }
         return count == 1 ? "\(verb) a task" : "\(verb) \(count) tasks"
+    }
+
+    /// "Adding a project", "Adding 3 projects"; "Adding your projects" when the count isn't there.
+    static func projects(_ verb: String, _ list: JSONValue?) -> String {
+        guard let count = list?.arrayValue?.count, count > 0 else { return "\(verb) your projects" }
+        return count == 1 ? "\(verb) a project" : "\(verb) \(count) projects"
+    }
+
+    /// "Linking a doc", "Linking an event", "Adding links": when a tasks_update or projects_update call
+    /// adds links. Nil when it doesn't.
+    static func linking(_ changes: JSONValue?) -> String? {
+        let added = (changes?.arrayValue ?? []).flatMap { $0["add_links"]?.arrayValue ?? [] }
+        guard let first = added.first else { return nil }
+        guard added.count == 1 else { return "Adding links" }
+        let kind = first["kind"]?.stringValue ?? first.stringValue.flatMap { TaskLink.detect($0)?.kind.rawValue }
+            ?? (first["file_id"] != nil ? "google_drive" : first["event_id"] != nil ? "calendar_event"
+                : first["message_id"] != nil || first["thread_id"] != nil ? "gmail" : "")
+        let word = ["google_doc": "a doc", "google_drive": "a Drive file", "calendar_event": "an event", "gmail": "an email",
+                    "file": "a file", "note": "a note", "reminder": "a reminder"][kind] ?? "a link"
+        return "Linking \(word)"
     }
 
     /// Where a Chrome tool is headed: "Gmail" for mail.google.com, otherwise the site without www.

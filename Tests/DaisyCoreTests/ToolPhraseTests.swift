@@ -39,5 +39,16 @@ final class ToolPhraseTests {
         expectEqual(ToolPhrases.describe(title: "tasks_add", kind: "other", input: twelve).title, "Adding 12 tasks")
         expectEqual(ToolPhrases.describe(title: "tasks_update", kind: "other").title, "Updating your tasks")
         expectEqual(ToolPhrases.describe(title: "tasks_list", kind: "other").title, "Checking your tasks")
+        let doc = JSONValue.object(["changes": .array([.object(["task": "Why Harvard",
+            "add_links": .array([.string("https://docs.google.com/document/d/1AbCdEfGhIjKlMnOpQrStUv/edit")])])])])
+        expectEqual(ToolPhrases.describe(title: "tasks_update", kind: "other", input: doc).title, "Linking a doc")
+        let event = JSONValue.object(["changes": .array([.object(["project": "Colleges",
+            "add_links": .array([.object(["kind": "calendar_event", "event_id": "abc123def456"])])])])])
+        expectEqual(ToolPhrases.describe(title: "projects_update", kind: "other", input: event).title, "Linking an event")
+        expectEqual(ToolPhrases.describe(title: "projects_update", kind: "other").title, "Updating your projects")
+        let two = JSONValue.object(["projects": .array([.object(["name": "Robotics"]), .object(["name": "Band"])])])
+        expectEqual(ToolPhrases.describe(title: "projects_add", kind: "other", input: two).title, "Adding 2 projects")
+        expectEqual(ToolPhrases.describe(title: "projects_list", kind: "other").title, "Checking your projects")
+        expectEqual(ToolPhrases.describe(title: "projects_remove", kind: "other").title, "Removing a project")
     }
 }

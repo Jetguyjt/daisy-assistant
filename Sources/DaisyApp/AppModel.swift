@@ -81,7 +81,7 @@ struct ConversationItem: Identifiable {
     @Published var agentLink: AgentLink = .starting
     /// Approval cards waiting on the user, from the conversation and from background jobs.
     lazy var approvalQueue: ApprovalQueue = makeApprovalQueue()
-    /// Standing permissions: Setup's list and "Yes to all like this" on conversation cards.
+    /// Standing permissions: the Permissions list and "Yes to all like this" on conversation cards.
     lazy var grants = GrantStore()
     /// Background jobs, each in a Hermes session of its own.
     lazy var jobs: JobsModel = makeJobs()

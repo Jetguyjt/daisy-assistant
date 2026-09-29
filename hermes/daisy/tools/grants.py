@@ -56,7 +56,7 @@ def _run(args: Dict[str, Any]) -> Any:
     if grant is None:
         return {"error": NOT_CARDED}
     until = ("until this request is done" if grant["duration"] == "request"
-             else "from now on, until the user turns it off in Setup")
+             else "from now on, until the user turns it off in Tools → Permissions")
     return {"granted": True, "id": grant["id"], "until": until, "covers": grant["covers"],
             "note": "Sends, shares, deletes and anything not listed still get their card."}
 

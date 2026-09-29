@@ -28,7 +28,7 @@ These gaps have to close before the tools below go live. Stress test in [orchest
   - tests; workers come from `~/.hermes/daisy/roles.json`, cron's pre-approved list from `cron-allow.json`
 - [x] Taint: after reading mail/web/files, new recipients, URLs or memory writes need a card
   - tests
-- [ ] Standing permissions: "don't ask me for each one" becomes one card (`approval_grant`), for the request or from now on; "Yes to all like this" on cards; Setup lists and revokes them
+- [ ] Standing permissions: "don't ask me for each one" becomes one card (`approval_grant`), for the request or from now on; "Yes to all like this" on cards; Tools → Permissions lists them, turns often-asked ones on and revokes them
   - tests (`hermes/test_daisy_grants.py`, `GrantsTests`); not seen live yet
 - [ ] Approval queue: no answer = no, card removed on timeout, voice loop freed
   - built and tested against stand-ins; not seen live yet
@@ -150,6 +150,8 @@ Notes: [persona.md](research/persona.md)
 
 - [ ] Tasks Daisy adds land in the Tasks tab
   - built 2026-09-29: Hermes gets `tasks_list` / `tasks_add` / `tasks_update` / `tasks_remove` on Daisy's own tasks.json (no card for adds and edits, a card for removals), nine statuses, subtasks, live reload. Before this, "add a task" went into Hermes's in-chat `todo_list` and never reached the tab. My 58 college-app tasks come over once with `scripts/import-hermes-todos.py`
+- [ ] Projects and links in the Tasks tab
+  - built 2026-09-29: projects are real (color, status, due date, notes, folder, links), added and edited in the tab or by Hermes (`projects_list` / `projects_add` / `projects_update` / `projects_remove`); renaming moves the tasks, deleting asks whether the tasks stay or go, archived ones hide behind a toggle. Tasks and projects link to files (bookmarked, so a move doesn't break them), web pages, Google Docs and Drive files, calendar events, emails, notes and reminders; paste a link and it picks the kind. Old tasks.json files read as before and their project names become projects. Not run live yet
 
 ## Voice loop and app
 

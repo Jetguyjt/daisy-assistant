@@ -118,7 +118,7 @@ LABELS = {
 STILL_ASKS = ("Still asks every time: sending, sharing or deleting anything; anything that emails, invites or "
               "notifies people or changes something shared; and everything not listed above.")
 UNTIL = {"request": "Until this request is done (3 hours at most). The next thing you ask starts fresh.",
-         "forever": "From now on, in every conversation, until you turn it off in Setup under Standing permissions."}
+         "forever": "From now on, in every conversation, until you turn it off in Tools → Permissions."}
 NO_TURN = ("Blocked by Daisy's guard: this request has no turn id, so a grant for it would have no end. Ask the "
            "user each time instead.")
 

@@ -167,7 +167,7 @@ forever_card = ask("approval_grant", {"what": "from now on you can add tasks and
                                       "tools": ["fake_own", "fake_edit"], "duration": "forever"}, session="c2")
 forever_title, _, forever_detail = forever_card["message"].partition(" — ")
 check("the forever card says from now on", forever_title == "Let Daisy use fake_own and use fake_edit without asking, from now on")
-check("and how to turn it off", "until you turn it off in Setup under Standing permissions" in forever_detail)
+check("and how to turn it off", "until you turn it off in Tools → Permissions" in forever_detail)
 check("three things or more are counted in the title", ask(
     "approval_grant", {"what": "x", "tools": ["fake_own", "fake_edit", "fake_other"]}, session="c3")["message"]
       .startswith("Let Daisy do 3 kinds of steps without asking, until this request is done — "))

@@ -1,14 +1,14 @@
 """Keeps tools from loosening the guard by rewriting its files.
 
 grants.json (standing OKs) and cron-allow.json (what scheduled runs may do without anyone there) only
-change through approval_grant, Setup, or the user's own hands. The guard refuses shell and code writes
+change through approval_grant, the app's Permissions list, or the user's own hands. The guard refuses shell and code writes
 to them when it can see the path, but code can build the path while it runs. So this wraps every tool
 call as tool_execution middleware and compares the two files before and after:
 
 - a grant that appears while a tool other than approval_grant runs, and lasts forever, is taken back out
 - a grant that was there before and changed while the tool ran is put back the way it was
 - an entry that appears in cron-allow.json while any tool runs is taken back out
-- removals stay: revoking in Setup mid-call, or a tool deleting a grant, only ever tightens things
+- removals stay: revoking in the app's Permissions list mid-call, or a tool deleting a grant, only ever tightens things
 
 New request-only grants are left alone: the app writes those when "Yes to all like this" is tapped,
 which can land while another tool of the same turn is running, and a forged one would need that
