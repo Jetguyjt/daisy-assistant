@@ -17,7 +17,7 @@ from __future__ import annotations
 import os
 
 from . import learned, registry, tools  # noqa: F401  (importing tools fills the registry)
-from .guard import classify, classify_command, on_pre_tool_call
+from .guard import classify, classify_command, on_pre_tool_call, sealed
 from .persona import PERSONA, persona_section
 
 ACTIVE = os.environ.get("DAISY_SESSION") == "1"
@@ -32,6 +32,7 @@ def register(ctx) -> None:
     # The persona and the typed tools are Daisy's alone.
     ctx.register_hook("pre_tool_call", on_pre_tool_call)
     learned.register(ctx)  # logs each memory write and who made it, for the Learned feed
+    sealed.register(ctx)   # undoes a tool quietly loosening grants.json or cron-allow.json
     if not ACTIVE:
         return
     ctx.register_system_prompt_section("daisy-persona", persona_section, max_chars=4000)
