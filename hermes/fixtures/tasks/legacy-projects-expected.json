@@ -1,0 +1,12 @@
+{
+  "note": "The projects legacy-tasks.json reads as: made from the project names on its tasks, the same id and color on both sides.",
+  "projects": [
+    {"id": "931BA945-8D72-5052-BA4A-A52B9B22EC10", "name": "School", "color": "violet", "status": "active", "revision": 0},
+    {"id": "25FA855A-B20B-5367-A292-37AF040405AD", "name": "College essays", "color": "blue", "status": "active", "revision": 0}
+  ],
+  "named": [
+    {"name": "College Applications", "id": "2F0226E2-54CF-57A0-8FDA-0A90EF56A78E", "color": "yellow"},
+    {"name": "  college   applications ", "id": "2F0226E2-54CF-57A0-8FDA-0A90EF56A78E", "color": "yellow"},
+    {"name": "Groceries", "id": "BE6D6C9D-3314-5DA1-A30A-5E9251CF4AF5", "color": "red"}
+  ]
+}

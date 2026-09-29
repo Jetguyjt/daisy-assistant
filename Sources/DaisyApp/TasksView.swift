@@ -1,27 +1,38 @@
+import AppKit
 import SwiftUI
 import DaisyCore
 
 /// The task list: projects, their tasks and subtasks, each with a status chip that changes in one click.
-/// Hermes's tasks tools write the same tasks.json, so the list reloads whenever the file changes.
+/// Projects are real things with a color, status, notes, folder and links; archived ones stay out of the
+/// way until shown. Hermes's tasks tools write the same tasks.json, so the list reloads whenever the file
+/// changes.
 struct TasksView: View {
     @ObservedObject var model: AppModel
+    @StateObject private var projects = ProjectsModel()
     @State private var query = ""
     @State private var filter: TaskFilter = .open
-    @State private var editing: WorkItem?
+    @State private var sheet: TasksSheet?
     @State private var deleting: WorkItem?
+    @State private var deletingProject: Project?
+    @State private var linkNotice: String?
     /// Collapsed projects ("p:name") and tasks ("t:id"), kept between launches.
     @AppStorage("tasksCollapsed") private var collapsedKeys = ""
+    @AppStorage("tasksShowArchived") private var showArchived = false
 
     var body: some View {
-        let counts = TaskCounts(model.tasks)
-        let groups = TaskTree.groups(model.tasks, filter: filter, query: query)
+        let hidden = showArchived ? [] : TaskTree.archived(model.tasks, projects: projects.projects)
+        let counts = TaskCounts(model.tasks.filter { !hidden.contains($0.id) })
+        let groups = TaskTree.groups(model.tasks, projects: projects.projects, filter: filter, query: query, archived: showArchived)
+        let archived = projects.projects.filter { $0.status == .archived }.count
         // Searching or picking one status opens everything, so nothing that matches hides in a fold.
         let folding = query.trimmingCharacters(in: .whitespaces).isEmpty && filter == .open
         let collapsed = folding ? Set(collapsedKeys.split(separator: ",").map(String.init)) : []
         HUDPage(kicker: "TASK LOG / " + counts.summary.uppercased(), title: "Tasks") {
             HStack(spacing: 10) {
                 TextField("Search tasks, projects and notes", text: $query).hudField()
-                Button { editing = WorkItem(title: "") } label: { Label("Add task", systemImage: "plus") }
+                Button { sheet = .project(Project(name: "", color: nextColor), isNew: true) } label: { Label("New project", systemImage: "folder.badge.plus") }
+                    .buttonStyle(HUDButtonStyle(kind: .ghost, compact: true))
+                Button { sheet = .task(WorkItem(title: "")) } label: { Label("Add task", systemImage: "plus") }
                     .buttonStyle(HUDButtonStyle(kind: .primary, compact: true))
             }
             TaskFilterBar(filter: $filter, counts: counts)
@@ -29,32 +40,114 @@ struct TasksView: View {
             ForEach(groups) { group in
                 let key = "p:" + group.id
                 VStack(alignment: .leading, spacing: 0) {
-                    TaskGroupHeader(group: group, collapsed: collapsed.contains(key), canFold: folding) { toggle(key) }
+                    ProjectHeader(group: group, collapsed: collapsed.contains(key), canFold: folding, toggle: { toggle(key) },
+                                  open: open, act: { act($0, on: group) })
                     if !collapsed.contains(key) {
                         ForEach(Self.rows(group, collapsed: collapsed)) { row in
-                            TaskRow(row: row, setStatus: setStatus, edit: { editing = $0 },
-                                    addSubtask: { editing = WorkItem(title: "", project: $0.project, parent: $0.id) },
-                                    delete: { deleting = $0 }, toggle: { toggle("t:" + row.id.uuidString) })
+                            TaskRow(row: row, setStatus: setStatus, edit: { sheet = .task($0) },
+                                    addSubtask: { sheet = .task(WorkItem(title: "", project: $0.project, parent: $0.id)) },
+                                    delete: { deleting = $0 }, open: open, toggle: { toggle("t:" + row.id.uuidString) })
                         }
                     }
                 }
                 .padding(.top, 4)
             }
-            if let notice = model.notice { Text(notice).font(.system(size: 11)).foregroundStyle(HUD.amber).textSelection(.enabled) }
+            if archived > 0 {
+                Button(showArchived ? "Hide archived projects" : "Show \(archived) archived project\(archived == 1 ? "" : "s")") { showArchived.toggle() }
+                    .buttonStyle(HUDButtonStyle(kind: .ghost, compact: true))
+                    .padding(.top, 6)
+            }
+            ForEach([linkNotice, projects.notice, model.notice].compactMap { $0 }, id: \.self) { notice in
+                Text(notice).font(.system(size: 11)).foregroundStyle(HUD.amber).textSelection(.enabled)
+            }
         }
         .task { await watch() }
-        .sheet(item: $editing) { item in TaskEditor(model: model, item: item) }
+        .sheet(item: $sheet) { sheet in
+            switch sheet {
+            case .task(let item): TaskEditor(model: model, projects: projects.projects, item: item)
+            case .project(let project, let isNew):
+                ProjectEditor(projects: projects, project: project, isNew: isNew, taskCount: members(of: project).count, saved: reloadTasks)
+            case .rename(let project):
+                ProjectRenameSheet(projects: projects, project: project, taskCount: members(of: project).count, saved: reloadTasks)
+            }
+        }
         .confirmationDialog(deleteTitle, isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
             Button(deleteButton, role: .destructive) { if let item = deleting { model.deleteTask(item) }; deleting = nil }
         } message: {
             Text(deleteMessage)
         }
+        .confirmationDialog(projectDeleteTitle, isPresented: Binding(get: { deletingProject != nil }, set: { if !$0 { deletingProject = nil } }),
+                            titleVisibility: .visible) {
+            if let project = deletingProject {
+                let inside = members(of: project).count, gone = doomed(project)
+                if inside > 0 {
+                    Button("Keep its \(inside) task\(inside == 1 ? "" : "s"), with no project") { remove(project, .keepTasks) }
+                    Button("Delete it and its \(gone) task\(gone == 1 ? "" : "s")", role: .destructive) { remove(project, .deleteTasks) }
+                } else {
+                    Button("Delete project", role: .destructive) { remove(project, .keepTasks) }
+                }
+            }
+        } message: {
+            Text(projectDeleteMessage)
+        }
     }
 
     /// Reloads when Daisy (through Hermes) or anything else changes tasks.json, for as long as the tab is open.
     private func watch() async {
-        await model.reloadTasks()
-        for await _ in TaskFile.changes(of: TaskStore.defaultURL) { await model.reloadTasks() }
+        await model.reloadTasks(); await projects.reload()
+        for await _ in TaskFile.changes(of: TaskStore.defaultURL) { await model.reloadTasks(); await projects.reload() }
+    }
+
+    private func reloadTasks() { Task { await model.reloadTasks() } }
+
+    private func open(_ link: TaskLink) {
+        linkNotice = LinkOpener.open(link) { linkNotice = $0 }
+    }
+
+    /// The next color no project uses yet, for a new one.
+    private var nextColor: ProjectColor {
+        let used = Set(projects.projects.map(\.color))
+        return ProjectColor.allCases.dropFirst().first { !used.contains($0) } ?? .accent
+    }
+
+    private func members(of project: Project) -> [WorkItem] { model.tasks.filter { Project.key($0.project) == project.key } }
+    /// Its tasks and everything under them: what "delete them too" removes.
+    private func doomed(_ project: Project) -> Int {
+        let inside = members(of: project)
+        return Set(inside.map(\.id) + inside.flatMap { TaskTree.descendants(of: $0.id, in: model.tasks).map(\.id) }).count
+    }
+
+    private func act(_ action: ProjectAction, on group: TaskGroup) {
+        guard let project = group.details else {
+            if action == .addTask { sheet = .task(WorkItem(title: "")) }
+            return
+        }
+        switch action {
+        case .addTask: sheet = .task(WorkItem(title: "", project: project.name))
+        case .edit: sheet = .project(project, isNew: false)
+        case .rename: sheet = .rename(project)
+        case .archive, .unarchive:
+            var changed = project
+            changed.status = action == .archive ? .archived : .active
+            Task { _ = await projects.save(changed) }
+        case .delete: deletingProject = project
+        }
+    }
+
+    private func remove(_ project: Project, _ tasks: ProjectDeletion) {
+        deletingProject = nil
+        Task {
+            _ = await projects.delete(project, tasks: tasks)
+            await model.reloadTasks()
+        }
+    }
+
+    private var projectDeleteTitle: String { "Delete the project “\(deletingProject?.name ?? "")”?" }
+    private var projectDeleteMessage: String {
+        guard let project = deletingProject else { return "" }
+        let inside = members(of: project).count
+        let extra = project.links.isEmpty && project.notes.isEmpty && project.folder.isEmpty ? "" : " Its notes, folder and links go with it."
+        return (inside == 0 ? "It has no tasks." : "Its tasks can stay, with no project, or be deleted too.") + extra + " This can't be undone."
     }
 
     private func setStatus(_ item: WorkItem, _ status: TaskStatus) {
@@ -83,7 +176,7 @@ struct TasksView: View {
 
     @ViewBuilder private func emptyState(_ counts: TaskCounts) -> some View {
         if counts.total == 0 {
-            Text("No tasks yet. Add one here, or ask Daisy: “add my college essays to my tasks.”")
+            Text("No tasks yet. Add a project or a task here, or ask Daisy: “add my college essays to my tasks.”")
                 .font(.system(size: 12)).foregroundStyle(HUD.dim).padding(.vertical, 6)
         } else {
             HStack(spacing: 10) {
@@ -112,6 +205,23 @@ struct TaskRowModel: Identifiable {
     let collapsed: Bool
     var id: UUID { node.id }
 }
+
+/// What the Tasks tab has open in a sheet.
+enum TasksSheet: Identifiable {
+    case task(WorkItem)
+    case project(Project, isNew: Bool)
+    case rename(Project)
+    var id: String {
+        switch self {
+        case .task(let item): "t:" + item.id.uuidString
+        case .project(let project, _): "p:" + project.id.uuidString
+        case .rename(let project): "r:" + project.id.uuidString
+        }
+    }
+}
+
+/// What a project header's menu does.
+enum ProjectAction { case addTask, edit, rename, archive, unarchive, delete }
 
 extension TaskStatus {
     /// The chip color in the current theme. Reading it in a view's body redraws the view when the accent changes.
@@ -177,27 +287,77 @@ private struct FilterChip: View {
     }
 }
 
-private struct TaskGroupHeader: View {
+/// A project's header: its color, name and status, its links, the open count, and a menu to add a
+/// task, edit, rename, archive or delete it. Clicking the name folds the project.
+private struct ProjectHeader: View {
     let group: TaskGroup
     let collapsed: Bool
     let canFold: Bool
     let toggle: () -> Void
+    let open: (TaskLink) -> Void
+    let act: (ProjectAction) -> Void
+    @State private var hovering = false
+
     var body: some View {
-        Button(action: toggle) {
-            HStack(spacing: 8) {
-                Image(systemName: "chevron.right").font(.system(size: 9, weight: .bold))
-                    .rotationEffect(.degrees(collapsed ? 0 : 90)).foregroundStyle(HUD.dim).opacity(canFold ? 1 : 0.3)
-                Text((group.project.isEmpty ? "No project" : group.project).uppercased())
-                    .font(HUD.label(10)).tracking(1.6).foregroundStyle(HUD.accent)
-                Rectangle().fill(HUD.line.opacity(0.12)).frame(height: 1)
-                Text("\(group.open) OPEN").font(HUD.label(9)).tracking(1.2).foregroundStyle(HUD.dim).monospacedDigit()
+        let project = group.details
+        let tint = project.map { $0.color.color } ?? HUD.dim
+        HStack(spacing: 8) {
+            Button(action: toggle) {
+                HStack(spacing: 8) {
+                    Image(systemName: "chevron.right").font(.system(size: 9, weight: .bold))
+                        .rotationEffect(.degrees(collapsed ? 0 : 90)).foregroundStyle(HUD.dim).opacity(canFold ? 1 : 0.3)
+                    Rectangle().fill(tint).frame(width: 7, height: 7)
+                    Text((project?.name ?? "No project").uppercased())
+                        .font(HUD.label(10)).tracking(1.6).foregroundStyle(project == nil ? HUD.steel : tint)
+                        .lineLimit(1)
+                    if let status = project?.status, status != .active {
+                        Text(status.title.uppercased()).font(HUD.label(8)).tracking(1.1).foregroundStyle(HUD.dim)
+                            .padding(.horizontal, 5).frame(height: 15)
+                            .overlay(Rectangle().strokeBorder(HUD.dim.opacity(0.4), lineWidth: 1))
+                    }
+                }
+                .contentShape(Rectangle())
             }
-            .padding(.vertical, 8)
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            .disabled(!canFold)
+            .help(project?.notes.isEmpty == false ? project!.notes : "")
+            if let project, !project.links.isEmpty { LinkIcons(links: project.links, open: open) }
+            if let folder = project?.folder, !folder.isEmpty {
+                Button { NSWorkspace.shared.open(URL(fileURLWithPath: folder, isDirectory: true)) } label: {
+                    Image(systemName: "folder").font(.system(size: 10.5)).foregroundStyle(HUD.steel).frame(width: 20, height: 20)
+                }
+                .buttonStyle(.plain).help("Open \((folder as NSString).abbreviatingWithTildeInPath)")
+            }
+            Rectangle().fill(HUD.line.opacity(0.12)).frame(height: 1)
+            if let project, let due = DueLabel(project.due, finished: project.status == .done || project.status == .archived) {
+                Text(due.text).font(HUD.label(9)).tracking(1.1).foregroundStyle(due.color).monospacedDigit()
+            }
+            Text("\(group.open) OPEN").font(HUD.label(9)).tracking(1.2).foregroundStyle(HUD.dim).monospacedDigit()
+            Menu { menu } label: {
+                Image(systemName: "ellipsis").font(.system(size: 11, weight: .semibold)).foregroundStyle(HUD.steel)
+                    .frame(width: 22, height: 20).contentShape(Rectangle())
+            }
+            .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+            .opacity(hovering ? 1 : 0.45)
+            .help(project == nil ? "Add a task" : "Project actions")
+            .accessibilityLabel("Actions for \(project?.name ?? "No project")")
         }
-        .buttonStyle(.plain)
-        .disabled(!canFold)
+        .padding(.vertical, 8)
+        .onHover { hovering = $0 }
+        .contextMenu { menu }
         .animation(.easeOut(duration: 0.15), value: collapsed)
+    }
+
+    @ViewBuilder private var menu: some View {
+        Button("Add a task…") { act(.addTask) }
+        if let project = group.details {
+            Divider()
+            Button("Edit…") { act(.edit) }
+            Button("Rename…") { act(.rename) }
+            if project.status == .archived { Button("Unarchive") { act(.unarchive) } } else { Button("Archive") { act(.archive) } }
+            Divider()
+            Button("Delete…", role: .destructive) { act(.delete) }
+        }
     }
 }
 
@@ -207,6 +367,7 @@ private struct TaskRow: View {
     let edit: (WorkItem) -> Void
     let addSubtask: (WorkItem) -> Void
     let delete: (WorkItem) -> Void
+    let open: (TaskLink) -> Void
     let toggle: () -> Void
     @State private var hovering = false
 
@@ -227,6 +388,7 @@ private struct TaskRow: View {
             }
             .opacity(row.node.matches ? 1 : 0.5)
             Spacer(minLength: 8)
+            if !item.links.isEmpty { LinkIcons(links: item.links, open: open) }
             if row.node.subtasks > 0 {
                 Text("\(row.node.finished)/\(row.node.subtasks)")
                     .font(HUD.readout(10)).foregroundStyle(row.node.finished == row.node.subtasks ? TaskStatus.done.color : HUD.dim)
@@ -255,6 +417,11 @@ private struct TaskRow: View {
             }
             Button("Edit…") { edit(item) }
             Button("Add a subtask…") { addSubtask(item) }
+            if !item.links.isEmpty {
+                Menu("Open a link") {
+                    ForEach(item.links) { link in Button("\(link.title) (\(link.kind.title))") { open(link) } }
+                }
+            }
             Divider()
             Button("Delete…", role: .destructive) { delete(item) }
         }
@@ -411,27 +578,39 @@ private struct TaskFlow: Layout {
     }
 }
 
-/// Add or edit one task: title, project, status, what it sits under, due date and notes.
+/// Add or edit one task: title, project, status, what it sits under, due date, notes and links.
 private struct TaskEditor: View {
     @ObservedObject var model: AppModel
+    let projects: [Project]
     @State var item: WorkItem
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        let projects = Array(Set(model.tasks.map { $0.project.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }))
-            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        // Archived projects last, so the ones in use come first.
+        let choices = projects.sorted {
+            if ($0.status == .archived) != ($1.status == .archived) { return $1.status == .archived }
+            return $0.name.localizedStandardCompare($1.name) == .orderedAscending
+        }
+        let known = Project.key(item.project).isEmpty || projects.contains { $0.key == Project.key(item.project) }
         VStack(alignment: .leading, spacing: 13) {
             Text(item.revision == 0 ? (item.parent == nil ? "New task" : "New subtask") : "Edit task")
                 .font(.system(size: 17, weight: .semibold)).foregroundStyle(HUD.ice)
             TextField("Title", text: $item.title).hudField()
             HStack(spacing: 8) {
                 TextField("Project, e.g. College Applications", text: $item.project).hudField()
-                if !projects.isEmpty {
+                if !choices.isEmpty {
                     Menu {
-                        ForEach(projects, id: \.self) { name in Button(name) { item.project = name } }
+                        Button("No project") { item.project = "" }
+                        Divider()
+                        ForEach(choices) { project in
+                            Button(project.status == .archived ? "\(project.name) (archived)" : project.name) { item.project = project.name }
+                        }
                     } label: { Image(systemName: "chevron.down") }
                     .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().help("Pick a project")
                 }
+            }
+            if !known {
+                Text("“\(Project.squashed(item.project))” will be a new project.").font(.system(size: 11)).foregroundStyle(HUD.dim)
             }
             HStack(alignment: .top, spacing: 14) {
                 field("STATUS") {
@@ -454,8 +633,9 @@ private struct TaskEditor: View {
             TextField("Due date, YYYY-MM-DD (optional)", text: $item.due).hudField()
             Text("NOTES").font(HUD.label(9)).tracking(1.4).foregroundStyle(HUD.dim)
             TextEditor(text: $item.notes).font(.system(size: 13)).scrollContentBackground(.hidden).padding(6)
-                .frame(height: 150).background(RoundedRectangle(cornerRadius: 8).fill(Color.black.opacity(0.28)))
+                .frame(height: 110).background(RoundedRectangle(cornerRadius: 8).fill(Color.black.opacity(0.28)))
                 .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(HUD.line.opacity(0.2), lineWidth: 1))
+            LinksEditor(links: $item.links)
             HStack {
                 Button("Cancel") { dismiss() }.buttonStyle(HUDButtonStyle(kind: .ghost))
                 Spacer()
@@ -486,6 +666,7 @@ private struct TaskEditor: View {
         draft.title = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
         draft.project = draft.project.trimmingCharacters(in: .whitespacesAndNewlines)
         draft.due = draft.due.trimmingCharacters(in: .whitespaces)
+        draft.links = draft.links.map(ProjectsModel.tidy)
         // A subtask with no project of its own goes in its parent's.
         if draft.project.isEmpty, let parent = draft.parent, let above = model.tasks.first(where: { $0.id == parent }) {
             draft.project = above.project
