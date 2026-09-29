@@ -262,7 +262,7 @@ check("without a grant it would have been a card", carded("fake_other", {}, "f-t
 reset()
 write_grants([{"id": "g-forged", "what": "everything", "duration": "forever", "given": time.time(),
                "tools": ["fake_edit", "fake_send", "fake_share", "fake_delete", "approval_grant", "gmail_send",
-                         "fake_click"], "app": "Pages", "scripts": [], "pins": {}}])
+                         "fake_click", "computer_act"], "app": "Pages", "scripts": [], "pins": {}}])
 check("sends keep their card", carded("fake_send", {}, "n1"))
 check("shares keep their card", carded("fake_share", {}, "n2"))
 check("deletes keep their card", carded("fake_delete", {}, "n3"))
@@ -302,6 +302,35 @@ check("arrow keys run", runs("fake_click", {"app": "Pages", "action": "key", "ke
 check("Return doesn't", carded("fake_click", {"app": "Pages", "action": "key", "keys": "return"}, "u1"))
 check("shortcuts don't", carded("fake_click", {"app": "Pages", "action": "key", "keys": "cmd+w"}, "u1"))
 check("modifier clicks don't", carded("fake_click", {"app": "Pages", "label": "Bold", "modifiers": ["cmd"]}, "u1"))
+check("a spot on screen doesn't, it could be any button", carded("fake_click", {"app": "Pages", "coordinate": [10, 20]}, "u1"))
+check("an unlabeled button doesn't", carded("fake_click", {"app": "Pages", "label": "unlabeled"}, "u1"))
+
+# The real computer_act, against a stand-in for Hermes's handler: a grant for Pages lets a labeled click
+# through, and run() still only does what the guard saw.
+
+computer = sys.modules["daisy_plugin.tools.computer"]
+driven = []
+
+
+def stand_in(args, **_):
+    driven.append(dict(args))
+    if args.get("action") == "capture":
+        rows = [{"index": 1, "role": "AXButton", "label": "Bold", "bounds": [10, 10, 80, 20], "app": "com.apple.Pages"},
+                {"index": 2, "role": "AXButton", "label": "Share", "bounds": [10, 20, 80, 20], "app": "com.apple.Pages"}]
+        return json.dumps({"mode": "ax", "width": 0, "height": 0, "app": "Pages", "window_title": "Essay",
+                           "elements": rows, "total_elements": 2, "summary": "capture mode=ax 0x0 app=Pages"})
+    return json.dumps({"ok": True, "action": args.get("action"), "effect": "confirmed", "verdict": {"decision": "done"}})
+
+
+computer.handler = stand_in
+os.environ["HERMES_SESSION_KEY"] = "u-real"
+registry.handler_for(registry.get("computer_look"))({"app": "Pages"})
+bold = {"action": "click", "app": "Pages", "element": 1}
+check("a labeled click in the granted app runs", runs("computer_act", bold, "u-real"))
+check("and run() does it, since the guard saw it", "error" not in json.loads(
+    registry.handler_for(registry.get("computer_act"))(bold)) and driven[-1].get("action") == "click")
+check("the Share button still asks", carded("computer_act", {"action": "click", "app": "Pages", "element": 2}, "u-real"))
+os.environ.pop("HERMES_SESSION_KEY")
 
 # The log
 

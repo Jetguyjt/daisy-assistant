@@ -77,11 +77,11 @@ PEOPLE = ("notify", "notify_guests", "guests", "attendees", "invitees", "shared"
 INTERPRETERS = re.compile(r"python[0-9.]*|bash|sh|zsh|node|ruby|perl")
 CODE_SUFFIXES = (".py", ".sh", ".bash", ".zsh", ".command", ".js", ".mjs", ".cjs", ".ts", ".rb", ".pl")
 TERMINALS = ("terminal", "iterm", "warp", "ghostty", "kitty", "alacritty", "wezterm", "hyper")
-# Words on a ui card that mean it does more than an edit: a send, delete or share button, a permission,
-# sign-in or payment prompt, quitting.
+# Words on a ui card that mean it may do more than an edit: a send, delete or share button, a permission,
+# sign-in or payment prompt, quitting, or an element with no label to go by.
 UI_STOPS = (SEND_WORDS | DELETE_WORDS | SHARE_WORDS |
             {"allow", "confirm", "ok", "sign", "signin", "login", "logout", "password", "passcode", "authorize",
-             "trust", "install", "quit", "order", "checkout"})
+             "trust", "install", "quit", "order", "checkout", "unlabeled"})
 # MCP tools a grant can name: an edit word in the name and nothing that sends, deletes, shares, runs code
 # or answers for the user.
 MCP_EDITS = {"create", "insert", "update", "patch", "modify", "edit", "set", "add", "write", "append", "put",
@@ -340,6 +340,8 @@ def _plain_ui(args: Dict[str, Any], verdict: Verdict, app: str) -> bool:
     answer a prompt or run a command keeps its card."""
     if any(name in app for name in TERMINALS) or "daisy" in app or args.get("modifiers"):
         return False
+    if any(key in args for key in ("coordinate", "from_coordinate", "to_coordinate")):
+        return False  # a spot on screen has no label to check, so it could be any button
     action = str(args.get("action") or "").strip().lower()
     if action == "key":
         return str(args.get("keys") or "").strip().lower().replace(" ", "") in SAFE_KEYS
@@ -433,19 +435,19 @@ def _script(args: Dict[str, Any], verdict: Verdict) -> str:
     segment = parsed.segments[0]
     if segment.redirects or segment.heredocs or not segment.words or segment.words[0].assignment():
         return ""
-    words = []
+    argv = []
     for word in segment.words:
         text, exact = word.text({})
         if not exact:
             return ""
-        words.append((text, word))
-    first = words[0][0]
+        argv.append((text, word))
+    first = argv[0][0]
     if INTERPRETERS.fullmatch(first.rsplit("/", 1)[-1]):
-        if len(words) < 2 or words[1][0].startswith("-"):
+        if len(argv) < 2 or argv[1][0].startswith("-"):
             return ""
-        shown, word = words[1]
+        shown, word = argv[1]
     elif "/" in first:
-        shown, word = words[0]
+        shown, word = argv[0]
     else:
         return ""
     if "://" in shown or verdict.title not in (f"Run the script {shown}", f"Run {shown}"):
@@ -456,8 +458,7 @@ def _script(args: Dict[str, Any], verdict: Verdict) -> str:
         path = os.path.join(os.environ.get("HOME", ""), path[2:])
     if not os.path.isabs(path):
         workdir = str(args.get("workdir") or args.get("cwd") or "")
-        workdir = os.path.expanduser(workdir) if workdir.startswith("~/") else workdir
-        if not os.path.isabs(workdir):
+        if not os.path.isabs(workdir):  # the terminal's own folder isn't known here, and ~ may not be expanded
             return ""
         path = os.path.join(workdir, path)
     real = os.path.realpath(path)
